@@ -10,7 +10,11 @@ import com.hvkeyn.ceditneuro.agent.ChatMessage
 import com.hvkeyn.ceditneuro.agent.buildSystemPrompt
 import com.hvkeyn.ceditneuro.agent.deepseek.DeepSeekBackend
 import com.hvkeyn.ceditneuro.data.AgentSettings
+import com.hvkeyn.ceditneuro.data.ProjectLibrary
 import com.hvkeyn.ceditneuro.data.SettingsStore
+import com.hvkeyn.ceditneuro.data.StoredChat
+import com.hvkeyn.ceditneuro.data.StoredSession
+import com.hvkeyn.ceditneuro.data.StoredShell
 import com.hvkeyn.ceditneuro.shell.DeviceShell
 import com.hvkeyn.ceditneuro.tools.EditFileTool
 import com.hvkeyn.ceditneuro.tools.GitDiffTool
@@ -27,6 +31,7 @@ import com.hvkeyn.ceditneuro.workspace.FileEntry
 import com.hvkeyn.ceditneuro.workspace.Workspace
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -58,6 +63,7 @@ data class ShellLine(
 
 data class WorkspaceUiState(
     val projectRoot: String? = null,
+    val recentProjects: List<String> = emptyList(),
     val rootEntries: List<FileEntry> = emptyList(),
     val dirContents: Map<String, List<FileEntry>> = emptyMap(),
     val expandedDirs: Set<String> = emptySet(),
@@ -89,6 +95,7 @@ class WorkspaceViewModel(
 
     private var workspace: Workspace? = null
     private val deviceShell = DeviceShell(appContext)
+    private val library = ProjectLibrary(appContext)
 
     /** Live editor text per open file, including unsaved changes. */
     private val buffers = mutableMapOf<String, String>()
@@ -97,25 +104,107 @@ class WorkspaceViewModel(
     private val conversation = mutableListOf<ChatMessage>()
 
     private var agentJob: Job? = null
+    private var persistJob: Job? = null
     private val idGenerator = AtomicLong(0)
+    private val treeRefresh = AtomicLong(0)
+    private val sessionEpoch = AtomicLong(0)
+
+    /**
+     * Opens the last folder after process death, once storage access is granted.
+     * Missing folders are dropped from the list. Chat and shell stay with their project.
+     */
+    fun restoreLastProject(storageGranted: Boolean) {
+        if (!storageGranted) return
+        if (workspace != null) {
+            _state.update { it.copy(recentProjects = library.roots()) }
+            return
+        }
+        val live = library.roots().filter { path -> File(path).isDirectory }
+        library.replaceRoots(live)
+        _state.update { it.copy(recentProjects = live) }
+        live.firstOrNull()?.let { openProject(File(it)) }
+    }
 
     fun openProject(root: File) {
-        val opened = runCatching { Workspace(root) }.getOrElse { error ->
+        val canonical = runCatching { root.canonicalFile }.getOrElse { error ->
             showMessage("Cannot open project: ${error.message}")
             return
         }
+        if (!canonical.isDirectory) {
+            library.forget(canonical.path)
+            _state.update { it.copy(recentProjects = library.roots()) }
+            showMessage("Folder is gone: ${canonical.path}")
+            return
+        }
+        if (workspace?.root?.canonicalPath == canonical.path) {
+            library.save(canonical.path, snapshotSession())
+            _state.update { it.copy(projectRoot = canonical.path, recentProjects = library.roots()) }
+            refreshProjectTree()
+            return
+        }
+
+        sessionEpoch.incrementAndGet()
+        agentJob?.cancel()
+        agentJob = null
+        persistJob?.cancel()
+        persistNow()
+
+        val opened = runCatching { Workspace(canonical) }.getOrElse { error ->
+            showMessage("Cannot open project: ${error.message}")
+            return
+        }
+        val session = library.load(canonical.path)
         workspace = opened
         buffers.clear()
         conversation.clear()
-        idGenerator.set(0)
+        conversation += session.conversation
+        idGenerator.set(session.nextId)
+        library.save(canonical.path, session)
 
         _state.value = WorkspaceUiState(
-            projectRoot = opened.root.absolutePath,
+            projectRoot = canonical.path,
+            recentProjects = library.roots(),
             rootEntries = opened.children(),
+            chat = session.chat.map { entry ->
+                ChatEntry(
+                    id = entry.id,
+                    role = runCatching { ChatRole.valueOf(entry.role) }.getOrDefault(ChatRole.Assistant),
+                    text = entry.text,
+                    toolName = entry.toolName,
+                )
+            },
+            shellLines = session.shell.map { line ->
+                ShellLine(id = line.id, command = line.command, output = line.output)
+            },
             chatVisible = _state.value.chatVisible,
             shellVisible = _state.value.shellVisible,
-            shellLines = _state.value.shellLines,
         )
+    }
+
+    fun forgetProject(path: String) {
+        val canonical = runCatching { File(path).canonicalPath }.getOrDefault(path)
+        val leavingCurrent = workspace?.root?.canonicalPath == canonical
+        if (leavingCurrent) {
+            sessionEpoch.incrementAndGet()
+            agentJob?.cancel()
+            agentJob = null
+            persistJob?.cancel()
+            workspace = null
+            buffers.clear()
+            conversation.clear()
+        }
+        library.forget(canonical)
+        val remaining = library.roots()
+        if (!leavingCurrent) {
+            _state.update { it.copy(recentProjects = remaining) }
+            return
+        }
+        _state.value = WorkspaceUiState(
+            recentProjects = remaining,
+            chatVisible = _state.value.chatVisible,
+            shellVisible = _state.value.shellVisible,
+        )
+        remaining.firstOrNull()?.let { openProject(File(it)) }
     }
 
     fun toggleDirectory(path: String) {
@@ -219,6 +308,7 @@ class WorkspaceViewModel(
         }
         val trimmed = command.trim()
         if (trimmed.isEmpty() || _state.value.shellRunning) return
+        val epoch = sessionEpoch.get()
         val id = nextId()
         _state.update {
             it.copy(
@@ -227,12 +317,17 @@ class WorkspaceViewModel(
                 shellLines = it.shellLines + ShellLine(id, trimmed, "", running = true),
             )
         }
+        schedulePersist()
         viewModelScope.launch {
             val rendered = runCatching {
                 withContext(Dispatchers.IO) {
                     deviceShell.run(trimmed, root, timeoutSeconds = 120).render()
                 }
             }.getOrElse { error -> "exit=1\n${error.message}" }
+            if (sessionEpoch.get() != epoch) {
+                rememberFinishedCommand(root.canonicalPath, trimmed, rendered, id)
+                return@launch
+            }
             _state.update { current ->
                 current.copy(
                     shellRunning = false,
@@ -241,6 +336,8 @@ class WorkspaceViewModel(
                     },
                 )
             }
+            refreshProjectTree()
+            persistNow()
         }
     }
 
@@ -262,6 +359,7 @@ class WorkspaceViewModel(
         appendChat(ChatRole.User, prompt)
         val history = conversation.toList()
         conversation += ChatMessage.user(prompt)
+        val epoch = sessionEpoch.get()
 
         val loop = buildAgentLoop(ws)
         val finalText = StringBuilder()
@@ -270,16 +368,22 @@ class WorkspaceViewModel(
             _state.update { it.copy(agentRunning = true, chatVisible = true, shellVisible = false, message = null) }
 
             runCatching {
-                loop.run(history, prompt).collect { event -> handleEvent(event, finalText) }
+                loop.run(history, prompt).collect { event ->
+                    if (sessionEpoch.get() == epoch) handleEvent(event, finalText)
+                }
             }.onFailure { error ->
                 if (error is kotlinx.coroutines.CancellationException) throw error
-                appendChat(ChatRole.Error, error.message ?: error.toString())
+                if (sessionEpoch.get() == epoch) {
+                    appendChat(ChatRole.Error, error.message ?: error.toString())
+                }
             }
 
+            if (sessionEpoch.get() != epoch) return@launch
             if (finalText.isNotBlank()) {
                 conversation += ChatMessage.assistant(finalText.toString())
             }
             _state.update { it.copy(agentRunning = false) }
+            persistNow()
         }
     }
 
@@ -322,6 +426,7 @@ class WorkspaceViewModel(
             val sealed = current.chat.map { if (it.streaming) it.copy(streaming = false) else it }
             current.copy(chat = sealed + ChatEntry(nextId(), role, text, toolName))
         }
+        schedulePersist()
     }
 
     private fun appendStreaming(role: ChatRole, delta: String) {
@@ -336,18 +441,22 @@ class WorkspaceViewModel(
                 current.copy(chat = sealed + ChatEntry(nextId(), role, delta, streaming = true))
             }
         }
+        schedulePersist()
     }
 
-    /** Called from file tools after the agent edits a file. */
+    /** Called from file tools after the agent creates or edits a file. */
     private fun onAgentEditedFile(path: String) {
+        refreshOpenFile(path)
+        refreshProjectTree(path)
+    }
+
+    private fun refreshOpenFile(path: String) {
         val ws = workspace ?: return
         if (_state.value.openFiles.none { it.path == path }) return
-
         if (path in _state.value.dirtyPaths) {
             showMessage("The agent changed $path, but you have unsaved edits. Save or revert, then reopen it.")
             return
         }
-
         val fresh = runCatching { ws.read(path) }.getOrNull() ?: return
         buffers[path] = fresh
         _state.update { current ->
@@ -360,9 +469,50 @@ class WorkspaceViewModel(
         }
     }
 
+    /**
+     * Reloads the visible tree from disk. [revealPath] expands every parent directory
+     * so a file the agent just created shows up without reopening the project.
+     */
+    private fun refreshProjectTree(revealPath: String? = null) {
+        val ws = workspace ?: return
+        val generation = treeRefresh.incrementAndGet()
+        val parents = ancestorDirs(revealPath)
+        viewModelScope.launch(Dispatchers.IO) {
+            val expandedNow = _state.value.expandedDirs + parents
+            val rootEntries = runCatching { ws.children() }.getOrDefault(emptyList())
+            val contents = expandedNow.associateWith { dir ->
+                runCatching { ws.children(dir) }.getOrDefault(emptyList())
+            }
+            if (generation != treeRefresh.get()) return@launch
+            _state.update { current ->
+                if (generation != treeRefresh.get()) {
+                    current
+                } else {
+                    current.copy(
+                        rootEntries = rootEntries,
+                        expandedDirs = current.expandedDirs + parents,
+                        dirContents = current.dirContents + contents,
+                    )
+                }
+            }
+        }
+    }
+
+    private fun ancestorDirs(relativePath: String?): Set<String> {
+        val parent = relativePath
+            ?.replace('\\', '/')
+            ?.trim('/')
+            ?.substringBeforeLast('/', "")
+            .orEmpty()
+        if (parent.isEmpty()) return emptySet()
+        val parts = parent.split('/')
+        return parts.indices.map { index -> parts.take(index + 1).joinToString("/") }.toSet()
+    }
+
     private fun buildAgentLoop(ws: Workspace): AgentLoop {
+        val epochAtBuild = sessionEpoch.get()
         val changeListener: (String, String, String) -> Unit = { path, _, _ ->
-            onAgentEditedFile(path)
+            if (sessionEpoch.get() == epochAtBuild) onAgentEditedFile(path)
         }
 
         val tools = mutableListOf<Tool>(
@@ -375,7 +525,12 @@ class WorkspaceViewModel(
             GitStatusTool(ws),
             GitDiffTool(ws),
             ShellTool(deviceShell, ws.root) { command, rendered ->
+                if (sessionEpoch.get() != epochAtBuild) {
+                    rememberFinishedCommand(ws.root.canonicalPath, command, rendered)
+                    return@ShellTool
+                }
                 appendShellLine(command, rendered)
+                refreshProjectTree()
             },
         )
 
@@ -392,6 +547,56 @@ class WorkspaceViewModel(
                 shellLines = it.shellLines + ShellLine(nextId(), command, rendered),
             )
         }
+        schedulePersist()
+    }
+
+    private fun rememberFinishedCommand(
+        rootPath: String,
+        command: String,
+        rendered: String,
+        id: Long? = null,
+    ) {
+        val existing = library.load(rootPath)
+        val lineId = id ?: (existing.nextId + 1)
+        library.updateSession(
+            rootPath,
+            existing.copy(
+                shell = (existing.shell + StoredShell(lineId, command, rendered)).takeLast(MAX_STORED_SHELL),
+                nextId = maxOf(existing.nextId, lineId),
+            ),
+        )
+    }
+
+    private fun snapshotSession(): StoredSession {
+        val current = _state.value
+        return StoredSession(
+            chat = current.chat.takeLast(MAX_STORED_CHAT).map { entry ->
+                StoredChat(
+                    id = entry.id,
+                    role = entry.role.name,
+                    text = entry.text,
+                    toolName = entry.toolName,
+                )
+            },
+            conversation = conversation.takeLast(MAX_STORED_CONVERSATION).toList(),
+            shell = current.shellLines.filterNot { it.running }.takeLast(MAX_STORED_SHELL).map { line ->
+                StoredShell(id = line.id, command = line.command, output = line.output)
+            },
+            nextId = idGenerator.get(),
+        )
+    }
+
+    private fun schedulePersist() {
+        persistJob?.cancel()
+        persistJob = viewModelScope.launch {
+            delay(400)
+            persistNow()
+        }
+    }
+
+    private fun persistNow() {
+        val root = workspace?.root?.canonicalPath ?: return
+        library.save(root, snapshotSession())
     }
 
     private fun nextId(): Long = idGenerator.incrementAndGet()
@@ -401,11 +606,17 @@ class WorkspaceViewModel(
     }
 
     override fun onCleared() {
+        persistJob?.cancel()
+        persistNow()
         agentJob?.cancel()
         super.onCleared()
     }
 
     companion object {
+        private const val MAX_STORED_CHAT = 400
+        private const val MAX_STORED_SHELL = 200
+        private const val MAX_STORED_CONVERSATION = 80
+
         fun factory(context: Context, settingsStore: SettingsStore): ViewModelProvider.Factory {
             val appContext = context.applicationContext
             return object : ViewModelProvider.Factory {

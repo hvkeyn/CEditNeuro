@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.hvkeyn.ceditneuro.ui.ShellLine
 import com.hvkeyn.ceditneuro.ui.WorkspaceUiState
@@ -44,6 +47,13 @@ fun ShellPanel(
 ) {
     var input by rememberSaveable { mutableStateOf("") }
     val listState = rememberLazyListState()
+    val submit = {
+        val command = input.trim()
+        if (command.isNotEmpty() && !state.shellRunning && state.projectRoot != null) {
+            input = ""
+            onRun(command)
+        }
+    }
 
     LaunchedEffect(state.shellLines.size, state.shellRunning) {
         if (state.shellLines.isNotEmpty()) {
@@ -107,15 +117,11 @@ fun ShellPanel(
                     modifier = Modifier.weight(1f),
                     placeholder = { Text("echo hello") },
                     maxLines = 4,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { submit() }),
                 )
                 Button(
-                    onClick = {
-                        val command = input.trim()
-                        if (command.isNotEmpty()) {
-                            input = ""
-                            onRun(command)
-                        }
-                    },
+                    onClick = submit,
                     enabled = input.isNotBlank() && !state.shellRunning && state.projectRoot != null,
                 ) {
                     Icon(
