@@ -37,6 +37,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -119,7 +120,7 @@ fun ChatPanel(
                     onValueChange = { input = it },
                     modifier = Modifier.weight(1f),
                     placeholder = { Text("Ask the agent to change something…") },
-                    maxLines = 5,
+                    maxLines = if (LocalConfiguration.current.screenHeightDp < 500) 2 else 5,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
                 )
                 if (state.agentRunning) {

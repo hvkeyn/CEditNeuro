@@ -13,7 +13,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,9 +26,13 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -70,6 +76,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.collectAsState
 import com.hvkeyn.ceditneuro.data.AgentSettings
@@ -154,8 +161,12 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets.safeDrawing.only(
+                    WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
+                ),
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                 ),
@@ -193,29 +204,46 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            val wide = maxWidth >= 720.dp
-            val showTree = if (wide) projectPanelOpen else projectPanelOpen || state.activePath == null
+            val compactHeight = maxHeight < 440.dp
+            val panes = adaptivePanes(
+                maxWidth = maxWidth,
+                maxHeight = maxHeight,
+                chatVisible = state.chatVisible,
+                shellVisible = state.shellVisible,
+            )
+            val showTree = if (panes.splitTree) {
+                projectPanelOpen
+            } else {
+                projectPanelOpen || state.activePath == null
+            }
 
             Box(modifier = Modifier.fillMaxSize()) {
-            Row(modifier = Modifier.fillMaxSize()) {
+            Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+            ) {
                 if (showTree) {
                     FileTreePane(
                         state = state,
+                        projectsMaxHeight = panes.projectsMaxHeight,
+                        compactHeight = compactHeight,
                         onToggleDir = viewModel::toggleDirectory,
                         onOpenFile = { path ->
                             viewModel.openFile(path)
-                            if (!wide) projectPanelOpen = false
+                            if (!panes.splitTree) projectPanelOpen = false
                         },
                         onOpenProject = { path -> viewModel.openProject(File(path)) },
                         onForgetProject = viewModel::forgetProject,
                         onChooseFolder = { folderPicker.launch(null) },
-                        modifier = if (wide) {
-                            Modifier.width(300.dp).fillMaxHeight()
+                        modifier = if (panes.splitTree) {
+                            Modifier.width(panes.treeWidth).fillMaxHeight()
                         } else {
                             Modifier.weight(1f).fillMaxHeight()
                         },
                     )
-                    if (wide) {
+                    if (panes.splitTree) {
                         Box(
                             modifier = Modifier
                                 .width(1.dp)
@@ -225,12 +253,12 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                     }
                 }
 
-                if (wide || !showTree) {
+                if (panes.splitTree || !showTree) {
                     EditorStage(
                         viewModel = viewModel,
                         state = state,
                         settings = settings,
-                        chatBesideEditor = wide && state.chatVisible,
+                        chatWidth = panes.chatWidth,
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight(),
@@ -238,7 +266,22 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                 }
             }
             AnimatedVisibility(
-                visible = state.chatVisible && !wide,
+                visible = state.shellVisible && panes.shellHeight != null,
+                enter = slideInVertically { height -> height },
+                exit = slideOutVertically { height -> height },
+            ) {
+                ShellPanel(
+                    state = state,
+                    onRun = viewModel::runShellCommand,
+                    onClose = viewModel::toggleShell,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(panes.shellHeight ?: 180.dp),
+                )
+            }
+            }
+            AnimatedVisibility(
+                visible = state.chatVisible && panes.chatWidth == null,
                 enter = slideInHorizontally { width -> width },
                 exit = slideOutHorizontally { width -> width },
                 modifier = Modifier.align(Alignment.CenterEnd),
@@ -247,11 +290,16 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                     viewModel = viewModel,
                     state = state,
                     settings = settings,
-                    modifier = Modifier.fillMaxHeight().fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .then(
+                            panes.overlayChatWidth?.let { Modifier.width(it) }
+                                ?: Modifier.fillMaxWidth(),
+                        ),
                 )
             }
             AnimatedVisibility(
-                visible = state.shellVisible,
+                visible = state.shellVisible && panes.shellHeight == null,
                 enter = slideInHorizontally { width -> width },
                 exit = slideOutHorizontally { width -> width },
                 modifier = Modifier.align(Alignment.CenterEnd),
@@ -260,7 +308,12 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                     state = state,
                     onRun = viewModel::runShellCommand,
                     onClose = viewModel::toggleShell,
-                    modifier = Modifier.fillMaxHeight().fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .then(
+                            panes.shellWidth?.let { Modifier.width(it) }
+                                ?: Modifier.fillMaxWidth(),
+                        ),
                 )
             }
             }
@@ -268,16 +321,77 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
     }
 }
 
+private data class AdaptivePanes(
+    val splitTree: Boolean,
+    val treeWidth: Dp,
+    val chatWidth: Dp?,
+    val overlayChatWidth: Dp?,
+    val shellWidth: Dp?,
+    val shellHeight: Dp?,
+    val projectsMaxHeight: Dp,
+)
+
+/**
+ * Splits the screen from the space that is actually available. A landscape phone is
+ * wide and short, so the shell docks to the bottom or the side instead of covering
+ * the editor. A portrait phone keeps full-screen chat and shell.
+ */
+private fun adaptivePanes(
+    maxWidth: Dp,
+    maxHeight: Dp,
+    chatVisible: Boolean,
+    shellVisible: Boolean,
+): AdaptivePanes {
+    val treeWidth = (maxWidth * 0.34f).coerceIn(200.dp, 320.dp)
+    val splitTree = maxWidth >= 600.dp && maxWidth - treeWidth >= 280.dp
+    val editorWidth = if (splitTree) maxWidth - treeWidth else maxWidth
+    val chatWidth = if (
+        chatVisible && !shellVisible && splitTree && editorWidth >= 560.dp
+    ) {
+        (editorWidth * 0.42f).coerceIn(240.dp, 420.dp)
+    } else {
+        null
+    }
+    val overlayChatWidth = when {
+        !chatVisible || shellVisible || chatWidth != null -> null
+        maxWidth >= 600.dp -> (maxWidth * 0.42f).coerceIn(260.dp, 440.dp)
+        else -> null
+    }
+    val shellHeight = when {
+        !shellVisible -> null
+        maxHeight >= 440.dp && maxWidth >= 600.dp -> (maxHeight * 0.40f).coerceIn(150.dp, 280.dp)
+        else -> null
+    }
+    val shellWidth = when {
+        !shellVisible || shellHeight != null -> null
+        maxWidth >= 600.dp -> (maxWidth * 0.46f).coerceIn(260.dp, 480.dp)
+        else -> null
+    }
+    return AdaptivePanes(
+        splitTree = splitTree,
+        treeWidth = treeWidth,
+        chatWidth = chatWidth,
+        overlayChatWidth = overlayChatWidth,
+        shellWidth = shellWidth,
+        shellHeight = shellHeight,
+        projectsMaxHeight = if (maxHeight < 440.dp) {
+            56.dp
+        } else {
+            (maxHeight * 0.28f).coerceIn(96.dp, 220.dp)
+        },
+    )
+}
+
 @Composable
 private fun EditorStage(
     viewModel: WorkspaceViewModel,
     state: WorkspaceUiState,
     settings: AgentSettings,
-    chatBesideEditor: Boolean,
+    chatWidth: Dp?,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier) {
-        if (chatBesideEditor) {
+        if (chatWidth != null) {
             Row(modifier = Modifier.fillMaxSize()) {
                 EditorSurface(
                     viewModel,
@@ -288,7 +402,7 @@ private fun EditorStage(
                     viewModel = viewModel,
                     state = state,
                     settings = settings,
-                    modifier = Modifier.fillMaxHeight().width(420.dp),
+                    modifier = Modifier.fillMaxHeight().width(chatWidth),
                 )
             }
         } else {
@@ -391,24 +505,35 @@ private fun FileTreePane(
     onOpenProject: (String) -> Unit,
     onForgetProject: (String) -> Unit,
     onChooseFolder: () -> Unit,
+    projectsMaxHeight: Dp,
+    compactHeight: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier
             .background(MaterialTheme.colorScheme.surface),
     ) {
-        Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)) {
+        Column(
+            modifier = Modifier.padding(
+                start = 16.dp,
+                end = 16.dp,
+                top = if (compactHeight) 8.dp else 16.dp,
+                bottom = if (compactHeight) 4.dp else 8.dp,
+            ),
+        ) {
             Text("Projects", style = MaterialTheme.typography.titleMedium)
-            Text(
-                text = "Chat and shell stay with each folder.",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (!compactHeight) {
+                Text(
+                    text = "Chat and shell stay with each folder.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 220.dp),
+                .heightIn(max = projectsMaxHeight),
         ) {
             if (state.recentProjects.isEmpty()) {
                 item {
@@ -431,7 +556,12 @@ private fun FileTreePane(
         }
         Button(
             onClick = onChooseFolder,
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
+            modifier = Modifier.padding(
+                start = 16.dp,
+                end = 16.dp,
+                top = if (compactHeight) 4.dp else 8.dp,
+                bottom = if (compactHeight) 8.dp else 12.dp,
+            ),
         ) {
             Text("Choose folder")
         }

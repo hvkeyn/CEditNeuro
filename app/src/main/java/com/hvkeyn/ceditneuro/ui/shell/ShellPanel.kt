@@ -32,6 +32,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -116,7 +117,7 @@ fun ShellPanel(
                     onValueChange = { input = it },
                     modifier = Modifier.weight(1f),
                     placeholder = { Text("echo hello") },
-                    maxLines = 4,
+                    maxLines = if (LocalConfiguration.current.screenHeightDp < 500) 2 else 4,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { submit() }),
                 )
