@@ -40,22 +40,19 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.Button
-import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -70,9 +67,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.collectAsState
+import com.hvkeyn.ceditneuro.data.AgentSettings
 import com.hvkeyn.ceditneuro.ui.chat.ChatPanel
 import com.hvkeyn.ceditneuro.ui.editor.EditorPane
 import com.hvkeyn.ceditneuro.ui.settings.SettingsDialog
+import com.hvkeyn.ceditneuro.ui.shell.ShellPanel
 import com.hvkeyn.ceditneuro.workspace.FileEntry
 import kotlinx.coroutines.launch
 import java.io.File
@@ -84,11 +83,11 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
     val settings by viewModel.settings.collectAsState()
     val context = LocalContext.current
 
-    val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var projectPanelOpen by rememberSaveable { mutableStateOf(true) }
     var hasStorageAccess by remember { mutableStateOf(hasStorageAccess(context)) }
 
     val legacyStorageLauncher = rememberLauncherForActivityResult(
@@ -144,95 +143,169 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
         )
     }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            ModalDrawerSheet(modifier = Modifier.width(320.dp)) {
-                FileTreePane(
-                    state = state,
-                    onToggleDir = viewModel::toggleDirectory,
-                    onOpenFile = { path ->
-                        viewModel.openFile(path)
-                        scope.launch { drawerState.close() }
-                    },
-                    onChooseFolder = { folderPicker.launch(null) },
-                )
-            }
-        },
-    ) {
-        Scaffold(
-            snackbarHost = { SnackbarHost(snackbarHostState) },
-            topBar = {
-                TopAppBar(
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                    ),
-                    navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(Icons.Default.Menu, contentDescription = "Files")
-                        }
-                    },
-                    title = {
-                        Text(
-                            text = state.projectName ?: "CEditNeuro",
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    },
-                    actions = {
-                        IconButton(onClick = viewModel::saveActiveFile) {
-                            Icon(Icons.Default.Save, contentDescription = "Save file")
-                        }
-                        IconButton(onClick = { showSettings = true }) {
-                            Icon(Icons.Default.Settings, contentDescription = "Settings")
-                        }
-                        IconButton(onClick = viewModel::toggleChat) {
-                            Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Toggle agent chat")
-                        }
-                    },
-                )
-            },
-        ) { innerPadding ->
-            BoxWithConstraints(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-            ) {
-                val sideBySide = maxWidth >= 720.dp
-
-                if (sideBySide && state.chatVisible) {
-                    Row(modifier = Modifier.fillMaxSize()) {
-                        EditorSurface(viewModel, state, modifier = Modifier.fillMaxHeight().weight(1f))
-                        ChatPanel(
-                            state = state,
-                            onSend = viewModel::sendPrompt,
-                            onCancel = viewModel::cancelAgent,
-                            onClose = viewModel::toggleChat,
-                            modifier = Modifier.fillMaxHeight().width(420.dp),
-                        )
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ),
+                navigationIcon = {
+                    IconButton(onClick = { projectPanelOpen = !projectPanelOpen }) {
+                        Icon(Icons.Default.Menu, contentDescription = "Project files")
                     }
-                } else {
-                    EditorSurface(viewModel, state, modifier = Modifier.fillMaxSize())
-                    AnimatedVisibility(
-                        visible = state.chatVisible,
-                        enter = slideInHorizontally { width -> width },
-                        exit = slideOutHorizontally { width -> width },
-                        modifier = Modifier.align(Alignment.CenterEnd),
-                    ) {
-                        ChatPanel(
-                            state = state,
-                            onSend = viewModel::sendPrompt,
-                            onCancel = viewModel::cancelAgent,
-                            onClose = viewModel::toggleChat,
+                },
+                title = {
+                    Text(
+                        text = state.projectName ?: "CEditNeuro",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
+                actions = {
+                    IconButton(onClick = viewModel::saveActiveFile) {
+                        Icon(Icons.Default.Save, contentDescription = "Save file")
+                    }
+                    IconButton(onClick = { showSettings = true }) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    }
+                    IconButton(onClick = viewModel::toggleShell) {
+                        Icon(Icons.Default.Terminal, contentDescription = "Toggle shell")
+                    }
+                    IconButton(onClick = viewModel::toggleChat) {
+                        Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Toggle agent chat")
+                    }
+                },
+            )
+        },
+    ) { innerPadding ->
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+        ) {
+            val wide = maxWidth >= 720.dp
+            val showTree = if (wide) projectPanelOpen else projectPanelOpen || state.activePath == null
+
+            Box(modifier = Modifier.fillMaxSize()) {
+            Row(modifier = Modifier.fillMaxSize()) {
+                if (showTree) {
+                    FileTreePane(
+                        state = state,
+                        onToggleDir = viewModel::toggleDirectory,
+                        onOpenFile = { path ->
+                            viewModel.openFile(path)
+                            if (!wide) projectPanelOpen = false
+                        },
+                        onChooseFolder = { folderPicker.launch(null) },
+                        modifier = if (wide) {
+                            Modifier.width(300.dp).fillMaxHeight()
+                        } else {
+                            Modifier.weight(1f).fillMaxHeight()
+                        },
+                    )
+                    if (wide) {
+                        Box(
                             modifier = Modifier
+                                .width(1.dp)
                                 .fillMaxHeight()
-                                .fillMaxWidth(),
+                                .background(MaterialTheme.colorScheme.outline),
                         )
                     }
                 }
+
+                if (wide || !showTree) {
+                    EditorStage(
+                        viewModel = viewModel,
+                        state = state,
+                        settings = settings,
+                        chatBesideEditor = wide && state.chatVisible,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                    )
+                }
+            }
+            AnimatedVisibility(
+                visible = state.shellVisible,
+                enter = slideInHorizontally { width -> width },
+                exit = slideOutHorizontally { width -> width },
+                modifier = Modifier.align(Alignment.CenterEnd),
+            ) {
+                ShellPanel(
+                    state = state,
+                    onRun = viewModel::runShellCommand,
+                    onClose = viewModel::toggleShell,
+                    modifier = Modifier.fillMaxHeight().fillMaxWidth(),
+                )
+            }
             }
         }
     }
+}
+
+@Composable
+private fun EditorStage(
+    viewModel: WorkspaceViewModel,
+    state: WorkspaceUiState,
+    settings: AgentSettings,
+    chatBesideEditor: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier) {
+        if (chatBesideEditor) {
+            Row(modifier = Modifier.fillMaxSize()) {
+                EditorSurface(
+                    viewModel,
+                    state,
+                    modifier = Modifier.fillMaxHeight().weight(1f),
+                )
+                AgentChat(
+                    viewModel = viewModel,
+                    state = state,
+                    settings = settings,
+                    modifier = Modifier.fillMaxHeight().width(420.dp),
+                )
+            }
+        } else {
+            EditorSurface(viewModel, state, modifier = Modifier.fillMaxSize())
+            AnimatedVisibility(
+                visible = state.chatVisible,
+                enter = slideInHorizontally { width -> width },
+                exit = slideOutHorizontally { width -> width },
+                modifier = Modifier.align(Alignment.CenterEnd),
+            ) {
+                AgentChat(
+                    viewModel = viewModel,
+                    state = state,
+                    settings = settings,
+                    modifier = Modifier.fillMaxHeight().fillMaxWidth(),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AgentChat(
+    viewModel: WorkspaceViewModel,
+    state: WorkspaceUiState,
+    settings: AgentSettings,
+    modifier: Modifier = Modifier,
+) {
+    ChatPanel(
+        state = state,
+        settings = settings,
+        onSend = viewModel::sendPrompt,
+        onCancel = viewModel::cancelAgent,
+        onClose = viewModel::toggleChat,
+        onSelectModel = { providerId, modelName ->
+            viewModel.updateSettings {
+                it.copy(activeProviderId = providerId, activeModel = modelName)
+            }
+        },
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -257,8 +330,12 @@ private fun FileTreePane(
     onToggleDir: (String) -> Unit,
     onOpenFile: (String) -> Unit,
     onChooseFolder: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = modifier
+            .background(MaterialTheme.colorScheme.surface),
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Project", style = MaterialTheme.typography.titleMedium)
             Text(
@@ -279,9 +356,21 @@ private fun FileTreePane(
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
             contentPadding = PaddingValues(vertical = 8.dp),
         ) {
+            if (state.projectRoot != null && state.rootEntries.isEmpty()) {
+                item {
+                    Text(
+                        text = "This folder is empty.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+            }
             fileTree(
                 entries = state.rootEntries,
                 depth = 0,
@@ -399,8 +488,8 @@ private fun StorageAccessGate(
         ) {
             Text("Storage access required", style = MaterialTheme.typography.titleMedium)
             Text(
-                text = "CEditNeuro edits project folders on shared storage, and Termux needs to " +
-                    "see the same files. Grant all-files access to continue.",
+                text = "CEditNeuro edits project folders on shared storage, so it needs " +
+                    "all-files access. The built-in shell uses the same folders.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -420,7 +509,7 @@ private fun hasStorageAccess(context: Context): Boolean =
 
 /**
  * Converts a SAF tree URI into a real path. Only the primary volume and removable volumes are
- * resolvable this way; cloud providers are rejected so that Termux sees the same files.
+ * resolvable this way; cloud providers are rejected so the editor and the shell see the same files.
  */
 private fun treeUriToFolder(uri: Uri): File? {
     val documentId = runCatching { DocumentsContract.getTreeDocumentId(uri) }.getOrNull() ?: return null

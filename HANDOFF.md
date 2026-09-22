@@ -35,7 +35,7 @@ graph TD
     AG --> TR[ToolRegistry]
     TR --> FTools[FileTools<br/>read/write/edit/grep/glob]
     TR --> GTools[GitTools<br/>JGit]
-    TR --> STools[ShellTool<br/>Termux, опционально]
+    TR --> STools[ShellTool<br/>встроенный shell]
     FTools --> WS[Workspace<br/>контроль путей]
     GTools --> WS
     BE --> DS[DeepSeek API]
@@ -95,7 +95,7 @@ sequenceDiagram
 | `glob` | поиск путей по шаблону |
 | `git_status` | ветка и состояние рабочего дерева |
 | `git_diff` | unified diff (рабочее дерево или индекс) |
-| `run_command` | shell через Termux — регистрируется только если Termux есть |
+| `run_command` | встроенный shell (mksh/toybox), регистрируется всегда |
 
 `edit_file` отказывается работать, если `old_string` встречается больше одного раза и не передан
 `replace_all`: молчаливая правка не в том месте дороже, чем повторный запрос модели.
@@ -114,7 +114,7 @@ sequenceDiagram
 | Стриминг DeepSeek (SSE, reasoning, tool calls) | готово |
 | Инструменты: файлы | готово |
 | Инструменты: git (JGit) | готово |
-| Shell через Termux | готово, опционально |
+| Встроенный shell (mksh/toybox) | готово |
 | Выдвижная панель чата | готово |
 | Настройки (ключ, модель, base URL) | готово |
 | Подсветка синтаксиса (TextMate) | **нет** — упёрлись в тулчейн, см. §8 |
@@ -147,7 +147,8 @@ CEditNeuro/
       Tool.kt, ToolRegistry.kt    контракт инструмента
       FileTools.kt                read/write/edit/list/grep/glob
       GitTools.kt                 status/diff через JGit
-      ShellTool.kt                Termux RUN_COMMAND
+      ShellTool.kt                run_command через DeviceShell
+    shell/DeviceShell.kt          /system/bin/sh внутри процесса приложения
       TextDiff.kt                 LCS-дифф (пока только в ответах инструментов)
       JsonSupport.kt              доступ к аргументам, JSON Schema
     ui/
@@ -194,24 +195,20 @@ echo "sdk.dir=/путь/до/Android/Sdk" > local.properties
 **Первый запуск:**
 
 1. Приложение попросит доступ ко всем файлам. Он обязателен: редактор работает с проектами на
-   внешнем хранилище, и Termux должен видеть те же пути. Именно поэтому это сайдлоад, а не
-   Play Store.
+   внешнем хранилище. Именно поэтому это сайдлоад, а не Play Store.
 2. «Choose folder» → указать папку проекта.
 3. Настройки → вставить API-ключ DeepSeek. Base URL и модель по умолчанию:
    `https://api.deepseek.com` и `deepseek-flash`.
 4. Иконка чата — выдвигает панель агента.
 
-### Настройка Termux (нужна для сборок и тестов)
+### Встроенный shell
 
-Android-песочница не даёт приложению тулчейна: нет компилятора, нет бинарника git, нет пакетного
-менеджера. Поэтому `run_command` делегирует команды в Termux.
+`run_command` и панель Shell запускают `/system/bin/sh` внутри этого приложения: mksh и toybox
+(`ls`, `mkdir`, `grep`, `find` и остальные апплеты системы). Отдельный Termux ставить не нужно.
 
-1. Установить Termux (лучше с F-Droid).
-2. В `~/.termux/termux.properties` добавить: `allow-external-apps=true`
-3. Перезапустить Termux, выполнить `termux-setup-storage`.
-
-Без Termux инструмент команд не регистрируется вообще, в шапке чата пишется «Termux not found —
-edits only», и агент ограничивается чтением и правкой файлов.
+Это не дистрибутив Termux. Его пакеты собраны под жёсткий префикс
+`/data/data/com.termux/files/usr` и не запускаются с нашим application id. `pkg`, `apt`,
+бинарный `git` и компиляторы в эту оболочку не входят. Статус и diff git идут через JGit.
 
 ---
 
@@ -231,9 +228,7 @@ edits only», и агент ограничивается чтением и пр�
   проверяет и `reasoning_content`, и `reasoning`).
 - JGit в рантайме на Android: собралось, но не исполнялось. Отсюда minSdk 26 и включённый
   core library desugaring.
-- `run_command` через Termux: формат интента и путь `/data/data/com.termux/files/usr/bin/sh` не
-  проверены на живом Termux.
-- Доступ к `/storage/emulated/0` для Termux при работе с папкой проекта.
+- Встроенный shell на устройстве: `echo` и `ls` в открытом проекте возвращают `exit=0`.
 
 **Известный блокер:**
 

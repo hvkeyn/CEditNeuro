@@ -11,6 +11,7 @@ import com.hvkeyn.ceditneuro.agent.buildSystemPrompt
 import com.hvkeyn.ceditneuro.agent.deepseek.DeepSeekBackend
 import com.hvkeyn.ceditneuro.data.AgentSettings
 import com.hvkeyn.ceditneuro.data.SettingsStore
+import com.hvkeyn.ceditneuro.shell.DeviceShell
 import com.hvkeyn.ceditneuro.tools.EditFileTool
 import com.hvkeyn.ceditneuro.tools.GitDiffTool
 import com.hvkeyn.ceditneuro.tools.GitStatusTool
@@ -24,12 +25,14 @@ import com.hvkeyn.ceditneuro.tools.ToolRegistry
 import com.hvkeyn.ceditneuro.tools.WriteFileTool
 import com.hvkeyn.ceditneuro.workspace.FileEntry
 import com.hvkeyn.ceditneuro.workspace.Workspace
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.atomic.AtomicLong
 
@@ -46,6 +49,13 @@ data class ChatEntry(
     val streaming: Boolean = false,
 )
 
+data class ShellLine(
+    val id: Long,
+    val command: String,
+    val output: String,
+    val running: Boolean = false,
+)
+
 data class WorkspaceUiState(
     val projectRoot: String? = null,
     val rootEntries: List<FileEntry> = emptyList(),
@@ -57,8 +67,10 @@ data class WorkspaceUiState(
     val reloadCounter: Long = 0L,
     val chat: List<ChatEntry> = emptyList(),
     val chatVisible: Boolean = false,
+    val shellVisible: Boolean = false,
+    val shellRunning: Boolean = false,
+    val shellLines: List<ShellLine> = emptyList(),
     val agentRunning: Boolean = false,
-    val termuxAvailable: Boolean = false,
     val message: String? = null,
 ) {
     val projectName: String?
@@ -76,6 +88,7 @@ class WorkspaceViewModel(
     val settings: StateFlow<AgentSettings> = settingsStore.settings
 
     private var workspace: Workspace? = null
+    private val deviceShell = DeviceShell(appContext)
 
     /** Live editor text per open file, including unsaved changes. */
     private val buffers = mutableMapOf<String, String>()
@@ -100,7 +113,8 @@ class WorkspaceViewModel(
             projectRoot = opened.root.absolutePath,
             rootEntries = opened.children(),
             chatVisible = _state.value.chatVisible,
-            termuxAvailable = isTermuxInstalled(),
+            shellVisible = _state.value.shellVisible,
+            shellLines = _state.value.shellLines,
         )
     }
 
@@ -191,7 +205,43 @@ class WorkspaceViewModel(
     }
 
     fun toggleChat() {
-        _state.update { it.copy(chatVisible = !it.chatVisible) }
+        _state.update { it.copy(chatVisible = !it.chatVisible, shellVisible = false) }
+    }
+
+    fun toggleShell() {
+        _state.update { it.copy(shellVisible = !it.shellVisible, chatVisible = false) }
+    }
+
+    fun runShellCommand(command: String) {
+        val root = workspace?.root ?: run {
+            showMessage("Open a project folder first.")
+            return
+        }
+        val trimmed = command.trim()
+        if (trimmed.isEmpty() || _state.value.shellRunning) return
+        val id = nextId()
+        _state.update {
+            it.copy(
+                shellVisible = true,
+                shellRunning = true,
+                shellLines = it.shellLines + ShellLine(id, trimmed, "", running = true),
+            )
+        }
+        viewModelScope.launch {
+            val rendered = runCatching {
+                withContext(Dispatchers.IO) {
+                    deviceShell.run(trimmed, root, timeoutSeconds = 120).render()
+                }
+            }.getOrElse { error -> "exit=1\n${error.message}" }
+            _state.update { current ->
+                current.copy(
+                    shellRunning = false,
+                    shellLines = current.shellLines.map { line ->
+                        if (line.id == id) line.copy(output = rendered, running = false) else line
+                    },
+                )
+            }
+        }
     }
 
     fun dismissMessage() {
@@ -217,7 +267,7 @@ class WorkspaceViewModel(
         val finalText = StringBuilder()
 
         agentJob = viewModelScope.launch {
-            _state.update { it.copy(agentRunning = true, chatVisible = true, message = null) }
+            _state.update { it.copy(agentRunning = true, chatVisible = true, shellVisible = false, message = null) }
 
             runCatching {
                 loop.run(history, prompt).collect { event -> handleEvent(event, finalText) }
@@ -324,10 +374,10 @@ class WorkspaceViewModel(
             GlobTool(ws),
             GitStatusTool(ws),
             GitDiffTool(ws),
+            ShellTool(deviceShell, ws.root) { command, rendered ->
+                appendShellLine(command, rendered)
+            },
         )
-        if (isTermuxInstalled()) {
-            tools += ShellTool(appContext, ws.root)
-        }
 
         return AgentLoop(
             backend = DeepSeekBackend { settingsStore.current },
@@ -336,10 +386,13 @@ class WorkspaceViewModel(
         )
     }
 
-    private fun isTermuxInstalled(): Boolean = runCatching {
-        appContext.packageManager.getPackageInfo("com.termux", 0)
-        true
-    }.getOrDefault(false)
+    private fun appendShellLine(command: String, rendered: String) {
+        _state.update {
+            it.copy(
+                shellLines = it.shellLines + ShellLine(nextId(), command, rendered),
+            )
+        }
+    }
 
     private fun nextId(): Long = idGenerator.incrementAndGet()
 

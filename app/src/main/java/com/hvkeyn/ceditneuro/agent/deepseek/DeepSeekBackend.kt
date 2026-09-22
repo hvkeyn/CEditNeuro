@@ -31,9 +31,9 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 /**
- * Talks to the DeepSeek chat completions endpoint, which is OpenAI-compatible. Streaming is
- * done with SSE; tool calls arrive as fragments spread across deltas and are reassembled by
- * [ToolCallAccumulator].
+ * OpenAI-compatible chat completions client. DeepSeek is the built-in host; any other
+ * provider saved in settings uses the same SSE stream. Tool-call fragments are reassembled
+ * by [ToolCallAccumulator].
  */
 class DeepSeekBackend(
     private val client: OkHttpClient = defaultClient(),
@@ -48,19 +48,23 @@ class DeepSeekBackend(
 
     override fun complete(messages: List<ChatMessage>, tools: List<Tool>): Flow<BackendChunk> = flow {
         val settings = settingsProvider()
+        val model = settings.model
         if (settings.apiKey.isBlank()) {
-            throw IOException("No DeepSeek API key configured. Add one in Settings.")
+            throw IOException("No API key for ${settings.provider.name}. Add one in Settings.")
         }
 
         val payload = buildJsonObject {
-            put("model", settings.model)
+            put("model", model.name)
             put("stream", true)
+            if (model.maxOutputTokens > 0) put("max_tokens", model.maxOutputTokens)
             put("messages", buildJsonArray {
                 messages.forEach { add(json.encodeToJsonElement(ChatMessage.serializer(), it)) }
             })
-            putJsonObject("thinking") { put("type", "enabled") }
-            put("reasoning_effort", settings.reasoningEffort)
-            if (tools.isNotEmpty()) {
+            if (model.supportsReasoning && settings.thinkingEnabled) {
+                putJsonObject("thinking") { put("type", "enabled") }
+                put("reasoning_effort", settings.reasoningEffort)
+            }
+            if (tools.isNotEmpty() && model.supportsTools) {
                 put("tools", buildJsonArray {
                     tools.forEach { tool ->
                         add(buildJsonObject {
@@ -77,7 +81,7 @@ class DeepSeekBackend(
         }
 
         val request = Request.Builder()
-            .url(settings.baseUrl.trimEnd('/') + CHAT_COMPLETIONS_PATH)
+            .url(chatCompletionsUrl(settings.baseUrl))
             .header("Authorization", "Bearer ${settings.apiKey}")
             .header("Content-Type", "application/json")
             .header("Accept", "text/event-stream")
@@ -87,11 +91,11 @@ class DeepSeekBackend(
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 val body = response.body?.string().orEmpty()
-                throw IOException("DeepSeek request failed: HTTP ${response.code} ${body.take(500)}")
+                throw IOException("${settings.provider.name} request failed: HTTP ${response.code} ${body.take(500)}")
             }
 
             val source = response.body?.source()
-                ?: throw IOException("DeepSeek returned an empty body.")
+                ?: throw IOException("${settings.provider.name} returned an empty body.")
 
             val accumulator = ToolCallAccumulator()
             var finishReason: String? = null
@@ -134,11 +138,15 @@ class DeepSeekBackend(
     }.flowOn(Dispatchers.IO)
 
     companion object {
-        private const val CHAT_COMPLETIONS_PATH = "/chat/completions"
         private const val SSE_DATA_PREFIX = "data:"
         private const val SSE_DONE = "[DONE]"
 
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+
+        fun chatCompletionsUrl(apiUrl: String): String {
+            val base = apiUrl.trim().trimEnd('/')
+            return if (base.endsWith("/chat/completions")) base else "$base/chat/completions"
+        }
 
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)

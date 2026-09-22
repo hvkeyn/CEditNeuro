@@ -2,59 +2,142 @@ package com.hvkeyn.ceditneuro.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.content.pm.ApplicationInfo
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import java.io.File
 
 data class AgentSettings(
-    val baseUrl: String = DEFAULT_BASE_URL,
-    val model: String = DEFAULT_MODEL,
-    val apiKey: String = "",
-    val reasoningEffort: String = "medium",
+    val providers: List<ModelProvider> = ModelCatalog.builtins(),
+    val activeProviderId: String = ModelCatalog.DEEPSEEK_ID,
+    val activeModel: String = ModelCatalog.FLASH_MODEL,
+    val reasoningEffort: String = "high",
+    val thinkingEnabled: Boolean = true,
     val autoApproveEdits: Boolean = false,
 ) {
+    val provider: ModelProvider
+        get() = providers.find { it.id == activeProviderId }
+            ?: providers.firstOrNull()
+            ?: ModelCatalog.deepSeek()
+
+    val model: CatalogModel
+        get() = provider.models.find { it.name == activeModel }
+            ?: provider.models.firstOrNull()
+            ?: CatalogModel(name = activeModel, displayName = activeModel)
+
+    val apiKey: String get() = provider.apiKey
+    val baseUrl: String get() = provider.apiUrl
+
+    fun modelLabel(): String = model.displayName.ifBlank { model.name }
+
+    /** Points the selection at a provider and model that still exist. */
+    fun normalized(): AgentSettings {
+        val selected = providers.find { it.id == activeProviderId } ?: providers.firstOrNull()
+            ?: return this
+        val modelName = selected.models.find { it.name == activeModel }?.name
+            ?: selected.models.firstOrNull()?.name
+            ?: activeModel
+        return copy(activeProviderId = selected.id, activeModel = modelName)
+    }
+
     companion object {
-        const val DEFAULT_BASE_URL = "https://api.deepseek.com"
-        const val DEFAULT_MODEL = "deepseek-flash"
         val REASONING_EFFORTS = listOf("low", "medium", "high")
     }
 }
 
 /**
- * Stores the DeepSeek credentials and agent preferences. The API key is kept in
- * [EncryptedSharedPreferences]; if the keystore is unavailable we fall back to plain
- * preferences rather than crashing on start-up.
+ * Provider list and API keys. Keys are stored in [EncryptedSharedPreferences] on the
+ * device. Nothing in this class reads a secret out of the project tree.
  */
 class SettingsStore(context: Context) {
 
     private val prefs: SharedPreferences = createPrefs(context)
+    private val json = Json {
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+        explicitNulls = false
+    }
 
-    private val _settings = MutableStateFlow(read())
+    private val _settings = MutableStateFlow(read(context))
     val settings: StateFlow<AgentSettings> = _settings.asStateFlow()
 
     val current: AgentSettings get() = _settings.value
 
     fun update(transform: (AgentSettings) -> AgentSettings) {
-        val next = transform(_settings.value)
-        prefs.edit()
-            .putString(KEY_BASE_URL, next.baseUrl)
-            .putString(KEY_MODEL, next.model)
-            .putString(KEY_API_KEY, next.apiKey)
-            .putString(KEY_REASONING, next.reasoningEffort)
-            .putBoolean(KEY_AUTO_APPROVE, next.autoApproveEdits)
-            .apply()
+        val next = transform(_settings.value).normalized()
+        persist(next)
         _settings.value = next
     }
 
-    private fun read(): AgentSettings = AgentSettings(
-        baseUrl = prefs.getString(KEY_BASE_URL, null) ?: AgentSettings.DEFAULT_BASE_URL,
-        model = prefs.getString(KEY_MODEL, null) ?: AgentSettings.DEFAULT_MODEL,
-        apiKey = prefs.getString(KEY_API_KEY, null).orEmpty(),
-        reasoningEffort = prefs.getString(KEY_REASONING, null) ?: "medium",
-        autoApproveEdits = prefs.getBoolean(KEY_AUTO_APPROVE, false),
-    )
+    private fun read(context: Context): AgentSettings {
+        val loaded = AgentSettings(
+            providers = loadProviders(),
+            activeProviderId = prefs.getString(KEY_ACTIVE_PROVIDER, null) ?: ModelCatalog.DEEPSEEK_ID,
+            activeModel = prefs.getString(KEY_ACTIVE_MODEL, null)
+                ?: prefs.getString(LEGACY_MODEL, null)
+                ?: ModelCatalog.FLASH_MODEL,
+            reasoningEffort = prefs.getString(KEY_REASONING, null) ?: "high",
+            thinkingEnabled = if (prefs.contains(KEY_THINKING)) prefs.getBoolean(KEY_THINKING, true) else true,
+            autoApproveEdits = prefs.getBoolean(KEY_AUTO_APPROVE, false),
+        ).normalized()
+        return importDebugSeed(context, loaded)
+    }
+
+    private fun loadProviders(): List<ModelProvider> {
+        val raw = prefs.getString(KEY_PROVIDERS, null)
+        if (!raw.isNullOrBlank()) {
+            val decoded = runCatching { json.decodeFromString<List<ModelProvider>>(raw) }.getOrNull()
+            if (decoded != null) return ModelCatalog.merge(decoded)
+        }
+        val legacyKey = prefs.getString(LEGACY_API_KEY, null).orEmpty()
+        val legacyUrl = migratedDeepSeekUrl(prefs.getString(LEGACY_BASE_URL, null))
+        return ModelCatalog.builtins().map { provider ->
+            if (provider.id == ModelCatalog.DEEPSEEK_ID) {
+                provider.copy(apiKey = legacyKey, apiUrl = legacyUrl)
+            } else {
+                provider
+            }
+        }
+    }
+
+    /**
+     * Debug-only one-shot import. A file dropped into the app's private files dir is
+     * read, stored in encrypted prefs, and deleted. Release builds ignore it.
+     */
+    private fun importDebugSeed(context: Context, settings: AgentSettings): AgentSettings {
+        val debuggable = context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+        if (!debuggable) return settings
+        val file = File(context.filesDir, SEED_FILE)
+        if (!file.isFile) return settings
+        val key = runCatching { file.readText() }.getOrDefault("").trim()
+        runCatching { file.delete() }
+        if (key.isEmpty()) return settings
+        val provider = settings.providers.find { it.id == ModelCatalog.DEEPSEEK_ID }
+        if (provider == null || provider.apiKey.isNotBlank()) return settings
+        val next = settings.copy(
+            providers = settings.providers.map { item ->
+                if (item.id == ModelCatalog.DEEPSEEK_ID) item.copy(apiKey = key) else item
+            },
+        )
+        persist(next)
+        return next
+    }
+
+    private fun persist(settings: AgentSettings) {
+        prefs.edit()
+            .putString(KEY_PROVIDERS, json.encodeToString(settings.providers))
+            .putString(KEY_ACTIVE_PROVIDER, settings.activeProviderId)
+            .putString(KEY_ACTIVE_MODEL, settings.activeModel)
+            .putString(KEY_REASONING, settings.reasoningEffort)
+            .putBoolean(KEY_THINKING, settings.thinkingEnabled)
+            .putBoolean(KEY_AUTO_APPROVE, settings.autoApproveEdits)
+            .apply()
+    }
 
     private fun createPrefs(context: Context): SharedPreferences = runCatching {
         val masterKey = MasterKey.Builder(context)
@@ -73,10 +156,24 @@ class SettingsStore(context: Context) {
 
     private companion object {
         const val FILE_NAME = "ceditneuro_settings"
-        const val KEY_BASE_URL = "base_url"
-        const val KEY_MODEL = "model"
-        const val KEY_API_KEY = "api_key"
+        const val SEED_FILE = "seed-api-key"
+        const val KEY_PROVIDERS = "providers"
+        const val KEY_ACTIVE_PROVIDER = "active_provider"
+        const val KEY_ACTIVE_MODEL = "active_model"
         const val KEY_REASONING = "reasoning_effort"
+        const val KEY_THINKING = "thinking_enabled"
         const val KEY_AUTO_APPROVE = "auto_approve_edits"
+        const val LEGACY_BASE_URL = "base_url"
+        const val LEGACY_MODEL = "model"
+        const val LEGACY_API_KEY = "api_key"
+
+        fun migratedDeepSeekUrl(stored: String?): String {
+            val url = stored?.trim()?.trimEnd('/').orEmpty()
+            return if (url.isEmpty() || url == "https://api.deepseek.com") {
+                ModelCatalog.DEEPSEEK_API_URL
+            } else {
+                url
+            }
+        }
     }
 }
