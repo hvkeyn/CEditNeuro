@@ -47,9 +47,11 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -62,6 +64,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -125,6 +128,25 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
         viewModel.restoreLastProject(hasStorageAccess)
     }
 
+    state.execPrompt?.let { reason ->
+        AlertDialog(
+            onDismissRequest = { viewModel.answerExecPrompt(false) },
+            title = { Text("Run installed programs") },
+            text = {
+                Text(
+                    "$reason Allow compilers and other programs to run inside this app. " +
+                        "This is not root. Files on shared storage are copied into the app before they start.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.answerExecPrompt(true) }) { Text("Allow") }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.answerExecPrompt(false) }) { Text("Don't allow") }
+            },
+        )
+    }
+
     LaunchedEffect(state.message) {
         val message = state.message
         if (message != null) {
@@ -155,7 +177,26 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
         SettingsDialog(
             settings = settings,
             onSettingsChange = viewModel::updateSettings,
+            onTestRemote = viewModel::testRemote,
             onDismiss = { showSettings = false },
+        )
+    }
+
+    state.hostPrompt?.let { prompt ->
+        AlertDialog(
+            onDismissRequest = { viewModel.answerHostPrompt(false) },
+            title = { Text("Trust this server") },
+            text = {
+                Text(
+                    "First secure connection to ${prompt.host}.\n\nFingerprint:\n${prompt.fingerprint}",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.answerHostPrompt(true) }) { Text("Trust") }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.answerHostPrompt(false) }) { Text("Don't trust") }
+            },
         )
     }
 
@@ -194,6 +235,12 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                     }
                     IconButton(onClick = viewModel::toggleChat) {
                         Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Toggle agent chat")
+                    }
+                    val siteUrl = settings.remotes.find { it.id == settings.activeRemoteId }?.webUrl.orEmpty()
+                    if (siteUrl.startsWith("http://") || siteUrl.startsWith("https://")) {
+                        IconButton(onClick = viewModel::toggleWeb) {
+                            Icon(Icons.Default.Public, contentDescription = "Open site")
+                        }
                     }
                 },
             )
@@ -314,6 +361,13 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                             panes.shellWidth?.let { Modifier.width(it) }
                                 ?: Modifier.fillMaxWidth(),
                         ),
+                )
+            }
+            if (state.webVisible && state.webUrl.isNotBlank()) {
+                WebPreview(
+                    url = state.webUrl,
+                    onClose = viewModel::toggleWeb,
+                    modifier = Modifier.fillMaxSize(),
                 )
             }
             }

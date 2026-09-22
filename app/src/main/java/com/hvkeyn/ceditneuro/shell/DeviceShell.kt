@@ -1,6 +1,7 @@
 package com.hvkeyn.ceditneuro.shell
 
 import android.content.Context
+import com.hvkeyn.ceditneuro.net.AgentNet
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -10,16 +11,26 @@ import java.util.concurrent.TimeUnit
  *
  * This is not the Termux distribution. Termux packages are built for the hardcoded
  * prefix `/data/data/com.termux/files/usr` and cannot be executed from another
- * application id. Compilers and `pkg` are therefore not part of this shell.
+ * application id. Programs installed for this app live in [toolchainBin].
  */
-class DeviceShell(context: Context) {
+class DeviceShell(
+    context: Context,
+    private val networkAllowed: () -> Boolean = { true },
+) {
 
     private val home: File = File(context.filesDir, "home").apply { mkdirs() }
     private val tmp: File = File(context.cacheDir, "shell").apply { mkdirs() }
+    val toolchain: File = File(context.filesDir, "toolchain").apply { mkdirs() }
+    val toolchainBin: File = File(toolchain, "bin").apply { mkdirs() }
+    private val toolchainLib: File = File(toolchain, "lib").apply { mkdirs() }
+    private val net = AgentNet()
 
     fun run(command: String, workDir: File, timeoutSeconds: Int): ShellOutput {
         val timeout = timeoutSeconds.coerceIn(5, 900)
         val directory = if (workDir.isDirectory) workDir else home
+        parseFetch(command)?.let { (url, dest) ->
+            return download(url, dest, directory)
+        }
 
         val process = ProcessBuilder(SHELL, "-c", command)
             .directory(directory)
@@ -29,7 +40,9 @@ class DeviceShell(context: Context) {
                     put("HOME", home.absolutePath)
                     put("TMPDIR", tmp.absolutePath)
                     put("TERM", "dumb")
-                    put("PATH", "/system/bin:/system/xbin")
+                    put("TOOLCHAIN", toolchain.absolutePath)
+                    put("PATH", "${toolchainBin.absolutePath}:/system/bin:/system/xbin")
+                    put("LD_LIBRARY_PATH", toolchainLib.absolutePath)
                 }
             }
             .start()
@@ -68,9 +81,47 @@ class DeviceShell(context: Context) {
         )
     }
 
+    /**
+     * `fetch` is handled in this process. A separate app_process downloader is
+     * killed on this Android version, and toybox has no curl.
+     */
+    private fun download(url: String, destArg: String, directory: File): ShellOutput {
+        if (!networkAllowed()) {
+            return ShellOutput(1, "Network is disabled in Settings.", timedOut = false)
+        }
+        val dest = if (File(destArg).isAbsolute) File(destArg) else File(directory, destArg)
+        dest.parentFile?.mkdirs()
+        val part = File(dest.parentFile, dest.name + ".part")
+        return runCatching {
+            net.download(url, part, AgentNet.MAX_DOWNLOAD_BYTES)
+            if (dest.exists() && !dest.delete()) {
+                part.delete()
+                return ShellOutput(1, "Could not replace ${dest.path}", timedOut = false)
+            }
+            if (!part.renameTo(dest)) {
+                part.copyTo(dest, overwrite = true)
+                part.delete()
+            }
+            ShellOutput(0, "saved ${dest.length()} bytes to ${dest.path}", timedOut = false)
+        }.getOrElse { error ->
+            part.delete()
+            ShellOutput(1, error.message ?: "Download failed.", timedOut = false)
+        }
+    }
+
     companion object {
         private const val SHELL = "/system/bin/sh"
         private const val MAX_OUTPUT_CHARS = 20_000
+
+        private fun parseFetch(command: String): Pair<String, String>? {
+            val trimmed = command.trim()
+            if (!trimmed.startsWith("fetch ") || trimmed.any { it == '\n' || it == ';' || it == '|' || it == '&' }) {
+                return null
+            }
+            val parts = trimmed.split(Regex("\\s+"))
+            if (parts.size != 3 || parts[0] != "fetch") return null
+            return parts[1] to parts[2]
+        }
     }
 }
 

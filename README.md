@@ -22,6 +22,8 @@ layer is wired end to end.
 | Tools: read / write / edit / list / grep / glob | done |
 | Tools: git status, git diff (JGit) | done |
 | Built-in shell (`run_command`, mksh/toybox) | done |
+| FTP, FTPS, and SFTP (`remote_list`, `remote_read`, `remote_write`, `remote_put`, `remote_get`) | done |
+| SSH command on the selected SFTP server (`ssh_exec`) and in-app site preview | done |
 | Collapsible chat panel | done |
 | Syntax highlighting (TextMate grammars) | **not yet** — blocked on record desugaring, see `docs/ARCHITECTURE.md` |
 | LSP, tree-sitter | not yet |

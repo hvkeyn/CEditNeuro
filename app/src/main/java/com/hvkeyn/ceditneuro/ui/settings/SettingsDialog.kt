@@ -33,11 +33,13 @@ import androidx.compose.ui.window.DialogProperties
 import com.hvkeyn.ceditneuro.data.AgentSettings
 import com.hvkeyn.ceditneuro.data.CatalogModel
 import com.hvkeyn.ceditneuro.data.ModelProvider
+import com.hvkeyn.ceditneuro.data.RemoteServer
 
 @Composable
 fun SettingsDialog(
     settings: AgentSettings,
     onSettingsChange: ((AgentSettings) -> AgentSettings) -> Unit,
+    onTestRemote: (RemoteServer) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var draft by remember(settings) { mutableStateOf(settings) }
@@ -137,6 +139,44 @@ fun SettingsDialog(
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
+                            Text("Agent network", style = MaterialTheme.typography.labelLarge)
+                            Text(
+                                text = "Let the agent download files and install modules.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(
+                            checked = draft.networkEnabled,
+                            onCheckedChange = { draft = draft.copy(networkEnabled = it) },
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Run installed programs", style = MaterialTheme.typography.labelLarge)
+                            Text(
+                                text = "Lets the agent install and start compilers inside this app. Asked once if left unset.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(
+                            checked = draft.execAllowed == true,
+                            onCheckedChange = { draft = draft.copy(execAllowed = it) },
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text("Auto-approve edits", style = MaterialTheme.typography.labelLarge)
                             Text(
                                 text = "Reserved for the diff review flow; edits already apply immediately.",
@@ -149,6 +189,12 @@ fun SettingsDialog(
                             onCheckedChange = { draft = draft.copy(autoApproveEdits = it) },
                         )
                     }
+
+                    RemoteSettingsSection(
+                        draft = draft,
+                        onDraft = { draft = it },
+                        onTest = onTestRemote,
+                    )
                 }
 
                 HorizontalDivider()
