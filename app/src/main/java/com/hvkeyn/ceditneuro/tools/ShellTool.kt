@@ -22,7 +22,7 @@ class ShellTool(
     override val description =
         "Run a shell command in the project root. Toybox commands (echo, ls, mkdir, rm, cp, mv, " +
             "grep, sed, find) run directly. A compiler or any other installed program runs by name " +
-            "from the toolchain after install_program, once the user has allowed it. " +
+            "from the toolchain after install_jdk or install_program, once the user has allowed it. " +
             "pkg and apt are not available. `fetch URL DEST` downloads a file when network is enabled. " +
             "timeout_seconds defaults to 120."
     override val parameters = objectSchema(

@@ -20,9 +20,11 @@ import com.hvkeyn.ceditneuro.net.AgentNet
 import com.hvkeyn.ceditneuro.net.RemoteClient
 import com.hvkeyn.ceditneuro.shell.DeviceShell
 import com.hvkeyn.ceditneuro.shell.ProgramRun
+import com.hvkeyn.ceditneuro.tools.BrowsePageTool
 import com.hvkeyn.ceditneuro.tools.EditFileTool
 import com.hvkeyn.ceditneuro.tools.HttpRequestTool
 import com.hvkeyn.ceditneuro.tools.InstallModuleTool
+import com.hvkeyn.ceditneuro.tools.InstallJdkTool
 import com.hvkeyn.ceditneuro.tools.InstallProgramTool
 import com.hvkeyn.ceditneuro.tools.GitDiffTool
 import com.hvkeyn.ceditneuro.tools.GitStatusTool
@@ -30,6 +32,7 @@ import com.hvkeyn.ceditneuro.tools.GlobTool
 import com.hvkeyn.ceditneuro.tools.GrepTool
 import com.hvkeyn.ceditneuro.tools.ListDirTool
 import com.hvkeyn.ceditneuro.tools.ReadFileTool
+import com.hvkeyn.ceditneuro.tools.RemoteConnectTool
 import com.hvkeyn.ceditneuro.tools.RemoteGetTool
 import com.hvkeyn.ceditneuro.tools.RemoteListTool
 import com.hvkeyn.ceditneuro.tools.RemotePutTool
@@ -45,6 +48,8 @@ import com.hvkeyn.ceditneuro.workspace.Workspace
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -100,6 +105,7 @@ data class WorkspaceUiState(
     val hostPrompt: HostTrustPrompt? = null,
     val webVisible: Boolean = false,
     val webUrl: String = "",
+    val webGeneration: Int = 0,
 ) {
     val projectName: String?
         get() = projectRoot?.let { File(it).name.ifBlank { it } }
@@ -122,6 +128,8 @@ class WorkspaceViewModel(
     private var execWaiter: CompletableDeferred<Boolean>? = null
     private val hostMutex = Mutex()
     private var hostWaiter: CompletableDeferred<Boolean>? = null
+    private var browseWaiter: CompletableDeferred<String>? = null
+    private var browseReportJob: Job? = null
     private val remoteClient = RemoteClient(::ensureHostTrusted)
     private val library = ProjectLibrary(appContext)
 
@@ -330,13 +338,73 @@ class WorkspaceViewModel(
     }
 
     fun toggleWeb() {
+        if (_state.value.webVisible) {
+            finishBrowse("The user closed the browser before the page finished.")
+            _state.update { it.copy(webVisible = false) }
+            return
+        }
         val url = activeRemote()?.webUrl.orEmpty()
         if (!url.startsWith("http://") && !url.startsWith("https://")) {
             showMessage("Set an http or https site URL on the selected server.")
             return
         }
         _state.update {
-            it.copy(webVisible = !it.webVisible, webUrl = url, chatVisible = false, shellVisible = false)
+            it.copy(
+                webVisible = true,
+                webUrl = url,
+                webGeneration = it.webGeneration + 1,
+                chatVisible = false,
+                shellVisible = false,
+            )
+        }
+    }
+
+    fun onBrowseLoaded(title: String, text: String) {
+        browseReportJob?.cancel()
+        browseReportJob = viewModelScope.launch {
+            delay(400)
+            val waiter = browseWaiter ?: return@launch
+            if (waiter.isCompleted) return@launch
+            val url = _state.value.webUrl
+            val body = text.trim().take(6000)
+            waiter.complete(
+                buildString {
+                    append("URL: ").append(url)
+                    if (title.isNotBlank()) append("\nTitle: ").append(title)
+                    append("\n\n")
+                    append(if (body.isBlank()) "The page loaded with no visible text." else body)
+                },
+            )
+        }
+    }
+
+    suspend fun browsePage(url: String): String {
+        val trimmed = url.trim()
+        if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
+            return "Only http and https pages can be opened in the browser."
+        }
+        finishBrowse("Superseded by a newer page.")
+        val waiter = CompletableDeferred<String>()
+        browseWaiter = waiter
+        _state.update {
+            it.copy(
+                webVisible = true,
+                webUrl = trimmed,
+                webGeneration = it.webGeneration + 1,
+                shellVisible = false,
+            )
+        }
+        return try {
+            withTimeout(25_000) { waiter.await() }
+        } catch (error: TimeoutCancellationException) {
+            "The browser did not finish loading $trimmed."
+        }
+    }
+
+    private fun finishBrowse(message: String) {
+        browseReportJob?.cancel()
+        browseWaiter?.let { waiter ->
+            if (!waiter.isCompleted) waiter.complete(message)
         }
     }
 
@@ -447,6 +515,34 @@ class WorkspaceViewModel(
     private fun activeRemote(): RemoteServer? =
         settingsStore.current.remotes.find { it.id == settingsStore.current.activeRemoteId }
 
+    fun adoptRemote(server: RemoteServer): RemoteServer {
+        val settings = settingsStore.current
+        val existing = settings.remotes.find {
+            it.protocol == server.protocol &&
+                it.host.equals(server.host, ignoreCase = true) &&
+                it.port == server.port &&
+                it.username == server.username
+        }
+        val saved = if (existing == null) {
+            server
+        } else {
+            server.copy(
+                id = existing.id,
+                name = existing.name.ifBlank { server.name },
+                trustedFingerprint = existing.trustedFingerprint,
+            )
+        }
+        settingsStore.update {
+            val remotes = if (existing == null) {
+                it.remotes + saved
+            } else {
+                it.remotes.map { current -> if (current.id == saved.id) saved else current }
+            }
+            it.copy(remotes = remotes, activeRemoteId = saved.id)
+        }
+        return saved
+    }
+
     fun answerExecPrompt(allow: Boolean) {
         settingsStore.update { it.copy(execAllowed = allow) }
         _state.update { it.copy(execPrompt = null) }
@@ -530,7 +626,7 @@ class WorkspaceViewModel(
 
             is AgentEvent.ToolStarted -> appendChat(
                 role = ChatRole.Tool,
-                text = event.arguments.ifBlank { "(no arguments)" },
+                text = visibleToolArguments(event.name, event.arguments),
                 toolName = "${event.name} →",
             )
 
@@ -544,6 +640,17 @@ class WorkspaceViewModel(
 
             is AgentEvent.Failed -> appendChat(ChatRole.Error, event.message)
         }
+    }
+
+    private fun visibleToolArguments(name: String, arguments: String): String {
+        val shown = if (name == "remote_connect") {
+            arguments
+                .replace(PASSWORD_FIELD, "\"password\":\"***\"")
+                .replace(URL_PASSWORD, "$1:***@")
+        } else {
+            arguments
+        }
+        return shown.ifBlank { "(no arguments)" }
     }
 
     private fun appendChat(role: ChatRole, text: String, toolName: String? = null) {
@@ -663,6 +770,12 @@ class WorkspaceViewModel(
             InstallModuleTool(ws, agentNet, { settingsStore.current.networkEnabled }) { path ->
                 if (sessionEpoch.get() == epochAtBuild) onAgentEditedFile(path)
             },
+            InstallJdkTool(
+                toolchain = deviceShell.toolchain,
+                net = agentNet,
+                networkAllowed = { settingsStore.current.networkEnabled },
+                ensureExec = this::ensureExecAllowed,
+            ),
             InstallProgramTool(
                 workspace = ws,
                 filesDir = appContext.filesDir,
@@ -671,6 +784,8 @@ class WorkspaceViewModel(
                 networkAllowed = { settingsStore.current.networkEnabled },
                 ensureExec = this::ensureExecAllowed,
             ),
+            RemoteConnectTool(remoteClient, this::adoptRemote) { settingsStore.current.networkEnabled },
+            BrowsePageTool({ settingsStore.current.networkEnabled }, this::browsePage),
             RemoteListTool(::activeRemote, remoteClient),
             RemoteReadTool(::activeRemote, remoteClient),
             RemoteWriteTool(::activeRemote, remoteClient),
@@ -683,11 +798,12 @@ class WorkspaceViewModel(
 
         val remote = activeRemote()
         val remoteSummary = if (remote == null) {
-            "No remote server is selected. Add an FTP or SFTP server in Settings before using remote tools."
+            "No remote is connected yet. When the user gives a host, login, and password, call remote_connect."
         } else {
-            "Active remote is ${remote.protocol}://${remote.username}@${remote.host}:${remote.port}, " +
+            "A remote is already connected: ${remote.protocol}://${remote.username}@${remote.host}:${remote.port}, " +
                 "start path ${remote.startPath}." +
-                remote.webUrl.takeIf { it.isNotBlank() }?.let { " Site URL: $it." }.orEmpty()
+                remote.webUrl.takeIf { it.isNotBlank() }?.let { " Site URL: $it." }.orEmpty() +
+                " Call remote_connect again if the user gives a different server."
         }
 
         return AgentLoop(
@@ -773,6 +889,8 @@ class WorkspaceViewModel(
     }
 
     companion object {
+        private val PASSWORD_FIELD = Regex(""""password"\s*:\s*"(?:\\.|[^"\\])*"""")
+        private val URL_PASSWORD = Regex("""((?:sftp|ftps|ftp|ssh)://[^:/\s"]+):([^@"\s]+)@""")
         private const val MAX_STORED_CHAT = 400
         private const val MAX_STORED_SHELL = 200
         private const val MAX_STORED_CONVERSATION = 80

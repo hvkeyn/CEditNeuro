@@ -23,11 +23,15 @@ class AgentNet {
         .callTimeout(120, TimeUnit.SECONDS)
         .build()
 
-    fun download(url: String, dest: File, maxBytes: Long) {
+    fun download(url: String, dest: File, maxBytes: Long, timeoutSeconds: Long = 120) {
         val httpUrl = parseUrl(url)
         dest.parentFile?.mkdirs()
         val request = Request.Builder().url(httpUrl).header("User-Agent", USER_AGENT).build()
-        client.newCall(request).execute().use { response ->
+        val caller = client.newBuilder()
+            .callTimeout(timeoutSeconds, TimeUnit.SECONDS)
+            .readTimeout(timeoutSeconds, TimeUnit.SECONDS)
+            .build()
+        caller.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 throw IOException("HTTP ${response.code} for $url")
             }

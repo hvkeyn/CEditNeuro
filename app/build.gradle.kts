@@ -92,6 +92,8 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.slf4j.nop)
     implementation(libs.commons.net)
+    implementation(libs.commons.compress)
+    implementation(libs.xz)
     implementation(libs.jsch)
 
     implementation(libs.sora.editor)

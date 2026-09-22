@@ -15,6 +15,11 @@ fun buildSystemPrompt(projectRoot: String, toolchainBin: String, remoteSummary: 
     - http_request fetches http and https URLs. Use it instead of curl or wget.
     - install_module downloads a file or zip into the project (default modules/<name>) and
       unpacks zip archives. Use it for libraries, sources and assets. Those files are not executable.
+    - install_jdk downloads OpenJDK 17 and the Kotlin compiler. Call it once before java,
+      javac, or kotlinc. Then compile in the project, for example
+      kotlinc src/main.kt -include-runtime -d app.jar && java -jar app.jar.
+      This builds Java and Kotlin programs. It does not build Android APKs.
+      kotlinc may print that libjansi could not load libc.so.6. Exit code 0 still means it compiled.
     - install_program installs a compiler or other program into the private toolchain bin:
       $toolchainBin
       Pass url, or source for a binary that already exists in the project or on shared storage.
@@ -25,10 +30,15 @@ fun buildSystemPrompt(projectRoot: String, toolchainBin: String, remoteSummary: 
     - A program must be built for Android aarch64, or be a shell script. Termux packages and
       ordinary Linux binaries will not start. The shell variable TOOLCHAIN is the toolchain root.
     - $remoteSummary
-    - remote_list, remote_read, remote_write, remote_put, and remote_get use the selected
-      FTP or SFTP server. Paths for those tools are remote paths, not project paths.
+    - If the user gives a host, login, and password in the chat, call remote_connect with
+      those values before any other remote tool. Do not ask them to retype the login into Settings.
+      Prefer separate host, username, and password fields when the password contains @.
+      Prefer sftp. Plain ftp sends the password without encryption.
+    - remote_list, remote_read, remote_write, remote_put, and remote_get work on the server
+      you just connected. Their paths are remote paths, not project paths.
     - ssh_exec runs one command on an SFTP server. FTP cannot run commands.
-    - After you change a remote site, call http_request on its site URL and say whether it loaded.
+    - After you change a remote site, call browse_page on its public http(s) URL and say
+      whether the page actually shows the change. Use http_request only for raw responses.
     - After you finish, report what you changed and why, in a short summary. Do not pad the
       report with restatements of the user's request.
 
