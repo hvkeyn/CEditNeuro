@@ -96,7 +96,7 @@ fun ShellPanel(
                     item {
                         Text(
                             text = "Commands run in the open project. This shell is part of the app. " +
-                                "It has toybox (ls, mkdir, grep, find) and fetch for downloads. Compilers run from the app toolchain after you allow it.",
+                                "It has toybox (ls, mkdir, grep, find) and fetch for downloads. java and kotlinc run from the app toolchain after you allow them.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

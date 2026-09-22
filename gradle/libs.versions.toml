@@ -15,6 +15,8 @@ documentfile = "1.0.1"
 securityCrypto = "1.1.0-alpha06"
 desugar = "2.1.3"
 commonsNet = "3.11.1"
+commonsCompress = "1.27.1"
+xz = "1.10"
 jsch = "0.2.21"
 
 [libraries]
@@ -48,6 +50,8 @@ jgit = { module = "org.eclipse.jgit:org.eclipse.jgit", version.ref = "jgit" }
 
 desugar-jdk-libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar" }
 commons-net = { module = "commons-net:commons-net", version.ref = "commonsNet" }
+commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commonsCompress" }
+xz = { module = "org.tukaani:xz", version.ref = "xz" }
 jsch = { module = "com.github.mwiede:jsch", version.ref = "jsch" }
 
 [plugins]

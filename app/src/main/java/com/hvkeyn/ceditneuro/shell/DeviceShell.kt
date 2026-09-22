@@ -9,9 +9,8 @@ import java.util.concurrent.TimeUnit
  * Our shell, inside this app. It runs `/system/bin/sh` (mksh + toybox) as the app
  * itself, so the user does not install a second terminal app.
  *
- * This is not the Termux distribution. Termux packages are built for the hardcoded
- * prefix `/data/data/com.termux/files/usr` and cannot be executed from another
- * application id. Programs installed for this app live in [toolchainBin].
+ * Programs installed for this app live in [toolchainBin]. install_jdk places an
+ * Android build of OpenJDK there and adds its libraries to LD_LIBRARY_PATH.
  */
 class DeviceShell(
     context: Context,
@@ -40,9 +39,18 @@ class DeviceShell(
                     put("HOME", home.absolutePath)
                     put("TMPDIR", tmp.absolutePath)
                     put("TERM", "dumb")
+                    val javaHome = File(toolchain, "lib/jvm/java-17-openjdk")
+                    val libraryPath = buildList {
+                        if (javaHome.isDirectory) {
+                            add(File(javaHome, "lib").absolutePath)
+                            add(File(javaHome, "lib/server").absolutePath)
+                        }
+                        add(toolchainLib.absolutePath)
+                    }.joinToString(":")
                     put("TOOLCHAIN", toolchain.absolutePath)
                     put("PATH", "${toolchainBin.absolutePath}:/system/bin:/system/xbin")
-                    put("LD_LIBRARY_PATH", toolchainLib.absolutePath)
+                    put("LD_LIBRARY_PATH", libraryPath)
+                    if (javaHome.isDirectory) put("JAVA_HOME", javaHome.absolutePath)
                 }
             }
             .start()
