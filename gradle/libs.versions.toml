@@ -14,6 +14,8 @@ jgit = "6.10.1.202505221210-r"
 documentfile = "1.0.1"
 securityCrypto = "1.1.0-alpha06"
 desugar = "2.1.3"
+commonsNet = "3.11.1"
+jsch = "0.2.21"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -45,6 +47,8 @@ sora-language-treesitter = { module = "io.github.Rosemoe.sora-editor:language-tr
 jgit = { module = "org.eclipse.jgit:org.eclipse.jgit", version.ref = "jgit" }
 
 desugar-jdk-libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar" }
+commons-net = { module = "commons-net:commons-net", version.ref = "commonsNet" }
+jsch = { module = "com.github.mwiede:jsch", version.ref = "jsch" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

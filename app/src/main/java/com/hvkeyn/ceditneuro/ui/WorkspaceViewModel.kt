@@ -10,28 +10,44 @@ import com.hvkeyn.ceditneuro.agent.ChatMessage
 import com.hvkeyn.ceditneuro.agent.buildSystemPrompt
 import com.hvkeyn.ceditneuro.agent.deepseek.DeepSeekBackend
 import com.hvkeyn.ceditneuro.data.AgentSettings
+import com.hvkeyn.ceditneuro.data.RemoteServer
 import com.hvkeyn.ceditneuro.data.ProjectLibrary
 import com.hvkeyn.ceditneuro.data.SettingsStore
 import com.hvkeyn.ceditneuro.data.StoredChat
 import com.hvkeyn.ceditneuro.data.StoredSession
 import com.hvkeyn.ceditneuro.data.StoredShell
+import com.hvkeyn.ceditneuro.net.AgentNet
+import com.hvkeyn.ceditneuro.net.RemoteClient
 import com.hvkeyn.ceditneuro.shell.DeviceShell
+import com.hvkeyn.ceditneuro.shell.ProgramRun
 import com.hvkeyn.ceditneuro.tools.EditFileTool
+import com.hvkeyn.ceditneuro.tools.HttpRequestTool
+import com.hvkeyn.ceditneuro.tools.InstallModuleTool
+import com.hvkeyn.ceditneuro.tools.InstallProgramTool
 import com.hvkeyn.ceditneuro.tools.GitDiffTool
 import com.hvkeyn.ceditneuro.tools.GitStatusTool
 import com.hvkeyn.ceditneuro.tools.GlobTool
 import com.hvkeyn.ceditneuro.tools.GrepTool
 import com.hvkeyn.ceditneuro.tools.ListDirTool
 import com.hvkeyn.ceditneuro.tools.ReadFileTool
+import com.hvkeyn.ceditneuro.tools.RemoteGetTool
+import com.hvkeyn.ceditneuro.tools.RemoteListTool
+import com.hvkeyn.ceditneuro.tools.RemotePutTool
+import com.hvkeyn.ceditneuro.tools.RemoteReadTool
+import com.hvkeyn.ceditneuro.tools.RemoteWriteTool
+import com.hvkeyn.ceditneuro.tools.SshExecTool
 import com.hvkeyn.ceditneuro.tools.ShellTool
 import com.hvkeyn.ceditneuro.tools.Tool
 import com.hvkeyn.ceditneuro.tools.ToolRegistry
 import com.hvkeyn.ceditneuro.tools.WriteFileTool
 import com.hvkeyn.ceditneuro.workspace.FileEntry
 import com.hvkeyn.ceditneuro.workspace.Workspace
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -61,6 +77,8 @@ data class ShellLine(
     val running: Boolean = false,
 )
 
+data class HostTrustPrompt(val serverId: String, val host: String, val fingerprint: String)
+
 data class WorkspaceUiState(
     val projectRoot: String? = null,
     val recentProjects: List<String> = emptyList(),
@@ -78,6 +96,10 @@ data class WorkspaceUiState(
     val shellLines: List<ShellLine> = emptyList(),
     val agentRunning: Boolean = false,
     val message: String? = null,
+    val execPrompt: String? = null,
+    val hostPrompt: HostTrustPrompt? = null,
+    val webVisible: Boolean = false,
+    val webUrl: String = "",
 ) {
     val projectName: String?
         get() = projectRoot?.let { File(it).name.ifBlank { it } }
@@ -94,7 +116,13 @@ class WorkspaceViewModel(
     val settings: StateFlow<AgentSettings> = settingsStore.settings
 
     private var workspace: Workspace? = null
-    private val deviceShell = DeviceShell(appContext)
+    private val deviceShell = DeviceShell(appContext) { settingsStore.current.networkEnabled }
+    private val agentNet = AgentNet()
+    private val execMutex = Mutex()
+    private var execWaiter: CompletableDeferred<Boolean>? = null
+    private val hostMutex = Mutex()
+    private var hostWaiter: CompletableDeferred<Boolean>? = null
+    private val remoteClient = RemoteClient(::ensureHostTrusted)
     private val library = ProjectLibrary(appContext)
 
     /** Live editor text per open file, including unsaved changes. */
@@ -294,11 +322,30 @@ class WorkspaceViewModel(
     }
 
     fun toggleChat() {
-        _state.update { it.copy(chatVisible = !it.chatVisible, shellVisible = false) }
+        _state.update { it.copy(chatVisible = !it.chatVisible, shellVisible = false, webVisible = false) }
     }
 
     fun toggleShell() {
-        _state.update { it.copy(shellVisible = !it.shellVisible, chatVisible = false) }
+        _state.update { it.copy(shellVisible = !it.shellVisible, chatVisible = false, webVisible = false) }
+    }
+
+    fun toggleWeb() {
+        val url = activeRemote()?.webUrl.orEmpty()
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            showMessage("Set an http or https site URL on the selected server.")
+            return
+        }
+        _state.update {
+            it.copy(webVisible = !it.webVisible, webUrl = url, chatVisible = false, shellVisible = false)
+        }
+    }
+
+    fun testRemote(server: RemoteServer) {
+        viewModelScope.launch {
+            val message = runCatching { remoteClient.probe(server) }
+                .fold({ it }, { error -> error.message ?: "Connection failed." })
+            showMessage(message)
+        }
     }
 
     fun runShellCommand(command: String) {
@@ -320,8 +367,15 @@ class WorkspaceViewModel(
         schedulePersist()
         viewModelScope.launch {
             val rendered = runCatching {
-                withContext(Dispatchers.IO) {
-                    deviceShell.run(trimmed, root, timeoutSeconds = 120).render()
+                if (ProgramRun.needsConsent(trimmed) && !ensureExecAllowed(
+                        "The command runs a program outside the system shell.",
+                    )
+                ) {
+                    "exit=1\nRunning installed programs is not allowed. Turn it on in Settings to run compilers."
+                } else {
+                    withContext(Dispatchers.IO) {
+                        deviceShell.run(trimmed, root, timeoutSeconds = 120).render()
+                    }
                 }
             }.getOrElse { error -> "exit=1\n${error.message}" }
             if (sessionEpoch.get() != epoch) {
@@ -346,7 +400,78 @@ class WorkspaceViewModel(
     }
 
     fun updateSettings(transform: (AgentSettings) -> AgentSettings) {
+        val before = settingsStore.current.execAllowed
         settingsStore.update(transform)
+        val after = settingsStore.current.execAllowed
+        if (before != after && after != null) {
+            _state.update { it.copy(execPrompt = null) }
+            execWaiter?.complete(after)
+        }
+    }
+
+    fun answerHostPrompt(allow: Boolean) {
+        val prompt = _state.value.hostPrompt
+        if (allow && prompt != null) {
+            settingsStore.update { settings ->
+                settings.copy(
+                    remotes = settings.remotes.map { server ->
+                        if (server.id == prompt.serverId) server.copy(trustedFingerprint = prompt.fingerprint) else server
+                    },
+                )
+            }
+        }
+        _state.update { it.copy(hostPrompt = null) }
+        hostWaiter?.complete(allow)
+    }
+
+    suspend fun ensureHostTrusted(serverId: String, host: String, fingerprint: String): Boolean {
+        val known = settingsStore.current.remotes.find { it.id == serverId }
+        if (known?.trustedFingerprint == fingerprint && fingerprint.isNotBlank()) return true
+        return hostMutex.withLock {
+            val again = settingsStore.current.remotes.find { it.id == serverId }
+            if (again?.trustedFingerprint == fingerprint && fingerprint.isNotBlank()) return@withLock true
+            val waiter = CompletableDeferred<Boolean>()
+            hostWaiter = waiter
+            _state.update { it.copy(hostPrompt = HostTrustPrompt(serverId, host, fingerprint)) }
+            try {
+                waiter.await()
+            } finally {
+                if (hostWaiter === waiter) {
+                    hostWaiter = null
+                    _state.update { it.copy(hostPrompt = null) }
+                }
+            }
+        }
+    }
+
+    private fun activeRemote(): RemoteServer? =
+        settingsStore.current.remotes.find { it.id == settingsStore.current.activeRemoteId }
+
+    fun answerExecPrompt(allow: Boolean) {
+        settingsStore.update { it.copy(execAllowed = allow) }
+        _state.update { it.copy(execPrompt = null) }
+        execWaiter?.complete(allow)
+    }
+
+    /**
+     * Shows the one-time allow dialog. A settings switch can answer it later without asking again.
+     */
+    suspend fun ensureExecAllowed(reason: String): Boolean {
+        settingsStore.current.execAllowed?.let { return it }
+        return execMutex.withLock {
+            settingsStore.current.execAllowed?.let { return@withLock it }
+            val waiter = CompletableDeferred<Boolean>()
+            execWaiter = waiter
+            _state.update { it.copy(execPrompt = reason) }
+            try {
+                waiter.await()
+            } finally {
+                if (execWaiter === waiter) {
+                    execWaiter = null
+                    _state.update { it.copy(execPrompt = null) }
+                }
+            }
+        }
     }
 
     fun sendPrompt(prompt: String) {
@@ -524,7 +649,7 @@ class WorkspaceViewModel(
             GlobTool(ws),
             GitStatusTool(ws),
             GitDiffTool(ws),
-            ShellTool(deviceShell, ws.root) { command, rendered ->
+            ShellTool(deviceShell, ws.root, this::ensureExecAllowed) { command, rendered ->
                 if (sessionEpoch.get() != epochAtBuild) {
                     rememberFinishedCommand(ws.root.canonicalPath, command, rendered)
                     return@ShellTool
@@ -532,12 +657,47 @@ class WorkspaceViewModel(
                 appendShellLine(command, rendered)
                 refreshProjectTree()
             },
+            HttpRequestTool(ws, agentNet, { settingsStore.current.networkEnabled }) { path ->
+                if (sessionEpoch.get() == epochAtBuild) onAgentEditedFile(path)
+            },
+            InstallModuleTool(ws, agentNet, { settingsStore.current.networkEnabled }) { path ->
+                if (sessionEpoch.get() == epochAtBuild) onAgentEditedFile(path)
+            },
+            InstallProgramTool(
+                workspace = ws,
+                filesDir = appContext.filesDir,
+                toolchain = deviceShell.toolchain,
+                net = agentNet,
+                networkAllowed = { settingsStore.current.networkEnabled },
+                ensureExec = this::ensureExecAllowed,
+            ),
+            RemoteListTool(::activeRemote, remoteClient),
+            RemoteReadTool(::activeRemote, remoteClient),
+            RemoteWriteTool(::activeRemote, remoteClient),
+            RemotePutTool(::activeRemote, remoteClient, ws),
+            RemoteGetTool(::activeRemote, remoteClient, ws) { path ->
+                if (sessionEpoch.get() == epochAtBuild) onAgentEditedFile(path)
+            },
+            SshExecTool(::activeRemote, remoteClient),
         )
+
+        val remote = activeRemote()
+        val remoteSummary = if (remote == null) {
+            "No remote server is selected. Add an FTP or SFTP server in Settings before using remote tools."
+        } else {
+            "Active remote is ${remote.protocol}://${remote.username}@${remote.host}:${remote.port}, " +
+                "start path ${remote.startPath}." +
+                remote.webUrl.takeIf { it.isNotBlank() }?.let { " Site URL: $it." }.orEmpty()
+        }
 
         return AgentLoop(
             backend = DeepSeekBackend { settingsStore.current },
             toolRegistry = ToolRegistry(tools),
-            systemPrompt = buildSystemPrompt(ws.root.absolutePath),
+            systemPrompt = buildSystemPrompt(
+                ws.root.absolutePath,
+                deviceShell.toolchainBin.absolutePath,
+                remoteSummary,
+            ),
         )
     }
 

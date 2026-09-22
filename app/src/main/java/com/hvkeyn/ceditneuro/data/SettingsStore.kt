@@ -19,6 +19,12 @@ data class AgentSettings(
     val reasoningEffort: String = "high",
     val thinkingEnabled: Boolean = true,
     val autoApproveEdits: Boolean = false,
+    /** Agent may download files and install modules. On until the user turns it off. */
+    val networkEnabled: Boolean = true,
+    /** Null until the user answers the prompt. True lets installed compilers run. */
+    val execAllowed: Boolean? = null,
+    val remotes: List<RemoteServer> = emptyList(),
+    val activeRemoteId: String = "",
 ) {
     val provider: ModelProvider
         get() = providers.find { it.id == activeProviderId }
@@ -84,6 +90,12 @@ class SettingsStore(context: Context) {
             reasoningEffort = prefs.getString(KEY_REASONING, null) ?: "high",
             thinkingEnabled = if (prefs.contains(KEY_THINKING)) prefs.getBoolean(KEY_THINKING, true) else true,
             autoApproveEdits = prefs.getBoolean(KEY_AUTO_APPROVE, false),
+            networkEnabled = prefs.getBoolean(KEY_NETWORK, true),
+            execAllowed = if (prefs.contains(KEY_EXEC)) prefs.getBoolean(KEY_EXEC, false) else null,
+            remotes = prefs.getString(KEY_REMOTES, null)?.let { raw ->
+                runCatching { json.decodeFromString<List<RemoteServer>>(raw) }.getOrNull()
+            }.orEmpty(),
+            activeRemoteId = prefs.getString(KEY_ACTIVE_REMOTE, null).orEmpty(),
         ).normalized()
         return importDebugSeed(context, loaded)
     }
@@ -129,13 +141,18 @@ class SettingsStore(context: Context) {
     }
 
     private fun persist(settings: AgentSettings) {
-        prefs.edit()
+        val editor = prefs.edit()
             .putString(KEY_PROVIDERS, json.encodeToString(settings.providers))
             .putString(KEY_ACTIVE_PROVIDER, settings.activeProviderId)
             .putString(KEY_ACTIVE_MODEL, settings.activeModel)
             .putString(KEY_REASONING, settings.reasoningEffort)
             .putBoolean(KEY_THINKING, settings.thinkingEnabled)
             .putBoolean(KEY_AUTO_APPROVE, settings.autoApproveEdits)
+            .putBoolean(KEY_NETWORK, settings.networkEnabled)
+        val execAllowed = settings.execAllowed
+        if (execAllowed == null) editor.remove(KEY_EXEC) else editor.putBoolean(KEY_EXEC, execAllowed)
+        editor.putString(KEY_REMOTES, json.encodeToString(settings.remotes))
+            .putString(KEY_ACTIVE_REMOTE, settings.activeRemoteId)
             .apply()
     }
 
@@ -163,6 +180,10 @@ class SettingsStore(context: Context) {
         const val KEY_REASONING = "reasoning_effort"
         const val KEY_THINKING = "thinking_enabled"
         const val KEY_AUTO_APPROVE = "auto_approve_edits"
+        const val KEY_NETWORK = "agent_network"
+        const val KEY_EXEC = "exec_allowed"
+        const val KEY_REMOTES = "remote_servers"
+        const val KEY_ACTIVE_REMOTE = "active_remote"
         const val LEGACY_BASE_URL = "base_url"
         const val LEGACY_MODEL = "model"
         const val LEGACY_API_KEY = "api_key"

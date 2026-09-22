@@ -12,9 +12,11 @@ android {
     defaultConfig {
         applicationId = "com.hvkeyn.ceditneuro"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        // API 29+ forbids executing a program this app just wrote. API 28 stays in the
+        // compatibility domain that can run compilers installed into the app's private files.
+        targetSdk = 28
+        versionCode = 2
+        versionName = "0.2.0"
     }
 
     buildTypes {
@@ -22,6 +24,9 @@ android {
             applicationIdSuffix = ".debug"
         }
         release {
+            // Same install as the debug app, so a release update keeps the on-device API key.
+            applicationIdSuffix = ".debug"
+            signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -42,6 +47,11 @@ android {
 
     buildFeatures {
         compose = true
+    }
+
+    lint {
+        // Sideloaded on purpose. API 28 is what still allows this app to run installed compilers.
+        disable += "ExpiredTargetSdkVersion"
     }
 
     packaging {
@@ -81,6 +91,8 @@ dependencies {
 
     implementation(libs.okhttp)
     implementation(libs.slf4j.nop)
+    implementation(libs.commons.net)
+    implementation(libs.jsch)
 
     implementation(libs.sora.editor)
 
