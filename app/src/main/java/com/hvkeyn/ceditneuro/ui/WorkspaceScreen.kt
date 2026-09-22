@@ -26,15 +26,18 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
@@ -42,6 +45,8 @@ import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -109,6 +114,10 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
         }
     }
 
+    LaunchedEffect(hasStorageAccess) {
+        viewModel.restoreLastProject(hasStorageAccess)
+    }
+
     LaunchedEffect(state.message) {
         val message = state.message
         if (message != null) {
@@ -156,10 +165,10 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                     }
                 },
                 title = {
-                    Text(
-                        text = state.projectName ?: "CEditNeuro",
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                    ProjectTitleMenu(
+                        state = state,
+                        onOpenProject = { path -> viewModel.openProject(File(path)) },
+                        onChooseFolder = { folderPicker.launch(null) },
                     )
                 },
                 actions = {
@@ -197,6 +206,8 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                             viewModel.openFile(path)
                             if (!wide) projectPanelOpen = false
                         },
+                        onOpenProject = { path -> viewModel.openProject(File(path)) },
+                        onForgetProject = viewModel::forgetProject,
                         onChooseFolder = { folderPicker.launch(null) },
                         modifier = if (wide) {
                             Modifier.width(300.dp).fillMaxHeight()
@@ -225,6 +236,19 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                             .fillMaxHeight(),
                     )
                 }
+            }
+            AnimatedVisibility(
+                visible = state.chatVisible && !wide,
+                enter = slideInHorizontally { width -> width },
+                exit = slideOutHorizontally { width -> width },
+                modifier = Modifier.align(Alignment.CenterEnd),
+            ) {
+                AgentChat(
+                    viewModel = viewModel,
+                    state = state,
+                    settings = settings,
+                    modifier = Modifier.fillMaxHeight().fillMaxWidth(),
+                )
             }
             AnimatedVisibility(
                 visible = state.shellVisible,
@@ -269,19 +293,6 @@ private fun EditorStage(
             }
         } else {
             EditorSurface(viewModel, state, modifier = Modifier.fillMaxSize())
-            AnimatedVisibility(
-                visible = state.chatVisible,
-                enter = slideInHorizontally { width -> width },
-                exit = slideOutHorizontally { width -> width },
-                modifier = Modifier.align(Alignment.CenterEnd),
-            ) {
-                AgentChat(
-                    viewModel = viewModel,
-                    state = state,
-                    settings = settings,
-                    modifier = Modifier.fillMaxHeight().fillMaxWidth(),
-                )
-            }
         }
     }
 }
@@ -325,10 +336,60 @@ private fun EditorSurface(
 }
 
 @Composable
+private fun ProjectTitleMenu(
+    state: WorkspaceUiState,
+    onOpenProject: (String) -> Unit,
+    onChooseFolder: () -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        Text(
+            text = state.projectName ?: "CEditNeuro",
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.clickable { open = true },
+        )
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            if (state.recentProjects.isEmpty()) {
+                DropdownMenuItem(
+                    text = { Text("No saved projects") },
+                    onClick = { open = false },
+                    enabled = false,
+                )
+            }
+            state.recentProjects.forEach { path ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = File(path).name.ifBlank { path },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    onClick = {
+                        open = false
+                        onOpenProject(path)
+                    },
+                )
+            }
+            DropdownMenuItem(
+                text = { Text("Choose folder") },
+                onClick = {
+                    open = false
+                    onChooseFolder()
+                },
+            )
+        }
+    }
+}
+
+@Composable
 private fun FileTreePane(
     state: WorkspaceUiState,
     onToggleDir: (String) -> Unit,
     onOpenFile: (String) -> Unit,
+    onOpenProject: (String) -> Unit,
+    onForgetProject: (String) -> Unit,
     onChooseFolder: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -336,21 +397,43 @@ private fun FileTreePane(
         modifier = modifier
             .background(MaterialTheme.colorScheme.surface),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Project", style = MaterialTheme.typography.titleMedium)
+        Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)) {
+            Text("Projects", style = MaterialTheme.typography.titleMedium)
             Text(
-                text = state.projectRoot ?: "No folder chosen",
+                text = "Chat and shell stay with each folder.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
             )
-            Button(
-                onClick = onChooseFolder,
-                modifier = Modifier.padding(top = 12.dp),
-            ) {
-                Text("Choose folder")
+        }
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 220.dp),
+        ) {
+            if (state.recentProjects.isEmpty()) {
+                item {
+                    Text(
+                        text = "No saved projects yet.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                }
             }
+            items(state.recentProjects, key = { it }) { path ->
+                ProjectRow(
+                    path = path,
+                    selected = path == state.projectRoot,
+                    onOpen = { onOpenProject(path) },
+                    onForget = { onForgetProject(path) },
+                )
+            }
+        }
+        Button(
+            onClick = onChooseFolder,
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
+        ) {
+            Text("Choose folder")
         }
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
@@ -377,6 +460,49 @@ private fun FileTreePane(
                 state = state,
                 onToggleDir = onToggleDir,
                 onOpenFile = onOpenFile,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProjectRow(
+    path: String,
+    selected: Boolean,
+    onOpen: () -> Unit,
+    onForget: () -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpen)
+            .background(
+                if (selected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
+            )
+            .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = File(path).name.ifBlank { path },
+                style = MaterialTheme.typography.bodySmall,
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = path,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        IconButton(onClick = onForget) {
+            Icon(
+                Icons.Default.Close,
+                contentDescription = "Remove project",
+                modifier = Modifier.size(16.dp),
             )
         }
     }
