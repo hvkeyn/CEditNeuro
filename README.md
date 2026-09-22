@@ -21,7 +21,7 @@ layer is wired end to end.
 | DeepSeek streaming client (SSE, reasoning, tool calls) | done |
 | Tools: read / write / edit / list / grep / glob | done |
 | Tools: git status, git diff (JGit) | done |
-| Shell via Termux (`run_command`) | done, optional |
+| Built-in shell (`run_command`, mksh/toybox) | done |
 | Collapsible chat panel | done |
 | Syntax highlighting (TextMate grammars) | **not yet** — blocked on record desugaring, see `docs/ARCHITECTURE.md` |
 | LSP, tree-sitter | not yet |
@@ -32,8 +32,6 @@ layer is wired end to end.
 - Android 8.0 (API 26) or newer, arm64 device recommended.
 - JDK 17 or newer, Android SDK 35 to build.
 - A DeepSeek API key.
-- *Optional, for builds and tests:* [Termux](https://f-droid.org/packages/com.termux/) with
-  `allow-external-apps=true` in `~/.termux/termux.properties`, plus `termux-setup-storage`.
 
 ## Build
 
@@ -52,19 +50,22 @@ dependency to the handful actually used, or building a minified release, brings 
 ## First run
 
 1. The app asks for all-files access. It is required: the app edits project folders on shared
-   storage, and Termux must see the same paths. This is why CEditNeuro is a sideloaded tool
-   and not a Play Store app.
+   storage. This is why CEditNeuro is a sideloaded tool and not a Play Store app.
 2. Tap **Choose folder** and point it at a project.
 3. Open **Settings** and paste your DeepSeek API key. Base URL and model default to
    `https://api.deepseek.com` and `deepseek-flash`.
 4. Tap the chat icon to slide the agent panel in.
 
-## Why Termux for commands
+## Built-in shell
 
-An Android app sandbox ships no toolchain: no compiler, no `git` binary, no package manager.
-Rather than pretend otherwise, `run_command` delegates to Termux through its `RUN_COMMAND`
-intent. When Termux is absent the tool is not registered at all, the chat header says
-"Termux not found — edits only", and the agent falls back to reading and editing files.
+`run_command` and the shell panel run `/system/bin/sh` inside this app. That is mksh plus
+toybox (`ls`, `mkdir`, `grep`, `find`, and the other applets on the device). Nothing else
+has to be installed.
+
+This is not the Termux distribution. Termux packages are built for the hardcoded prefix
+`/data/data/com.termux/files/usr`, so they cannot be executed under this application id.
+`pkg`, `apt`, `git`, and compilers are not part of the shell. Git status and diff still go
+through JGit.
 
 ## Layout
 
@@ -73,8 +74,9 @@ app/src/main/java/com/hvkeyn/ceditneuro/
   agent/            agent loop, message models, prompts
   agent/deepseek/   streaming chat-completions client
   data/             settings and API key storage
+  shell/            built-in mksh/toybox shell
   tools/            the capabilities the agent can call
-  ui/               Compose screens, editor surface, chat panel
+  ui/               Compose screens, editor surface, chat panel, shell panel
   workspace/        project root and path-safety rules
 ```
 

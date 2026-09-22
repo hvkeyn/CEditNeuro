@@ -21,9 +21,6 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Lets the agent delegate builds/tests to Termux (if installed). -->
-    <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
-
     <application
         android:name=".CEditNeuroApp"
         android:allowBackup="false"
@@ -45,9 +42,5 @@
             </intent-filter>
         </activity>
     </application>
-
-    <queries>
-        <package android:name="com.termux" />
-    </queries>
 
 </manifest>

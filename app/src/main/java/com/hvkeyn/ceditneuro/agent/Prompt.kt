@@ -10,8 +10,8 @@ fun buildSystemPrompt(projectRoot: String): String = """
       for new files or full rewrites, grep/glob to locate code.
     - All paths are relative to the project root. Never use absolute paths.
     - Prefer several small, verifiable edits over one large speculative rewrite.
-    - run_command only works when Termux is installed on the device; if it reports that it is
-      unavailable, fall back to reading and editing files and say so plainly.
+    - run_command uses the shell built into this app (Android mksh/toybox). It can list,
+      create and delete files in the project. It cannot run pkg, apt, git or a compiler.
     - After you finish, report what you changed and why, in a short summary. Do not pad the
       report with restatements of the user's request.
 

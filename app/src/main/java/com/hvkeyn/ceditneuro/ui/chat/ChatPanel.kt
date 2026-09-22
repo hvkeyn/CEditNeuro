@@ -2,6 +2,7 @@ package com.hvkeyn.ceditneuro.ui.chat
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +19,8 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -25,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.hvkeyn.ceditneuro.data.AgentSettings
 import com.hvkeyn.ceditneuro.ui.ChatEntry
 import com.hvkeyn.ceditneuro.ui.ChatRole
 import com.hvkeyn.ceditneuro.ui.WorkspaceUiState
@@ -43,9 +48,11 @@ import com.hvkeyn.ceditneuro.ui.WorkspaceUiState
 @Composable
 fun ChatPanel(
     state: WorkspaceUiState,
+    settings: AgentSettings,
     onSend: (String) -> Unit,
     onCancel: () -> Unit,
     onClose: () -> Unit,
+    onSelectModel: (providerId: String, modelName: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var input by rememberSaveable { mutableStateOf("") }
@@ -69,11 +76,7 @@ fun ChatPanel(
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Agent", style = MaterialTheme.typography.titleSmall)
                     Text(
-                        text = if (state.termuxAvailable) {
-                            "Termux detected — builds and tests enabled"
-                        } else {
-                            "Termux not found — edits only"
-                        },
+                        text = "Built-in shell for commands",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -83,6 +86,8 @@ fun ChatPanel(
                 }
             }
 
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            ModelPicker(settings = settings, onSelectModel = onSelectModel)
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
             LazyColumn(
@@ -136,6 +141,48 @@ fun ChatPanel(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ModelPicker(
+    settings: AgentSettings,
+    onSelectModel: (providerId: String, modelName: String) -> Unit,
+) {
+    var open by rememberSaveable { mutableStateOf(false) }
+    Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+        Box {
+            TextButton(onClick = { open = true }) {
+                Text(settings.modelLabel())
+            }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                settings.providers.forEach { provider ->
+                    Text(
+                        text = provider.name,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    )
+                    provider.models.forEach { model ->
+                        DropdownMenuItem(
+                            text = { Text(model.displayName.ifBlank { model.name }) },
+                            onClick = {
+                                open = false
+                                onSelectModel(provider.id, model.name)
+                            },
+                        )
+                    }
+                }
+            }
+        }
+        if (settings.apiKey.isBlank()) {
+            Text(
+                text = "No API key for ${settings.provider.name}. Add one in Settings.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 4.dp),
+            )
         }
     }
 }

@@ -13,7 +13,7 @@ graph TD
     AG --> TR[ToolRegistry]
     TR --> FTools[FileTools]
     TR --> GTools[GitTools]
-    TR --> STools[ShellTool<br/>Termux]
+    TR --> STools[ShellTool<br/>built-in shell]
     FTools --> WS[Workspace]
     GTools --> WS
 ```
@@ -49,7 +49,7 @@ between a confused model and `../../` walks, so it is deliberately the narrowest
 | `glob` | find paths by pattern |
 | `git_status` | branch and working tree state |
 | `git_diff` | unified diff, working tree or index |
-| `run_command` | shell via Termux, only registered when Termux exists |
+| `run_command` | built-in mksh/toybox shell, always registered |
 
 `edit_file` refuses to act when `old_string` matches more than once unless `replace_all` is
 set. Models reach for the shortest unique anchor they can find, and a silent wrong-site edit is
@@ -57,8 +57,8 @@ far more expensive to debug than a retry.
 
 ## Deliberate limits on Android
 
-- **No local toolchain.** Builds and tests require Termux. Without it the agent is edit-only,
-  and it is instructed to say so rather than fake a result.
+- **No local toolchain.** The built-in shell is toybox. It cannot install packages or run a
+  compiler, and the agent is instructed to say so rather than fake a result.
 - **Context discipline.** The agent reads files through tools instead of having the project
   dumped into the prompt. Phones cannot afford a huge context, and it keeps the request cheap.
 - **A single editor instance.** Switching tabs re-runs `setText`, which resets undo history and
@@ -79,6 +79,6 @@ far more expensive to debug than a retry.
 2. **Diff review.** Zed-style Accept/Reject per edit. `TextDiff` already produces the unified
    diff that the UI needs; today it only feeds the tool result text.
 3. **Foreground service** for agent runs, so a long task survives backgrounding.
-4. **Termux result channel.** Replace the output-file polling in `ShellTool` with Termux's
-   `RUN_COMMAND_SERVICE` result callback.
+4. **Richer shell.** A real PTY and a way to add compilers without vendoring the Termux
+   bootstrap, which is locked to `com.termux`.
 5. **LSP and tree-sitter**, using the Sora Editor modules already declared in the catalog.
