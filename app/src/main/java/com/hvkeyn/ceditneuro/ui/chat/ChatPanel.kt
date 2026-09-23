@@ -1,8 +1,8 @@
 package com.hvkeyn.ceditneuro.ui.chat
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,8 +10,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -22,11 +22,10 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -36,7 +35,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -88,35 +86,13 @@ fun ChatPanel(
 
     Surface(modifier = modifier, color = MaterialTheme.colorScheme.surfaceVariant) {
         Column {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Agent", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        text = "Built-in shell for commands",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                IconButton(onClick = onClose) {
-                    Icon(Icons.Default.Close, contentDescription = "Hide chat")
-                }
-            }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-            ModelPicker(settings = settings, onSelectModel = onSelectModel)
-            AgentControls(
-                state = state,
+            AgentToolbar(
                 settings = settings,
-                onContinue = onContinue,
-                onCancel = onCancel,
                 onWorkFocus = onWorkFocus,
                 onNetwork = onNetwork,
                 onPrograms = onPrograms,
+                onSelectModel = onSelectModel,
+                onClose = onClose,
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
@@ -145,19 +121,38 @@ fun ChatPanel(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp),
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 OutlinedTextField(
                     value = input,
                     onValueChange = { input = it },
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text("Ask the agent to change something…") },
-                    maxLines = if (LocalConfiguration.current.screenHeightDp < 500) 2 else 5,
+                    placeholder = { Text("Ask the agent…") },
+                    maxLines = if (LocalConfiguration.current.screenHeightDp < 500) 2 else 4,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
                 )
-                Button(
+                RoundAction(
+                    icon = Icons.Filled.PlayArrow,
+                    description = "Continue",
+                    filled = false,
+                    enabled = !state.agentRunning && state.projectRoot != null && state.chat.isNotEmpty(),
+                    onClick = onContinue,
+                )
+                RoundAction(
+                    icon = Icons.Filled.Stop,
+                    description = "Stop",
+                    filled = state.agentRunning,
+                    danger = true,
+                    enabled = state.agentRunning,
+                    onClick = onCancel,
+                )
+                RoundAction(
+                    icon = Icons.AutoMirrored.Filled.Send,
+                    description = "Send",
+                    filled = true,
+                    enabled = !state.agentRunning && input.isNotBlank() && state.projectRoot != null,
                     onClick = {
                         val prompt = input.trim()
                         if (prompt.isNotEmpty()) {
@@ -165,43 +160,63 @@ fun ChatPanel(
                             onSend(prompt)
                         }
                     },
-                    enabled = !state.agentRunning && input.isNotBlank() && state.projectRoot != null,
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", modifier = Modifier.size(18.dp))
-                }
+                )
             }
         }
     }
 }
 
 @Composable
-private fun AgentControls(
-    state: WorkspaceUiState,
+private fun AgentToolbar(
     settings: AgentSettings,
-    onContinue: () -> Unit,
-    onCancel: () -> Unit,
     onWorkFocus: (String) -> Unit,
     onNetwork: (Boolean) -> Unit,
     onPrograms: (Boolean) -> Unit,
+    onSelectModel: (providerId: String, modelName: String) -> Unit,
+    onClose: () -> Unit,
 ) {
+    var modelOpen by rememberSaveable { mutableStateOf(false) }
     var workOpen by remember { mutableStateOf(false) }
     val workLabel = when (settings.workFocus) {
         AgentSettings.WORK_BUILD -> "Build"
         AgentSettings.WORK_REMOTE -> "Remote"
         else -> "Edit"
     }
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(
-                onClick = onContinue,
-                enabled = !state.agentRunning && state.projectRoot != null && state.chat.isNotEmpty(),
-            ) { Text("Continue") }
-            TextButton(onClick = onCancel, enabled = state.agentRunning) { Text("Stop") }
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 6.dp, end = 2.dp, top = 2.dp, bottom = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             Box {
-                TextButton(onClick = { workOpen = true }) { Text("Work: $workLabel") }
+                Pill(text = settings.modelLabel(), onClick = { modelOpen = true }, maxWidth = 132.dp)
+                DropdownMenu(expanded = modelOpen, onDismissRequest = { modelOpen = false }) {
+                    settings.providers.forEach { provider ->
+                        Text(
+                            text = provider.name,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        )
+                        provider.models.forEach { model ->
+                            DropdownMenuItem(
+                                text = { Text(model.displayName.ifBlank { model.name }) },
+                                onClick = {
+                                    modelOpen = false
+                                    onSelectModel(provider.id, model.name)
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+            Box {
+                Pill(text = workLabel, onClick = { workOpen = true })
                 DropdownMenu(expanded = workOpen, onDismissRequest = { workOpen = false }) {
                     DropdownMenuItem(
-                        text = { Text("Edit files") },
+                        text = { Text("Edit") },
                         onClick = {
                             workOpen = false
                             onWorkFocus(AgentSettings.WORK_EDIT)
@@ -223,64 +238,82 @@ private fun AgentControls(
                     )
                 }
             }
-        }
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            FilterChip(
-                selected = settings.networkEnabled,
-                onClick = { onNetwork(!settings.networkEnabled) },
-                label = { Text("Network") },
-            )
-            FilterChip(
+            Pill(text = "Net", selected = settings.networkEnabled, onClick = { onNetwork(!settings.networkEnabled) })
+            Pill(
+                text = "Run",
                 selected = settings.execAllowed == true,
                 onClick = { onPrograms(settings.execAllowed != true) },
-                label = { Text("Programs") },
+            )
+            Box(modifier = Modifier.weight(1f))
+            IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Default.Close, contentDescription = "Hide chat", modifier = Modifier.size(18.dp))
+            }
+        }
+        if (settings.apiKey.isBlank()) {
+            Text(
+                text = "No API key. Add one in Settings.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 2.dp),
             )
         }
     }
 }
 
 @Composable
-private fun ModelPicker(
-    settings: AgentSettings,
-    onSelectModel: (providerId: String, modelName: String) -> Unit,
+private fun Pill(
+    text: String,
+    onClick: () -> Unit,
+    selected: Boolean = false,
+    maxWidth: androidx.compose.ui.unit.Dp = 88.dp,
 ) {
-    var open by rememberSaveable { mutableStateOf(false) }
-    Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
-        Box {
-            TextButton(onClick = { open = true }) {
-                Text(settings.modelLabel())
-            }
-            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                settings.providers.forEach { provider ->
-                    Text(
-                        text = provider.name,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    )
-                    provider.models.forEach { model ->
-                        DropdownMenuItem(
-                            text = { Text(model.displayName.ifBlank { model.name }) },
-                            onClick = {
-                                open = false
-                                onSelectModel(provider.id, model.name)
-                            },
-                        )
-                    }
-                }
-            }
-        }
-        if (settings.apiKey.isBlank()) {
-            Text(
-                text = "No API key for ${settings.provider.name}. Add one in Settings.",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 4.dp),
-            )
-        }
+    val background = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+    val border = if (selected) Color.Transparent else MaterialTheme.colorScheme.outline
+    Text(
+        text = text,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        style = MaterialTheme.typography.labelMedium,
+        color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier
+            .widthIn(max = maxWidth)
+            .background(background, RoundedCornerShape(8.dp))
+            .border(1.dp, border, RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+    )
+}
+
+@Composable
+private fun RoundAction(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    description: String,
+    onClick: () -> Unit,
+    enabled: Boolean,
+    filled: Boolean,
+    danger: Boolean = false,
+) {
+    val background = when {
+        !enabled -> Color.Transparent
+        danger -> MaterialTheme.colorScheme.errorContainer
+        filled -> MaterialTheme.colorScheme.primaryContainer
+        else -> MaterialTheme.colorScheme.surface
+    }
+    val tint = when {
+        !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        danger -> MaterialTheme.colorScheme.onErrorContainer
+        filled -> MaterialTheme.colorScheme.onPrimaryContainer
+        else -> MaterialTheme.colorScheme.primary
+    }
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier
+            .padding(bottom = 4.dp)
+            .size(40.dp)
+            .background(background, CircleShape),
+    ) {
+        Icon(icon, contentDescription = description, tint = tint, modifier = Modifier.size(20.dp))
     }
 }
 
@@ -298,52 +331,39 @@ private fun AgentActivityBar(activity: AgentActivity) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             CircularProgressIndicator(
                 modifier = Modifier.size(12.dp),
                 strokeWidth = 2.dp,
             )
             Text(
-                text = "${activity.phase} · $clock",
+                text = buildString {
+                    append(activity.phase)
+                    append(" · ")
+                    append(clock)
+                    if (activity.focus.isNotBlank()) {
+                        append(" · ")
+                        append(activity.focus)
+                    }
+                },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(start = 8.dp),
-            )
-        }
-        Text(
-            text = activity.context,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (activity.focus.isNotBlank()) {
-            Text(
-                text = activity.focus,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 8.dp).weight(1f),
             )
         }
         val bars = agentBars(activity.phase)
         LinearProgressIndicator(
             progress = { bars.overall / 100f },
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
         )
-        if (bars.stepIndeterminate) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-        } else {
-            LinearProgressIndicator(
-                progress = { bars.step / 100f },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
     }
 }
 
