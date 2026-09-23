@@ -27,11 +27,13 @@ import com.hvkeyn.ceditneuro.data.StoredShell
 import com.hvkeyn.ceditneuro.net.AgentNet
 import com.hvkeyn.ceditneuro.net.RemoteClient
 import com.hvkeyn.ceditneuro.shell.DeviceShell
+import com.hvkeyn.ceditneuro.workspace.StoragePaths
 import com.hvkeyn.ceditneuro.shizuku.ShizukuShell
 import com.hvkeyn.ceditneuro.shell.ProgramRun
 import com.hvkeyn.ceditneuro.tools.BrowsePageTool
 import com.hvkeyn.ceditneuro.tools.EditFileTool
 import com.hvkeyn.ceditneuro.tools.HttpRequestTool
+import com.hvkeyn.ceditneuro.tools.InstallApkTool
 import com.hvkeyn.ceditneuro.tools.InstallModuleTool
 import com.hvkeyn.ceditneuro.tools.InstallAndroidSdkTool
 import com.hvkeyn.ceditneuro.tools.InstallJdkTool
@@ -1077,7 +1079,8 @@ class WorkspaceViewModel(
 
     private suspend fun prepareShizuku(): String? {
         if (!runCatching { Shizuku.pingBinder() }.getOrDefault(false)) {
-            return "Shizuku is not running. Open the Shizuku app, start it, and allow CEditNeuro."
+            return "Shizuku is not running. Install and open an APK with install_apk. " +
+                "Shizuku is only needed for shell-user commands such as dumpsys or logcat."
         }
         if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) return null
         return withContext(Dispatchers.Main) {
@@ -1355,6 +1358,7 @@ class WorkspaceViewModel(
                 ensureExec = this::ensureExecAllowed,
             ),
             ShizukuExecTool(ws, shizukuShell, this::prepareShizuku),
+            InstallApkTool(appContext, ws),
             InstallAndroidSdkTool(
                 toolchain = deviceShell.toolchain,
                 net = agentNet,
@@ -1407,6 +1411,7 @@ class WorkspaceViewModel(
                 remoteSummary,
                 settingsStore.current.workFocus,
                 accessLine(),
+                StoragePaths.describe(),
             ),
         )
     }

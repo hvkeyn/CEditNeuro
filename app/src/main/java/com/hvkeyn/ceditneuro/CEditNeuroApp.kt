@@ -3,6 +3,7 @@ package com.hvkeyn.ceditneuro
 import android.app.Application
 import com.hvkeyn.ceditneuro.data.SettingsStore
 import com.hvkeyn.ceditneuro.ui.WorkspaceViewModel
+import com.hvkeyn.ceditneuro.workspace.StoragePaths
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -21,6 +22,7 @@ class CEditNeuroApp : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        StoragePaths.context = this
     }
 
     companion object {

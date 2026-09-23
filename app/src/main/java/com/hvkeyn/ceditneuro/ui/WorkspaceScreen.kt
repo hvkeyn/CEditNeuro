@@ -99,6 +99,7 @@ import com.hvkeyn.ceditneuro.ui.editor.EditorPane
 import com.hvkeyn.ceditneuro.ui.settings.SettingsDialog
 import com.hvkeyn.ceditneuro.ui.shell.ShellPanel
 import com.hvkeyn.ceditneuro.workspace.FileEntry
+import com.hvkeyn.ceditneuro.workspace.StoragePaths
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -1011,9 +1012,9 @@ private fun treeUriToFolder(uri: Uri): File? {
     val relative = parts.getOrNull(1).orEmpty()
 
     val base = when {
-        volume.equals("primary", ignoreCase = true) -> Environment.getExternalStorageDirectory()
+        volume.equals("primary", ignoreCase = true) -> StoragePaths.primaryRoot()
         volume.isBlank() -> return null
-        else -> File("/storage/$volume")
+        else -> StoragePaths.volumeNamed(volume) ?: File("/storage/$volume")
     }
     if (!base.exists()) return null
     return if (relative.isBlank()) base else File(base, relative)

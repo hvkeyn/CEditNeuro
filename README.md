@@ -30,6 +30,8 @@ layer is wired end to end.
 | In-process completion and syntax diagnostics for those languages | done |
 | TextMate grammars | **not yet** — blocked on record desugaring, see `docs/ARCHITECTURE.md` |
 | One agent per open project, with its own shade card | done |
+| Install and open an APK with `install_apk` (no Shizuku) | done |
+| Shared-storage paths follow this phone's real storage root and Downloads folder | done |
 | Update check at the bottom of Language models settings | done — install starts only after confirmation |
 | `install_jdk`, `install_android_sdk`, `install_runtime` from the Termux mirror | done |
 | Zed-style per-edit Accept/Reject diffs | not yet — edits apply immediately |

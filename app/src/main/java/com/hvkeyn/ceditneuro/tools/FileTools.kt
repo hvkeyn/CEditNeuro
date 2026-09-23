@@ -1,5 +1,6 @@
 package com.hvkeyn.ceditneuro.tools
 
+import com.hvkeyn.ceditneuro.workspace.StoragePaths
 import com.hvkeyn.ceditneuro.workspace.Workspace
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -140,8 +141,14 @@ class WriteFileTool(
         val before = if (file.isFile) file.readText() else ""
 
         workspace.write(path, content)
+        val written = workspace.resolve(path)
+        if (!written.isFile) {
+            return@withContext ToolResult.error(
+                "Nothing was written. Requested `$path`, resolved ${written.absolutePath}.",
+            )
+        }
         onEdit(path, before, content)
-        ToolResult.ok("Wrote ${content.length} characters to $path.")
+        ToolResult.ok("Wrote ${written.length()} bytes to ${written.absolutePath}.")
     }
 }
 
@@ -319,8 +326,8 @@ class MkdirTool(private val workspace: Workspace) : Tool {
             return@withContext ToolResult.error(it.message ?: "Bad path.")
         }
         if (dir.isFile) return@withContext ToolResult.error("$path is a file.")
-        if (!dir.mkdirs() && !dir.isDirectory) return@withContext ToolResult.error("Could not create $path.")
-        ToolResult.ok("Created ${dir.path}")
+        if (!dir.mkdirs() && !dir.isDirectory) return@withContext ToolResult.error("Could not create ${dir.absolutePath}.")
+        ToolResult.ok("Created ${dir.absolutePath}")
     }
 }
 
@@ -401,7 +408,10 @@ class MovePathTool(private val workspace: Workspace) : Tool {
         if (dest.exists()) return@withContext ToolResult.error("Destination already exists: $to")
         dest.parentFile?.mkdirs()
         val moved = source.renameTo(dest) || (source.copyRecursively(dest) && source.deleteRecursively())
-        if (!moved) return@withContext ToolResult.error("Could not move ${source.path} to ${dest.path}.")
-        ToolResult.ok("Moved ${source.path} to ${dest.path}")
+        if (!moved || !dest.exists()) {
+            return@withContext ToolResult.error("Could not move ${source.absolutePath} to ${dest.absolutePath}.")
+        }
+        if (dest.isFile) StoragePaths.scan(dest)
+        ToolResult.ok("Moved ${source.absolutePath} to ${dest.absolutePath}")
     }
 }
