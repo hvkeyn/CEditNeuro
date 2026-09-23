@@ -2,6 +2,7 @@ package com.hvkeyn.ceditneuro.shell
 
 import android.content.Context
 import com.hvkeyn.ceditneuro.net.AgentNet
+import com.hvkeyn.ceditneuro.workspace.StoragePaths
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -33,13 +34,16 @@ class DeviceShell(
             return download(parsed.first, parsed.second, directory)
         }
 
-        val process = ProcessBuilder(SHELL, "-c", command)
+        val rewritten = StoragePaths.rewriteCommand(command)
+        val process = ProcessBuilder(SHELL, "-c", rewritten)
             .directory(directory)
             .redirectErrorStream(false)
             .apply {
                 environment().apply {
                     put("HOME", home.absolutePath)
                     put("TMPDIR", tmp.absolutePath)
+                    put("EXTERNAL_STORAGE", StoragePaths.primaryRoot().absolutePath)
+                    put("DOWNLOAD", StoragePaths.publicDownload().absolutePath)
                     put("TERM", "dumb")
                     val javaHome = File(toolchain, "lib/jvm/java-17-openjdk")
                     val libraryPath = buildList {
@@ -111,14 +115,14 @@ class DeviceShell(
             pumps.forEach { it.join(1_000) }
             return ShellOutput(
                 exitCode = null,
-                output = renderOutput(stdout, stderr, truncated.get()),
+                output = renderOutput(stdout, stderr, truncated.get()) + StoragePaths.noteVisibleFiles(rewritten),
                 timedOut = true,
             )
         }
         pumps.forEach { it.join(2_000) }
         return ShellOutput(
             exitCode = process.exitValue(),
-            output = renderOutput(stdout, stderr, truncated.get()),
+            output = renderOutput(stdout, stderr, truncated.get()) + StoragePaths.noteVisibleFiles(rewritten),
             timedOut = false,
         )
     }
@@ -131,7 +135,11 @@ class DeviceShell(
         if (!networkAllowed()) {
             return ShellOutput(1, "Network is disabled in Settings.", timedOut = false)
         }
-        val dest = if (File(destArg).isAbsolute) File(destArg) else File(directory, destArg)
+        val dest = if (File(destArg).isAbsolute) {
+            StoragePaths.absolute(destArg)
+        } else {
+            StoragePaths.finish(File(directory, destArg))
+        }
         dest.parentFile?.mkdirs()
         val part = File(dest.parentFile, dest.name + ".part")
         return runCatching {
@@ -144,7 +152,8 @@ class DeviceShell(
                 part.copyTo(dest, overwrite = true)
                 part.delete()
             }
-            ShellOutput(0, "saved ${dest.length()} bytes to ${dest.path}", timedOut = false)
+            StoragePaths.scan(dest)
+            ShellOutput(0, "saved ${dest.length()} bytes to ${dest.absolutePath}", timedOut = false)
         }.getOrElse { error ->
             part.delete()
             ShellOutput(1, error.message ?: "Download failed.", timedOut = false)

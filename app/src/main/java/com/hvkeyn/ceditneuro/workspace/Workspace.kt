@@ -27,8 +27,8 @@ class Workspace(val root: File) {
         require(!normalized.contains('\u0000')) { "Path contains NUL." }
         val candidate = when {
             normalized.isEmpty() -> canonicalRoot
-            normalized.startsWith("/") -> File(normalized).canonicalFile
-            else -> File(canonicalRoot, normalized).canonicalFile
+            normalized.startsWith("/") -> StoragePaths.absolute(normalized)
+            else -> StoragePaths.finish(File(canonicalRoot, normalized))
         }
         require(isReachable(candidate)) {
             "This app cannot use $path. Other apps' private data and root-only paths stay closed."
@@ -86,8 +86,13 @@ class Workspace(val root: File) {
 
     fun write(relativePath: String, content: String) {
         val file = resolve(relativePath)
-        file.parentFile?.mkdirs()
+        val parent = file.parentFile
+        if (parent != null && !parent.exists() && !parent.mkdirs()) {
+            throw java.io.IOException("Could not create ${parent.absolutePath}")
+        }
         file.writeText(content)
+        if (!file.isFile) throw java.io.IOException("Nothing was written to ${file.absolutePath}")
+        StoragePaths.scan(file)
     }
 
     companion object {
