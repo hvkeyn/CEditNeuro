@@ -54,17 +54,25 @@ fun WebPreview(
                     Icon(Icons.Default.Close, contentDescription = "Close site")
                 }
             }
-            AndroidView(
-                modifier = Modifier.fillMaxSize(),
-                factory = { context -> PageWebView(context) },
-                update = { view ->
-                    view.onLoaded = onLoaded
-                    if (view.generation != generation) {
-                        view.generation = generation
-                        view.loadUrl(url)
-                    }
-                },
-            )
+            if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                Text(
+                    text = "No page yet. Ask the agent to open one, or set a site URL on the server.",
+                    modifier = Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            } else {
+                AndroidView(
+                    modifier = Modifier.fillMaxSize(),
+                    factory = { context -> PageWebView(context) },
+                    update = { view ->
+                        view.onLoaded = onLoaded
+                        if (view.generation != generation) {
+                            view.generation = generation
+                            view.loadUrl(url)
+                        }
+                    },
+                )
+            }
         }
     }
 }

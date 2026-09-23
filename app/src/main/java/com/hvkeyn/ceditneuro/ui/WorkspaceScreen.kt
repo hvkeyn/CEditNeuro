@@ -18,6 +18,8 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -38,6 +40,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -90,6 +93,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.collectAsState
 import com.hvkeyn.ceditneuro.data.AgentSettings
+import com.hvkeyn.ceditneuro.update.AppUpdater
 import com.hvkeyn.ceditneuro.ui.chat.ChatPanel
 import com.hvkeyn.ceditneuro.ui.editor.EditorPane
 import com.hvkeyn.ceditneuro.ui.settings.SettingsDialog
@@ -109,6 +113,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
     val snackbarHostState = remember { SnackbarHostState() }
 
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    val versionName = remember { AppUpdater.localVersion(context) }
     var projectPanelOpen by rememberSaveable { mutableStateOf(true) }
     var hasStorageAccess by remember { mutableStateOf(hasStorageAccess(context)) }
 
@@ -293,48 +298,38 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                 title = {
                     ProjectTitleMenu(
                         state = state,
+                        versionName = versionName,
                         onOpenProject = { path -> viewModel.openProject(File(path)) },
                         onChooseFolder = { folderPicker.launch(null) },
+                        onCheckUpdate = { viewModel.checkForUpdate(manual = true) },
                     )
                 },
                 actions = {
-                    IconButton(
-                        onClick = viewModel::saveActiveFile,
-                        modifier = if (shortLandscape) Modifier.size(40.dp) else Modifier,
-                    ) {
-                        Icon(Icons.Default.Save, contentDescription = "Save file")
-                    }
-                    IconButton(
-                        onClick = { showSettings = true },
-                        modifier = if (shortLandscape) Modifier.size(40.dp) else Modifier,
-                    ) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
-                    }
-                    IconButton(
-                        onClick = viewModel::toggleShell,
-                        modifier = if (shortLandscape) Modifier.size(40.dp) else Modifier,
-                    ) {
-                        Icon(Icons.Default.Terminal, contentDescription = "Toggle shell")
-                    }
-                    IconButton(
-                        onClick = viewModel::toggleChat,
-                        modifier = if (shortLandscape) Modifier.size(40.dp) else Modifier,
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Toggle agent chat")
-                    }
-                    IconButton(
-                        onClick = viewModel::toggleWeb,
-                        modifier = if (shortLandscape) Modifier.size(40.dp) else Modifier,
-                    ) {
-                        Icon(
-                            Icons.Default.Public,
-                            contentDescription = "Toggle browser",
-                            tint = if (state.webVisible) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            },
-                        )
+                    Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                        val actionSize = if (shortLandscape) Modifier.size(40.dp) else Modifier
+                        IconButton(onClick = viewModel::saveActiveFile, modifier = actionSize) {
+                            Icon(Icons.Default.Save, contentDescription = "Save file")
+                        }
+                        IconButton(onClick = { showSettings = true }, modifier = actionSize) {
+                            Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        }
+                        IconButton(onClick = viewModel::toggleShell, modifier = actionSize) {
+                            Icon(Icons.Default.Terminal, contentDescription = "Toggle shell")
+                        }
+                        IconButton(onClick = viewModel::toggleChat, modifier = actionSize) {
+                            Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Toggle agent chat")
+                        }
+                        IconButton(onClick = viewModel::toggleWeb, modifier = actionSize) {
+                            Icon(
+                                Icons.Default.Public,
+                                contentDescription = "Toggle browser",
+                                tint = if (state.webVisible) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                            )
+                        }
                     }
                 },
             )
@@ -358,21 +353,48 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
             } else {
                 projectPanelOpen || state.activePath == null
             }
+            val editorColumn = panes.splitTree || !showTree
+            val dockChat = editorColumn && panes.chatWidth != null
+            val dockShell = editorColumn && panes.shellHeight != null
 
-            val webOpen = state.webVisible && state.webUrl.isNotBlank()
+            val webOpen = state.webVisible
             val webFraction = when {
                 compactHeight && (state.chatVisible || state.shellVisible) -> 0.34f
                 compactHeight -> 0.46f
                 state.chatVisible || state.shellVisible -> 0.38f
                 else -> 0.62f
             }
-            val webPanelHeight = if (webOpen) maxHeight * webFraction else 0.dp
+            val webPanelHeight = if (webOpen) (maxHeight * webFraction).coerceAtLeast(96.dp) else 0.dp
             Box(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(bottom = webPanelHeight),
             ) {
+            if (state.otherRuns.isNotEmpty()) {
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(state.otherRuns, key = { it.path }) { run ->
+                        Text(
+                            text = if (run.running) {
+                                "${run.name} · ${run.phase}" + if (run.focus.isBlank()) "" else " · ${run.focus}"
+                            } else {
+                                "${run.name} · ${run.phase}"
+                            },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.clickable { viewModel.openProject(File(run.path)) },
+                        )
+                    }
+                }
+            }
             Row(
                 modifier = Modifier
                     .weight(1f)
@@ -407,7 +429,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                     }
                 }
 
-                if (panes.splitTree || !showTree) {
+                if (editorColumn) {
                     Column(
                         modifier = Modifier
                             .weight(1f)
@@ -421,7 +443,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                                 .weight(1f),
                         )
                         AnimatedVisibility(
-                            visible = state.shellVisible && panes.shellHeight != null,
+                            visible = state.shellVisible && dockShell,
                             enter = slideInVertically { height -> height },
                             exit = slideOutVertically { height -> height },
                         ) {
@@ -435,7 +457,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                             )
                         }
                     }
-                    if (panes.chatWidth != null) {
+                    if (dockChat) {
                         Box(
                             modifier = Modifier
                                 .width(1.dp)
@@ -455,7 +477,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
             }
             }
             AnimatedVisibility(
-                visible = state.chatVisible && panes.chatWidth == null,
+                visible = state.chatVisible && !dockChat,
                 enter = slideInHorizontally { width -> width },
                 exit = slideOutHorizontally { width -> width },
                 modifier = Modifier.align(Alignment.CenterEnd),
@@ -474,7 +496,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                 )
             }
             AnimatedVisibility(
-                visible = state.shellVisible && panes.shellHeight == null,
+                visible = state.shellVisible && !dockShell,
                 enter = slideInHorizontally { width -> width },
                 exit = slideOutHorizontally { width -> width },
                 modifier = Modifier.align(Alignment.CenterEnd),
@@ -501,7 +523,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .fillMaxHeight(webFraction),
+                        .height(webPanelHeight),
                 )
             }
             }
@@ -546,24 +568,23 @@ private fun adaptivePanes(
         (maxWidth * 0.34f).coerceIn(280.dp, 400.dp)
     }
     val chatRoom = maxWidth - treeWidth - minEditor
-    val chatWidth = if (chatVisible && maxWidth >= 560.dp && chatRoom >= 200.dp) {
+    val chatWidth = if (!short && chatVisible && maxWidth >= 560.dp && chatRoom >= 200.dp) {
         wantChat.coerceAtMost(chatRoom)
     } else {
         null
     }
     val overlayChatWidth = when {
-        chatWidth != null || !chatVisible || shellVisible -> null
+        chatWidth != null || !chatVisible || shellVisible || short -> null
         maxWidth >= 600.dp -> (maxWidth * 0.42f).coerceIn(260.dp, 440.dp)
         else -> null
     }
     val shellHeight = when {
-        !shellVisible -> null
-        short && maxWidth >= 560.dp -> (maxHeight * 0.30f).coerceIn(104.dp, 148.dp)
+        !shellVisible || short -> null
         maxHeight >= 440.dp && maxWidth >= 600.dp -> (maxHeight * 0.32f).coerceIn(140.dp, 240.dp)
         else -> null
     }
     val shellWidth = when {
-        !shellVisible || shellHeight != null -> null
+        !shellVisible || shellHeight != null || short -> null
         maxWidth >= 600.dp -> (maxWidth * 0.42f).coerceIn(260.dp, 420.dp)
         else -> null
     }
@@ -623,8 +644,10 @@ private fun EditorSurface(
 @Composable
 private fun ProjectTitleMenu(
     state: WorkspaceUiState,
+    versionName: String,
     onOpenProject: (String) -> Unit,
     onChooseFolder: () -> Unit,
+    onCheckUpdate: () -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
     Box {
@@ -643,13 +666,30 @@ private fun ProjectTitleMenu(
                 )
             }
             state.recentProjects.forEach { path ->
+                val run = state.otherRuns.firstOrNull { it.path == path }
+                val phase = when {
+                    path == state.projectRoot && state.agentRunning -> state.agentActivity?.phase
+                    run != null -> run.phase
+                    else -> null
+                }
                 DropdownMenuItem(
                     text = {
-                        Text(
-                            text = File(path).name.ifBlank { path },
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        Column {
+                            Text(
+                                text = File(path).name.ifBlank { path },
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            if (!phase.isNullOrBlank()) {
+                                Text(
+                                    text = phase,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
                     },
                     onClick = {
                         open = false
@@ -662,6 +702,18 @@ private fun ProjectTitleMenu(
                 onClick = {
                     open = false
                     onChooseFolder()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text("Version $versionName") },
+                onClick = {},
+                enabled = false,
+            )
+            DropdownMenuItem(
+                text = { Text("Check for updates") },
+                onClick = {
+                    open = false
+                    onCheckUpdate()
                 },
             )
         }
