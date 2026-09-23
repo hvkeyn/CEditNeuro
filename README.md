@@ -84,6 +84,19 @@ and other runtimes into this app's toolchain with `install_jdk`, `install_androi
 `install_runtime`. Those tools download Debian packages from the Termux mirror and unpack
 them here.
 
+## Paths outside the project
+
+A relative path stays inside the open project. An absolute path is a real directory on
+this phone. `/sdcard` and `/mnt/sdcard` mean the shared-storage root Android reports for
+the device. The Downloads folder is whichever of `Download` or `Downloads` actually
+exists there, and a removable volume keeps its own root. Tools return that absolute path
+and the file size. A path under a hidden mount such as `/mnt/runtime` is not used, because
+the file manager would not show the file.
+
+The shell variable `HOME` is this app's private directory. `DOWNLOAD` is the public
+Downloads folder. `install_apk` installs an APK that is already on the device through the
+system installer and opens it after you confirm. Shizuku is not required for that.
+
 ## Several projects
 
 Each open folder keeps its own chat and its own agent. Switching folders leaves the other
