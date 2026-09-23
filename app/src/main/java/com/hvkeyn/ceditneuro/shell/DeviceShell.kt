@@ -70,6 +70,11 @@ class DeviceShell(
                         put("PYTHONHOME", toolchain.absolutePath)
                         put("PYTHONUNBUFFERED", "1")
                     }
+                    val androidSdk = File(toolchain, "android-sdk")
+                    if (androidSdk.isDirectory) {
+                        put("ANDROID_HOME", androidSdk.absolutePath)
+                        put("ANDROID_SDK_ROOT", androidSdk.absolutePath)
+                    }
                 }
             }
             .start()

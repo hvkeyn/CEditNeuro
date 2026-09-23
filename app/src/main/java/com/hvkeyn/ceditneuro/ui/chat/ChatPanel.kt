@@ -2,6 +2,7 @@ package com.hvkeyn.ceditneuro.ui.chat
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -24,6 +26,8 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -49,6 +53,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.hvkeyn.ceditneuro.agent.agentBars
 import com.hvkeyn.ceditneuro.data.AgentSettings
 import com.hvkeyn.ceditneuro.ui.AgentActivity
 import com.hvkeyn.ceditneuro.ui.ChatEntry
@@ -61,7 +66,11 @@ fun ChatPanel(
     state: WorkspaceUiState,
     settings: AgentSettings,
     onSend: (String) -> Unit,
+    onContinue: () -> Unit,
     onCancel: () -> Unit,
+    onWorkFocus: (String) -> Unit,
+    onNetwork: (Boolean) -> Unit,
+    onPrograms: (Boolean) -> Unit,
     onClose: () -> Unit,
     onSelectModel: (providerId: String, modelName: String) -> Unit,
     modifier: Modifier = Modifier,
@@ -100,6 +109,15 @@ fun ChatPanel(
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
             ModelPicker(settings = settings, onSelectModel = onSelectModel)
+            AgentControls(
+                state = state,
+                settings = settings,
+                onContinue = onContinue,
+                onCancel = onCancel,
+                onWorkFocus = onWorkFocus,
+                onNetwork = onNetwork,
+                onPrograms = onPrograms,
+            )
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
             LazyColumn(
@@ -139,25 +157,87 @@ fun ChatPanel(
                     maxLines = if (LocalConfiguration.current.screenHeightDp < 500) 2 else 5,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
                 )
-                if (state.agentRunning) {
-                    Button(onClick = onCancel) {
-                        Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(18.dp))
-                    }
-                } else {
-                    Button(
-                        onClick = {
-                            val prompt = input.trim()
-                            if (prompt.isNotEmpty()) {
-                                input = ""
-                                onSend(prompt)
-                            }
-                        },
-                        enabled = input.isNotBlank() && state.projectRoot != null,
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", modifier = Modifier.size(18.dp))
-                    }
+                Button(
+                    onClick = {
+                        val prompt = input.trim()
+                        if (prompt.isNotEmpty()) {
+                            input = ""
+                            onSend(prompt)
+                        }
+                    },
+                    enabled = !state.agentRunning && input.isNotBlank() && state.projectRoot != null,
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", modifier = Modifier.size(18.dp))
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun AgentControls(
+    state: WorkspaceUiState,
+    settings: AgentSettings,
+    onContinue: () -> Unit,
+    onCancel: () -> Unit,
+    onWorkFocus: (String) -> Unit,
+    onNetwork: (Boolean) -> Unit,
+    onPrograms: (Boolean) -> Unit,
+) {
+    var workOpen by remember { mutableStateOf(false) }
+    val workLabel = when (settings.workFocus) {
+        AgentSettings.WORK_BUILD -> "Build"
+        AgentSettings.WORK_REMOTE -> "Remote"
+        else -> "Edit"
+    }
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(
+                onClick = onContinue,
+                enabled = !state.agentRunning && state.projectRoot != null && state.chat.isNotEmpty(),
+            ) { Text("Continue") }
+            TextButton(onClick = onCancel, enabled = state.agentRunning) { Text("Stop") }
+            Box {
+                TextButton(onClick = { workOpen = true }) { Text("Work: $workLabel") }
+                DropdownMenu(expanded = workOpen, onDismissRequest = { workOpen = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Edit files") },
+                        onClick = {
+                            workOpen = false
+                            onWorkFocus(AgentSettings.WORK_EDIT)
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Build") },
+                        onClick = {
+                            workOpen = false
+                            onWorkFocus(AgentSettings.WORK_BUILD)
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Remote") },
+                        onClick = {
+                            workOpen = false
+                            onWorkFocus(AgentSettings.WORK_REMOTE)
+                        },
+                    )
+                }
+            }
+        }
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            FilterChip(
+                selected = settings.networkEnabled,
+                onClick = { onNetwork(!settings.networkEnabled) },
+                label = { Text("Network") },
+            )
+            FilterChip(
+                selected = settings.execAllowed == true,
+                onClick = { onPrograms(settings.execAllowed != true) },
+                label = { Text("Programs") },
+            )
         }
     }
 }
@@ -249,6 +329,19 @@ private fun AgentActivityBar(activity: AgentActivity) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+            )
+        }
+        val bars = agentBars(activity.phase)
+        LinearProgressIndicator(
+            progress = { bars.overall / 100f },
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        )
+        if (bars.stepIndeterminate) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        } else {
+            LinearProgressIndicator(
+                progress = { bars.step / 100f },
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }

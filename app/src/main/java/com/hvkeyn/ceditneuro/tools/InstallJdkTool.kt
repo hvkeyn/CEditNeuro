@@ -32,7 +32,7 @@ class InstallJdkTool(
     override val description =
         "Download OpenJDK 17 and the Kotlin compiler into this app so java, javac, and kotlinc " +
             "can build programs. Call this once before compiling. The user is asked to allow it. " +
-            "This builds ordinary Java and Kotlin programs, not Android APKs."
+            "For an Android APK, call install_android_sdk after this and run gradle assembleDebug."
     override val parameters = objectSchema(properties = emptyMap())
 
     override suspend fun execute(args: JsonObject): ToolResult = withContext(Dispatchers.IO) {
@@ -317,6 +317,6 @@ class InstallJdkTool(
         private const val INSTALLED =
             "Installed OpenJDK 17 and Kotlin 2.0.21. java, javac, jar, and kotlinc are on PATH. " +
                 "Example: kotlinc src/main.kt -include-runtime -d app.jar && java -jar app.jar. " +
-                "This builds Java and Kotlin programs, not Android APKs."
+                "For an Android APK, call install_android_sdk, then gradle assembleDebug."
     }
 }

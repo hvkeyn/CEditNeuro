@@ -52,6 +52,7 @@ import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -126,6 +127,42 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
 
     LaunchedEffect(hasStorageAccess) {
         viewModel.restoreLastProject(hasStorageAccess)
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.checkForUpdate()
+    }
+
+    state.appUpdate?.let { update ->
+        val progress = if (update.total > 0) update.received.toFloat() / update.total else 0f
+        AlertDialog(
+            onDismissRequest = { if (!update.downloading) viewModel.dismissUpdate() },
+            title = { Text("Update ${update.versionName}") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("A newer release is on GitHub. Install it only if you confirm.")
+                    if (update.notes.isNotBlank()) Text(update.notes)
+                    if (update.downloading) {
+                        if (update.total > 0) {
+                            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                        } else {
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        }
+                        Text("Downloading…")
+                    }
+                    update.error?.let { Text(it) }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = viewModel::confirmUpdate,
+                    enabled = !update.downloading,
+                ) { Text("Install") }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissUpdate) { Text("Later") }
+            },
+        )
     }
 
     state.execPrompt?.let { reason ->
@@ -478,7 +515,11 @@ private fun AgentChat(
         state = state,
         settings = settings,
         onSend = viewModel::sendPrompt,
+        onContinue = viewModel::continueAgent,
         onCancel = viewModel::cancelAgent,
+        onWorkFocus = { focus -> viewModel.updateSettings { it.copy(workFocus = focus) } },
+        onNetwork = { enabled -> viewModel.updateSettings { it.copy(networkEnabled = enabled) } },
+        onPrograms = { enabled -> viewModel.updateSettings { it.copy(execAllowed = enabled) } },
         onClose = viewModel::toggleChat,
         onSelectModel = { providerId, modelName ->
             viewModel.updateSettings {
