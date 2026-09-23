@@ -171,7 +171,11 @@ class InstallAndroidSdkTool(
                 val header = ByteArray(60)
                 val read = readFullyOrEof(input, header)
                 if (read == 0) break
-                if (read < 60) throw IllegalStateException("Truncated Debian package: ${deb.name}")
+                if (read < 60) {
+                    throw IllegalStateException(
+                        "Truncated Debian package: ${deb.name} (${deb.length()} bytes, header read $read)",
+                    )
+                }
                 val name = String(header, 0, 16, Charsets.US_ASCII).trim().trimEnd('/')
                 val size = String(header, 48, 10, Charsets.US_ASCII).trim().toLong()
                 if (name == "data.tar.xz") {
@@ -355,7 +359,25 @@ class InstallAndroidSdkTool(
             return read
         }
 
-        override fun close() = Unit
+        override fun skip(n: Long): Long = drain(n)
+
+        override fun close() {
+            drain(left)
+        }
+
+        private fun drain(n: Long): Long {
+            if (n <= 0 || left <= 0) return 0
+            var remaining = minOf(n, left)
+            var skipped = 0L
+            val buf = ByteArray(8192)
+            while (remaining > 0) {
+                val read = read(buf, 0, minOf(buf.size.toLong(), remaining).toInt())
+                if (read < 0) break
+                skipped += read
+                remaining -= read
+            }
+            return skipped
+        }
     }
 
     companion object {

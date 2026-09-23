@@ -49,6 +49,9 @@ class AgentNet {
                         if (total > maxBytes) throw IOException("Download exceeded $maxBytes bytes.")
                         output.write(buffer, 0, read)
                     }
+                    if (length >= 0 && total != length) {
+                        throw IOException("Download ended at $total of $length bytes.")
+                    }
                 }
             }
         }
