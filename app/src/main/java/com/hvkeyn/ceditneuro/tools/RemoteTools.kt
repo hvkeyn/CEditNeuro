@@ -14,7 +14,9 @@ private class RemoteBridge(
     private val onLocalWrite: (String) -> Unit = {},
 ) {
     fun requireServer(): RemoteServer =
-        server() ?: throw IllegalStateException("No remote server is selected. Add one in Settings.")
+        server() ?: throw IllegalStateException(
+            "No remote server yet. Call remote_connect with the host, username, and password from the user.",
+        )
 
     suspend fun list(path: String): String {
         val active = requireServer()
@@ -39,7 +41,7 @@ private class RemoteBridge(
     suspend fun write(path: String, content: String): String {
         val active = requireServer()
         client.write(active, path, content.toByteArray(Charsets.UTF_8))
-        val site = active.webUrl.takeIf { it.isNotBlank() }?.let { " Check it with http_request: $it" }.orEmpty()
+        val site = active.webUrl.takeIf { it.isNotBlank() }?.let { " Then browse_page $it." }.orEmpty()
         return "Wrote $path on ${active.host}.$site"
     }
 
@@ -52,7 +54,7 @@ private class RemoteBridge(
         val bytes = withContext(Dispatchers.IO) { file.readBytes() }
         val active = requireServer()
         client.write(active, remotePath, bytes)
-        val site = active.webUrl.takeIf { it.isNotBlank() }?.let { " Check it with http_request: $it" }.orEmpty()
+        val site = active.webUrl.takeIf { it.isNotBlank() }?.let { " Then browse_page $it." }.orEmpty()
         return "Uploaded $localPath to $remotePath on ${active.host}.$site"
     }
 
@@ -69,11 +71,90 @@ private class RemoteBridge(
     }
 }
 
+class RemoteConnectTool(
+    private val client: RemoteClient,
+    private val adopt: (RemoteServer) -> RemoteServer,
+    private val networkAllowed: () -> Boolean,
+) : Tool {
+    override val name = "remote_connect"
+    override val description =
+        "Connect to an FTP, FTPS, or SFTP server with credentials the user just gave you in the chat. " +
+            "Call this before remote_list, remote_read, remote_write, remote_put, remote_get, or ssh_exec. " +
+            "ssh means SFTP. Do not ask the user to retype the same login into Settings."
+    override val parameters = objectSchema(
+        properties = mapOf(
+            "url" to stringProp("Optional ftp://, ftps://, or sftp:// URL including user and password."),
+            "protocol" to stringProp("ftp, ftps, or sftp. Defaults from the URL, otherwise sftp."),
+            "host" to stringProp("Server host name or IP."),
+            "port" to intProp("Port. Defaults to 22 for sftp and 21 for ftp/ftps."),
+            "username" to stringProp("Login."),
+            "password" to stringProp("Password."),
+            "start_path" to stringProp("Remote directory to start in. Defaults to /."),
+            "web_url" to stringProp("Public http(s) URL of the site to open in the browser after edits."),
+        ),
+    )
+
+    override suspend fun execute(args: JsonObject): ToolResult {
+        if (!networkAllowed()) return ToolResult.error("Agent network is off. Turn on Agent network in Settings.")
+        val parsed = parse(args)
+        val saved = adopt(parsed)
+        return remoteResult {
+            val report = client.probe(saved)
+            val site = saved.webUrl.takeIf { it.isNotBlank() }?.let { " Site: $it. Use browse_page on it after changes." }.orEmpty()
+            report + site
+        }
+    }
+
+    private fun parse(args: JsonObject): RemoteServer {
+        val fromUrl = args.stringArg("url")?.let(::parseRemoteUrl)
+        val protocol = (args.stringArg("protocol") ?: fromUrl?.protocol ?: "sftp").lowercase()
+            .let { if (it == "ssh") "sftp" else it }
+        if (protocol !in RemoteServer.PROTOCOLS) {
+            throw IllegalArgumentException("Protocol must be ftp, ftps, or sftp.")
+        }
+        val host = args.stringArg("host")?.trim().orEmpty().ifBlank { fromUrl?.host.orEmpty() }
+        if (host.isBlank()) throw IllegalArgumentException("Missing host.")
+        val port = args.intArg("port") ?: fromUrl?.port ?: RemoteServer.defaultPort(protocol)
+        if (port !in 1..65535) throw IllegalArgumentException("Port must be from 1 to 65535.")
+        return RemoteServer(
+            protocol = protocol,
+            host = host,
+            port = port,
+            username = args.stringArg("username") ?: fromUrl?.username.orEmpty(),
+            password = args.stringArg("password") ?: fromUrl?.password.orEmpty(),
+            startPath = args.stringArg("start_path")?.trim()?.ifBlank { null } ?: fromUrl?.startPath ?: "/",
+            webUrl = args.stringArg("web_url")?.trim().orEmpty(),
+            name = host,
+        )
+    }
+}
+
+private data class ParsedUrl(
+    val protocol: String,
+    val host: String,
+    val port: Int?,
+    val username: String,
+    val password: String,
+    val startPath: String,
+)
+
+private fun parseRemoteUrl(raw: String): ParsedUrl {
+    val uri = java.net.URI(raw.trim())
+    val protocol = uri.scheme?.lowercase()?.let { if (it == "ssh") "sftp" else it }
+        ?: throw IllegalArgumentException("URL needs a scheme such as sftp://.")
+    val host = uri.host ?: throw IllegalArgumentException("URL has no host.")
+    val userInfo = uri.userInfo.orEmpty()
+    val username = userInfo.substringBefore(':')
+    val password = if (userInfo.contains(':')) userInfo.substringAfter(':') else ""
+    val path = uri.path?.takeIf { it.isNotBlank() } ?: "/"
+    return ParsedUrl(protocol, host, uri.port.takeIf { it > 0 }, username, password, path)
+}
+
 class RemoteListTool(server: () -> RemoteServer?, client: RemoteClient) : Tool {
     private val bridge = RemoteBridge(server, client)
     override val name = "remote_list"
     override val description =
-        "List a directory on the selected FTP or SFTP server. path is remote, relative to the server start path, or absolute."
+        "List a directory on the connected FTP or SFTP server. path is remote, relative to the server start path, or absolute."
     override val parameters = objectSchema(
         properties = mapOf("path" to stringProp("Remote directory. Defaults to the server start path.")),
     )
@@ -101,8 +182,8 @@ class RemoteWriteTool(server: () -> RemoteServer?, client: RemoteClient) : Tool 
     private val bridge = RemoteBridge(server, client)
     override val name = "remote_write"
     override val description =
-        "Create or replace a text file on the selected FTP or SFTP server. " +
-            "After uploading a site, check the server web URL with http_request."
+        "Create or replace a text file on the connected FTP or SFTP server. " +
+            "After uploading a site, open it with browse_page."
     override val parameters = objectSchema(
         properties = mapOf(
             "path" to stringProp("Remote file path."),
@@ -169,8 +250,8 @@ class SshExecTool(server: () -> RemoteServer?, client: RemoteClient) : Tool {
     private val bridge = RemoteBridge(server, client)
     override val name = "ssh_exec"
     override val description =
-        "Run one command on the selected SFTP server over SSH. FTP cannot do this. " +
-            "Use it to reload a service, then check the site with http_request."
+        "Run one command on the connected SFTP server over SSH. FTP cannot do this. " +
+            "Use it to reload a service, then check the site with browse_page."
     override val parameters = objectSchema(
         properties = mapOf("command" to stringProp("One remote shell command.")),
         required = listOf("command"),

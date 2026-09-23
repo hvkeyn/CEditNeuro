@@ -16,6 +16,8 @@ import org.apache.commons.net.ftp.FTPSClient
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.net.ConnectException
+import java.net.UnknownHostException
 import java.security.MessageDigest
 import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
@@ -109,7 +111,7 @@ private class SftpOps(server: RemoteServer) : RemoteOps {
             if (fingerprint.isNotBlank() && fingerprint != server.trustedFingerprint) {
                 throw UntrustedHostException(fingerprint)
             }
-            throw IOException(error.message ?: "SSH connection failed.")
+            throw IOException(explainConnect(error, server.host, server.port))
         }
         sftp = session.openChannel("sftp") as ChannelSftp
         sftp.connect(20_000)
@@ -200,8 +202,8 @@ private class FtpOps(server: RemoteServer) : RemoteOps {
             if (fingerprint.isNotBlank() && fingerprint != server.trustedFingerprint) {
                 throw UntrustedHostException(fingerprint)
             }
-            if (error is IOException) throw error
-            throw IOException(error.message ?: "FTP connection failed.")
+            if (error is IOException && error.message?.startsWith("FTP login failed") == true) throw error
+            throw IOException(explainConnect(error, server.host, server.port))
         }
     }
 
@@ -294,6 +296,28 @@ private fun sha256Fingerprint(bytes: ByteArray): String {
     val encoded = android.util.Base64.encodeToString(digest, android.util.Base64.NO_WRAP).trimEnd('=')
     return "SHA256:$encoded"
 }
+
+private fun explainConnect(error: Throwable, host: String, port: Int): String {
+    val raw = generateSequence(error) { it.cause }
+        .mapNotNull { it.message?.takeIf(String::isNotBlank) }
+        .joinToString(" ")
+    val refused = error.causes().any { it is ConnectException } ||
+        raw.contains("Connection refused", ignoreCase = true)
+    val dns = error.causes().any { it is UnknownHostException } ||
+        raw.contains("Unable to resolve", ignoreCase = true)
+    return when {
+        raw.contains("FTP login failed", ignoreCase = true) ||
+            raw.contains("Auth fail", ignoreCase = true) ->
+            "Login rejected by $host. The username or password was not accepted."
+        dns -> "DNS failed for $host. The name did not resolve."
+        refused -> "Connection refused by $host:$port."
+        raw.contains("timeout", ignoreCase = true) || raw.contains("timed out", ignoreCase = true) ->
+            "Timed out connecting to $host:$port. Check the host name, the IP, and the port."
+        else -> raw.ifBlank { "Connection to $host:$port failed." }.take(400)
+    }
+}
+
+private fun Throwable.causes(): Sequence<Throwable> = generateSequence(this) { it.cause }
 
 private fun checkSize(size: Int) {
     if (size > MAX_BYTES) throw IOException("Transfer is $size bytes, limit is $MAX_BYTES.")

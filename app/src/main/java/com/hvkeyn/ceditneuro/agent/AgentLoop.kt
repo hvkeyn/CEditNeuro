@@ -31,9 +31,10 @@ class AgentLoop(
         messages += history
         messages += ChatMessage.user(userRequest)
 
-        repeat(maxToolRounds) {
+        repeat(maxToolRounds) { round ->
             val assistantText = StringBuilder()
             var pendingCalls: List<ToolCall> = emptyList()
+            emit(activity(messages, round))
 
             backend.complete(messages, toolRegistry.all).collect { chunk ->
                 when (chunk) {
@@ -69,6 +70,21 @@ class AgentLoop(
         }
 
         emit(AgentEvent.TurnFinished("max_tool_rounds"))
+    }
+
+    private fun activity(messages: List<ChatMessage>, round: Int): AgentEvent.Activity {
+        val chars = messages.sumOf { message ->
+            (message.content?.length ?: 0) +
+                (message.toolCalls?.sumOf { call ->
+                    call.function.name.length + call.function.arguments.length
+                } ?: 0)
+        }
+        val phase = if (round == 0) {
+            "Waiting for the model"
+        } else {
+            "Waiting for the model · step ${round + 1}"
+        }
+        return AgentEvent.Activity(phase, messages.size, chars)
     }
 
     private suspend fun executeTool(call: ToolCall): ToolResult {

@@ -27,7 +27,7 @@ class HttpRequestTool(
         properties = mapOf(
             "url" to stringProp("Absolute http or https URL."),
             "method" to stringProp("GET, POST, PUT, or DELETE. Defaults to GET."),
-            "headers" to stringProp("Optional request headers, one 'Name: value' per line."),
+            "headers" to stringProp("Optional request headers, one 'Name: value' per line. Content-Type is sent as given."),
             "body" to stringProp("Optional request body for POST and PUT."),
             "save_path" to stringProp("Optional path inside the project to store the response bytes."),
             "max_chars" to intProp("How much of a text response to return. Defaults to 16000."),
