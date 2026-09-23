@@ -1,6 +1,7 @@
 package com.hvkeyn.ceditneuro.ui
 
 import android.content.Context
+import android.content.pm.PackageManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -19,6 +20,7 @@ import com.hvkeyn.ceditneuro.data.StoredShell
 import com.hvkeyn.ceditneuro.net.AgentNet
 import com.hvkeyn.ceditneuro.net.RemoteClient
 import com.hvkeyn.ceditneuro.shell.DeviceShell
+import com.hvkeyn.ceditneuro.shizuku.ShizukuShell
 import com.hvkeyn.ceditneuro.shell.ProgramRun
 import com.hvkeyn.ceditneuro.tools.BrowsePageTool
 import com.hvkeyn.ceditneuro.tools.EditFileTool
@@ -26,9 +28,15 @@ import com.hvkeyn.ceditneuro.tools.HttpRequestTool
 import com.hvkeyn.ceditneuro.tools.InstallModuleTool
 import com.hvkeyn.ceditneuro.tools.InstallJdkTool
 import com.hvkeyn.ceditneuro.tools.InstallProgramTool
+import com.hvkeyn.ceditneuro.tools.InstallRuntimeTool
+import com.hvkeyn.ceditneuro.tools.ShizukuExecTool
+import com.hvkeyn.ceditneuro.tools.ZipPathsTool
 import com.hvkeyn.ceditneuro.tools.GitDiffTool
 import com.hvkeyn.ceditneuro.tools.GitStatusTool
+import com.hvkeyn.ceditneuro.tools.DeletePathTool
 import com.hvkeyn.ceditneuro.tools.GlobTool
+import com.hvkeyn.ceditneuro.tools.MkdirTool
+import com.hvkeyn.ceditneuro.tools.MovePathTool
 import com.hvkeyn.ceditneuro.tools.GrepTool
 import com.hvkeyn.ceditneuro.tools.ListDirTool
 import com.hvkeyn.ceditneuro.tools.ReadFileTool
@@ -45,11 +53,17 @@ import com.hvkeyn.ceditneuro.tools.ToolRegistry
 import com.hvkeyn.ceditneuro.tools.WriteFileTool
 import com.hvkeyn.ceditneuro.workspace.FileEntry
 import com.hvkeyn.ceditneuro.workspace.Workspace
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
+import rikka.shizuku.Shizuku
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -100,6 +114,7 @@ data class WorkspaceUiState(
     val shellRunning: Boolean = false,
     val shellLines: List<ShellLine> = emptyList(),
     val agentRunning: Boolean = false,
+    val agentActivity: AgentActivity? = null,
     val message: String? = null,
     val execPrompt: String? = null,
     val hostPrompt: HostTrustPrompt? = null,
@@ -110,6 +125,14 @@ data class WorkspaceUiState(
     val projectName: String?
         get() = projectRoot?.let { File(it).name.ifBlank { it } }
 }
+
+/** Live line shown while the agent is waiting, thinking, or running a tool. */
+data class AgentActivity(
+    val phase: String,
+    val context: String,
+    val focus: String,
+    val startedAt: Long,
+)
 
 class WorkspaceViewModel(
     private val appContext: Context,
@@ -123,6 +146,7 @@ class WorkspaceViewModel(
 
     private var workspace: Workspace? = null
     private val deviceShell = DeviceShell(appContext) { settingsStore.current.networkEnabled }
+    private val shizukuShell = ShizukuShell(appContext)
     private val agentNet = AgentNet()
     private val execMutex = Mutex()
     private var execWaiter: CompletableDeferred<Boolean>? = null
@@ -140,6 +164,9 @@ class WorkspaceViewModel(
     private val conversation = mutableListOf<ChatMessage>()
 
     private var agentJob: Job? = null
+    private var thoughtTail = ""
+    private var lastThoughtUi = 0L
+    private val activityJson = Json { ignoreUnknownKeys = true }
     private var persistJob: Job? = null
     private val idGenerator = AtomicLong(0)
     private val treeRefresh = AtomicLong(0)
@@ -581,13 +608,28 @@ class WorkspaceViewModel(
         val history = conversation.toList()
         conversation += ChatMessage.user(prompt)
         val epoch = sessionEpoch.get()
+        val openFile = _state.value.activePath?.substringAfterLast('/').orEmpty()
+        val preparedChars = history.sumOf { it.content?.length ?: 0 } + prompt.length
 
         val loop = buildAgentLoop(ws)
         val finalText = StringBuilder()
+        thoughtTail = ""
+        _state.update {
+            it.copy(
+                agentRunning = true,
+                chatVisible = true,
+                shellVisible = false,
+                message = null,
+                agentActivity = AgentActivity(
+                    phase = "Preparing the request",
+                    context = formatActivityContext(history.size + 1, preparedChars),
+                    focus = if (openFile.isBlank()) "" else "open $openFile",
+                    startedAt = System.currentTimeMillis(),
+                ),
+            )
+        }
 
         agentJob = viewModelScope.launch {
-            _state.update { it.copy(agentRunning = true, chatVisible = true, shellVisible = false, message = null) }
-
             runCatching {
                 loop.run(history, prompt).collect { event ->
                     if (sessionEpoch.get() == epoch) handleEvent(event, finalText)
@@ -603,7 +645,7 @@ class WorkspaceViewModel(
             if (finalText.isNotBlank()) {
                 conversation += ChatMessage.assistant(finalText.toString())
             }
-            _state.update { it.copy(agentRunning = false) }
+            _state.update { it.copy(agentRunning = false, agentActivity = null) }
             persistNow()
         }
     }
@@ -611,7 +653,8 @@ class WorkspaceViewModel(
     fun cancelAgent() {
         agentJob?.cancel()
         agentJob = null
-        _state.update { it.copy(agentRunning = false) }
+        thoughtTail = ""
+        _state.update { it.copy(agentRunning = false, agentActivity = null) }
         appendChat(ChatRole.Error, "Stopped by the user.")
     }
 
@@ -620,26 +663,128 @@ class WorkspaceViewModel(
             is AgentEvent.AssistantText -> {
                 finalText.append(event.text)
                 appendStreaming(ChatRole.Assistant, event.text)
+                if (_state.value.agentActivity?.phase != "Writing the answer") {
+                    setActivity(phase = "Writing the answer", focus = "")
+                }
             }
 
-            is AgentEvent.Reasoning -> appendStreaming(ChatRole.Reasoning, event.text)
+            is AgentEvent.Reasoning -> {
+                appendStreaming(ChatRole.Reasoning, event.text)
+                noteThought(event.text)
+            }
 
-            is AgentEvent.ToolStarted -> appendChat(
-                role = ChatRole.Tool,
-                text = visibleToolArguments(event.name, event.arguments),
-                toolName = "${event.name} →",
-            )
+            is AgentEvent.Activity -> {
+                thoughtTail = ""
+                val openFile = _state.value.activePath?.substringAfterLast('/').orEmpty()
+                setActivity(
+                    phase = event.phase,
+                    context = formatActivityContext(event.messages, event.chars),
+                    focus = if (openFile.isBlank()) "" else "open $openFile",
+                )
+            }
 
-            is AgentEvent.ToolFinished -> appendChat(
-                role = if (event.result.isError) ChatRole.Error else ChatRole.Tool,
-                text = event.result.content,
-                toolName = "${event.name} ←",
-            )
+            is AgentEvent.ToolStarted -> {
+                appendChat(
+                    role = ChatRole.Tool,
+                    text = visibleToolArguments(event.name, event.arguments),
+                    toolName = "${event.name} →",
+                )
+                setActivity(phase = event.name, focus = toolFocus(event.name, event.arguments))
+            }
+
+            is AgentEvent.ToolFinished -> {
+                appendChat(
+                    role = if (event.result.isError) ChatRole.Error else ChatRole.Tool,
+                    text = event.result.content,
+                    toolName = "${event.name} ←",
+                )
+                val line = event.result.content
+                    .lineSequence()
+                    .firstOrNull { it.isNotBlank() }
+                    .orEmpty()
+                    .take(140)
+                val phase = if (event.result.isError) "${event.name} failed" else "${event.name} done"
+                setActivity(phase = phase, focus = line)
+            }
 
             is AgentEvent.TurnFinished -> Unit
 
             is AgentEvent.Failed -> appendChat(ChatRole.Error, event.message)
         }
+    }
+
+    private suspend fun prepareShizuku(): String? {
+        if (!runCatching { Shizuku.pingBinder() }.getOrDefault(false)) {
+            return "Shizuku is not running. Open the Shizuku app, start it, and allow CEditNeuro."
+        }
+        if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) return null
+        return withContext(Dispatchers.Main) {
+            val waiter = CompletableDeferred<Boolean>()
+            val listener = Shizuku.OnRequestPermissionResultListener { _, result ->
+                if (!waiter.isCompleted) waiter.complete(result == PackageManager.PERMISSION_GRANTED)
+            }
+            Shizuku.addRequestPermissionResultListener(listener)
+            try {
+                Shizuku.requestPermission(SHIZUKU_REQUEST)
+                val granted = withTimeoutOrNull(60_000) { waiter.await() } == true
+                if (granted) null else "Shizuku permission was not granted."
+            } finally {
+                Shizuku.removeRequestPermissionResultListener(listener)
+            }
+        }
+    }
+
+    private fun formatActivityContext(messages: Int, chars: Int): String {
+        val model = settingsStore.current.modelLabel()
+        val size = if (chars >= 1024) "${chars / 1024} KB" else "$chars B"
+        val project = _state.value.projectName ?: "no project"
+        return "$model · $messages messages · $size · $project"
+    }
+
+    private fun setActivity(phase: String, context: String? = null, focus: String? = null) {
+        _state.update { current ->
+            val previous = current.agentActivity
+            val started = previous?.startedAt ?: System.currentTimeMillis()
+            current.copy(
+                agentActivity = AgentActivity(
+                    phase = phase,
+                    context = context ?: previous?.context.orEmpty(),
+                    focus = focus ?: previous?.focus.orEmpty(),
+                    startedAt = started,
+                ),
+            )
+        }
+    }
+
+    private fun noteThought(delta: String) {
+        thoughtTail = (thoughtTail + delta).takeLast(240)
+        val now = System.currentTimeMillis()
+        val alreadyThinking = _state.value.agentActivity?.phase == "Thinking"
+        if (alreadyThinking && now - lastThoughtUi < 400) return
+        lastThoughtUi = now
+        val line = thoughtTail
+            .lineSequence()
+            .lastOrNull { it.isNotBlank() }
+            ?.trim()
+            .orEmpty()
+            .ifBlank { thoughtTail.trim() }
+            .take(140)
+        setActivity(phase = "Thinking", focus = line)
+    }
+
+    private fun toolFocus(name: String, arguments: String): String {
+        val shown = visibleToolArguments(name, arguments)
+        val obj = runCatching { activityJson.parseToJsonElement(shown) as? JsonObject }.getOrNull()
+        val keys = when (name) {
+            "remote_connect" -> listOf("host", "protocol", "username")
+            "grep", "glob" -> listOf("pattern", "path")
+            "move_path" -> listOf("from", "to")
+            else -> FOCUS_KEYS
+        }
+        val value = keys.firstNotNullOfOrNull { key ->
+            (obj?.get(key) as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+        }
+        return (value ?: shown).replace('\n', ' ').trim().take(140)
     }
 
     private fun visibleToolArguments(name: String, arguments: String): String {
@@ -679,7 +824,7 @@ class WorkspaceViewModel(
     /** Called from file tools after the agent creates or edits a file. */
     private fun onAgentEditedFile(path: String) {
         refreshOpenFile(path)
-        refreshProjectTree(path)
+        if (!path.startsWith("/")) refreshProjectTree(path)
     }
 
     private fun refreshOpenFile(path: String) {
@@ -756,7 +901,11 @@ class WorkspaceViewModel(
             GlobTool(ws),
             GitStatusTool(ws),
             GitDiffTool(ws),
-            ShellTool(deviceShell, ws.root, this::ensureExecAllowed) { command, rendered ->
+            MkdirTool(ws),
+            DeletePathTool(ws),
+            MovePathTool(ws),
+            ZipPathsTool(ws),
+            ShellTool(deviceShell, ws, this::ensureExecAllowed) { command, rendered ->
                 if (sessionEpoch.get() != epochAtBuild) {
                     rememberFinishedCommand(ws.root.canonicalPath, command, rendered)
                     return@ShellTool
@@ -770,6 +919,13 @@ class WorkspaceViewModel(
             InstallModuleTool(ws, agentNet, { settingsStore.current.networkEnabled }) { path ->
                 if (sessionEpoch.get() == epochAtBuild) onAgentEditedFile(path)
             },
+            InstallRuntimeTool(
+                toolchain = deviceShell.toolchain,
+                net = agentNet,
+                networkAllowed = { settingsStore.current.networkEnabled },
+                ensureExec = this::ensureExecAllowed,
+            ),
+            ShizukuExecTool(ws, shizukuShell, this::prepareShizuku),
             InstallJdkTool(
                 toolchain = deviceShell.toolchain,
                 net = agentNet,
@@ -889,8 +1045,13 @@ class WorkspaceViewModel(
     }
 
     companion object {
+        private val FOCUS_KEYS = listOf(
+            "path", "command", "url", "host", "cwd", "query", "pattern",
+            "local_path", "remote_path", "from", "to", "name", "source", "dest",
+        )
         private val PASSWORD_FIELD = Regex(""""password"\s*:\s*"(?:\\.|[^"\\])*"""")
         private val URL_PASSWORD = Regex("""((?:sftp|ftps|ftp|ssh)://[^:/\s"]+):([^@"\s]+)@""")
+        private const val SHIZUKU_REQUEST = 31
         private const val MAX_STORED_CHAT = 400
         private const val MAX_STORED_SHELL = 200
         private const val MAX_STORED_CONVERSATION = 80

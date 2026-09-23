@@ -56,10 +56,12 @@ internal fun globToRegex(glob: String): Regex {
 class ListDirTool(private val workspace: Workspace) : Tool {
 
     override val name = "list_dir"
-    override val description = "List the direct children of a workspace directory."
+    override val description =
+        "List the direct children of a directory. A relative path is inside the project. " +
+            "An absolute path is a real filesystem path this app can read, such as /sdcard/Download."
     override val parameters = objectSchema(
         properties = mapOf(
-            "path" to stringProp("Directory relative to the workspace root. Defaults to the root."),
+            "path" to stringProp("Project-relative directory, or an absolute path. Defaults to the project root."),
         ),
     )
 
@@ -78,11 +80,11 @@ class ReadFileTool(private val workspace: Workspace) : Tool {
 
     override val name = "read_file"
     override val description =
-        "Read a text file from the workspace. Returns numbered lines. " +
-            "Use offset and limit to page through large files."
+        "Read a text file. A relative path is inside the project. An absolute path is a real " +
+            "filesystem path this app can read. Returns numbered lines. Use offset and limit for large files."
     override val parameters = objectSchema(
         properties = mapOf(
-            "path" to stringProp("File path relative to the workspace root."),
+            "path" to stringProp("Project-relative file, or an absolute path."),
             "offset" to intProp("1-based first line to return. Defaults to 1."),
             "limit" to intProp("Maximum number of lines to return. Defaults to 400."),
         ),
@@ -123,7 +125,7 @@ class WriteFileTool(
             "an existing file, so unrelated code is not lost."
     override val parameters = objectSchema(
         properties = mapOf(
-            "path" to stringProp("File path relative to the workspace root."),
+            "path" to stringProp("Project-relative file, or an absolute path this app can write."),
             "content" to stringProp("Full new contents of the file."),
         ),
         required = listOf("path", "content"),
@@ -155,7 +157,7 @@ class EditFileTool(
             "lines to make the match unique."
     override val parameters = objectSchema(
         properties = mapOf(
-            "path" to stringProp("File path relative to the workspace root."),
+            "path" to stringProp("Project-relative file, or an absolute path this app can write."),
             "old_string" to stringProp("Exact existing text to replace."),
             "new_string" to stringProp("Replacement text. May be empty to delete."),
             "replace_all" to boolProp("Replace every occurrence. Defaults to false."),
@@ -220,7 +222,7 @@ class GrepTool(private val workspace: Workspace) : Tool {
     override val parameters = objectSchema(
         properties = mapOf(
             "pattern" to stringProp("Regular expression to search for."),
-            "path" to stringProp("Subdirectory to search. Defaults to the workspace root."),
+            "path" to stringProp("Directory to search. Project-relative, or an absolute path. Defaults to the project."),
             "glob" to stringProp("Optional filename filter, for example *.kt."),
             "max_results" to intProp("Maximum matches to return. Defaults to 100."),
         ),
@@ -298,5 +300,108 @@ class GlobTool(private val workspace: Workspace) : Tool {
         }
 
         if (paths.isEmpty()) ToolResult.ok("(no files matched)") else ToolResult.ok(paths.joinToString("\n"))
+    }
+}
+
+class MkdirTool(private val workspace: Workspace) : Tool {
+    override val name = "mkdir"
+    override val description =
+        "Create a directory, including missing parents. Relative paths are inside the project. " +
+            "Absolute paths are real filesystem paths this app can write."
+    override val parameters = objectSchema(
+        properties = mapOf("path" to stringProp("Directory to create.")),
+        required = listOf("path"),
+    )
+
+    override suspend fun execute(args: JsonObject): ToolResult = withContext(Dispatchers.IO) {
+        val path = args.stringArg("path") ?: return@withContext ToolResult.error("Missing 'path'.")
+        val dir = runCatching { workspace.resolve(path) }.getOrElse {
+            return@withContext ToolResult.error(it.message ?: "Bad path.")
+        }
+        if (dir.isFile) return@withContext ToolResult.error("$path is a file.")
+        if (!dir.mkdirs() && !dir.isDirectory) return@withContext ToolResult.error("Could not create $path.")
+        ToolResult.ok("Created ${dir.path}")
+    }
+}
+
+class DeletePathTool(private val workspace: Workspace) : Tool {
+    override val name = "delete_path"
+    override val description =
+        "Delete a file or directory. Set recursive true to delete a directory and its contents. " +
+            "Refuses to delete the project root or a storage root."
+    override val parameters = objectSchema(
+        properties = mapOf(
+            "path" to stringProp("File or directory. Relative to the project, or absolute."),
+            "recursive" to boolProp("Delete a directory tree. Defaults to false."),
+        ),
+        required = listOf("path"),
+    )
+
+    override suspend fun execute(args: JsonObject): ToolResult = withContext(Dispatchers.IO) {
+        val path = args.stringArg("path") ?: return@withContext ToolResult.error("Missing 'path'.")
+        val recursive = args.boolArg("recursive") ?: false
+        val target = runCatching { workspace.resolve(path) }.getOrElse {
+            return@withContext ToolResult.error(it.message ?: "Bad path.")
+        }
+        if (isProtected(target, workspace)) {
+            return@withContext ToolResult.error("Refusing to delete ${target.path}.")
+        }
+        if (!target.exists()) return@withContext ToolResult.error("No such path: $path")
+        val removed = if (target.isDirectory) {
+            if (!recursive) return@withContext ToolResult.error("$path is a directory. Pass recursive=true.")
+            target.deleteRecursively()
+        } else {
+            target.delete()
+        }
+        if (!removed) return@withContext ToolResult.error("Could not delete ${target.path}.")
+        ToolResult.ok("Deleted ${target.path}")
+    }
+
+    private fun isProtected(target: File, workspace: Workspace): Boolean {
+        val path = target.canonicalPath
+        if (path == workspace.root.canonicalPath) return true
+        return path in PROTECTED_ROOTS
+    }
+
+    companion object {
+        private val PROTECTED_ROOTS = setOf(
+            "/",
+            "/sdcard",
+            "/storage",
+            "/storage/emulated",
+            "/storage/emulated/0",
+            "/mnt",
+            "/data",
+        )
+    }
+}
+
+class MovePathTool(private val workspace: Workspace) : Tool {
+    override val name = "move_path"
+    override val description =
+        "Move or rename a file or directory. Source and destination may be project-relative or absolute."
+    override val parameters = objectSchema(
+        properties = mapOf(
+            "from" to stringProp("Existing file or directory."),
+            "to" to stringProp("New path."),
+        ),
+        required = listOf("from", "to"),
+    )
+
+    override suspend fun execute(args: JsonObject): ToolResult = withContext(Dispatchers.IO) {
+        val from = args.stringArg("from") ?: return@withContext ToolResult.error("Missing 'from'.")
+        val to = args.stringArg("to") ?: return@withContext ToolResult.error("Missing 'to'.")
+        val source = runCatching { workspace.resolve(from) }.getOrElse {
+            return@withContext ToolResult.error(it.message ?: "Bad source.")
+        }
+        val dest = runCatching { workspace.resolve(to) }.getOrElse {
+            return@withContext ToolResult.error(it.message ?: "Bad destination.")
+        }
+        if (!source.exists()) return@withContext ToolResult.error("No such path: $from")
+        if (dest.exists()) return@withContext ToolResult.error("Destination already exists: $to")
+        dest.parentFile?.mkdirs()
+        val moved = source.renameTo(dest) || (source.copyRecursively(dest) && source.deleteRecursively())
+        if (!moved) return@withContext ToolResult.error("Could not move ${source.path} to ${dest.path}.")
+        ToolResult.ok("Moved ${source.path} to ${dest.path}")
     }
 }
