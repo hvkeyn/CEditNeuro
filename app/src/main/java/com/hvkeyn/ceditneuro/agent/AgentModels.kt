@@ -24,6 +24,8 @@ data class ToolCall(
 data class ChatMessage(
     val role: String,
     val content: String? = null,
+    /** Echoed back on the next DeepSeek call. Dropping it makes a tool round fail. */
+    @SerialName("reasoning_content") val reasoningContent: String? = null,
     @SerialName("tool_calls") val toolCalls: List<ToolCall>? = null,
     @SerialName("tool_call_id") val toolCallId: String? = null,
     val name: String? = null,
@@ -33,8 +35,16 @@ data class ChatMessage(
 
         fun user(text: String) = ChatMessage(role = "user", content = text)
 
-        fun assistant(text: String? = null, toolCalls: List<ToolCall>? = null) =
-            ChatMessage(role = "assistant", content = text, toolCalls = toolCalls)
+        fun assistant(
+            text: String? = null,
+            toolCalls: List<ToolCall>? = null,
+            reasoning: String? = null,
+        ) = ChatMessage(
+            role = "assistant",
+            content = text,
+            reasoningContent = reasoning?.takeIf { it.isNotBlank() },
+            toolCalls = toolCalls,
+        )
 
         fun tool(toolCallId: String, name: String, content: String) = ChatMessage(
             role = "tool",

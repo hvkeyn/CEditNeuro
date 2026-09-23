@@ -824,7 +824,16 @@ class WorkspaceViewModel(
                 setActivity(phase = phase, focus = line)
             }
 
-            is AgentEvent.TurnFinished -> Unit
+            is AgentEvent.TurnFinished -> {
+                val note = when (event.reason) {
+                    "length" -> "Stopped: the model hit its output limit. Continue resumes from here."
+                    "connection" -> "Stopped: the connection dropped. Continue resumes from here."
+                    "max_tool_rounds" -> "Stopped: this run reached its step limit. Continue keeps going."
+                    "empty" -> "Stopped: the model returned an empty reply."
+                    else -> null
+                }
+                if (note != null) appendChat(ChatRole.Error, note)
+            }
 
             is AgentEvent.Failed -> appendChat(ChatRole.Error, event.message)
         }
