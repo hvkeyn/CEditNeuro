@@ -12,7 +12,6 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FilterInputStream
 import java.io.InputStream
-import java.net.URLEncoder
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Paths
@@ -64,7 +63,7 @@ class InstallRuntimeTool(
         try {
             for (path in spec.debs) {
                 val deb = File(staging, path.substringAfterLast('/').replace(':', '_'))
-                net.download(packageUrl(path), deb, MAX_DOWNLOAD, TIMEOUT_SECONDS)
+                TermuxRepo.download(net, path, deb, MAX_DOWNLOAD, TIMEOUT_SECONDS)
                 extractDeb(deb, toolchain, unpacked)
                 deb.delete()
             }
@@ -94,11 +93,6 @@ class InstallRuntimeTool(
             }
         }
     }
-
-    private fun packageUrl(path: String): String =
-        BASE + path.split('/').joinToString("/") { segment ->
-            URLEncoder.encode(segment, Charsets.UTF_8).replace("+", "%20")
-        }
 
     private fun extractDeb(deb: File, destRoot: File, unpacked: LongArray) {
         FileInputStream(deb).use { input ->
@@ -267,7 +261,6 @@ class InstallRuntimeTool(
     )
 
     companion object {
-        private const val BASE = "https://packages.termux.dev/apt/termux-main/"
         private const val TIMEOUT_SECONDS = 600L
         private const val MAX_DOWNLOAD = 80L * 1024L * 1024L
         private const val MAX_UNPACKED = 400L * 1024L * 1024L

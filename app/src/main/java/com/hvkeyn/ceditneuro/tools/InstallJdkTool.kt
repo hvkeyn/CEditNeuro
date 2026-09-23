@@ -57,7 +57,7 @@ class InstallJdkTool(
         try {
             for (path in DEBS) {
                 val deb = File(staging, path.substringAfterLast('/'))
-                net.download(BASE + path, deb, MAX_DOWNLOAD, TIMEOUT_SECONDS)
+                TermuxRepo.download(net, path, deb, MAX_DOWNLOAD, TIMEOUT_SECONDS)
                 extractDeb(deb, toolchain, unpacked)
                 deb.delete()
             }
@@ -103,7 +103,7 @@ class InstallJdkTool(
         val unpacked = longArrayOf(0L)
         return try {
             val deb = File(staging, "zlib.deb")
-            net.download(BASE + ZLIB_DEB, deb, MAX_DOWNLOAD, TIMEOUT_SECONDS)
+            TermuxRepo.download(net, ZLIB_DEB, deb, MAX_DOWNLOAD, TIMEOUT_SECONDS)
             extractDeb(deb, toolchain, unpacked)
             ToolResult.ok("Repaired zlib in the JDK toolchain. java and javac can start again.")
         } catch (error: CancellationException) {
@@ -344,7 +344,6 @@ class InstallJdkTool(
     }
 
     companion object {
-        private const val BASE = "https://packages.termux.dev/apt/termux-main/"
         private const val KOTLIN_URL =
             "https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip"
         private const val STAMP_NAME = "jdk-stamp"
@@ -355,7 +354,8 @@ class InstallJdkTool(
         private val AR_MAGIC = "!<arch>\n".toByteArray(Charsets.US_ASCII)
         private const val ZLIB_DEB = "pool/main/z/zlib/zlib_1.3.2_aarch64.deb"
         private val DEBS = listOf(
-            "pool/main/libc/libc++/libc++_29_aarch64.deb",
+            "pool/main/libc/libc++/libc++_30_aarch64.deb",
+            "pool/main/libi/libiconv/libiconv_1.19_aarch64.deb",
             "pool/main/liba/libandroid-shmem/libandroid-shmem_0.7_aarch64.deb",
             "pool/main/liba/libandroid-spawn/libandroid-spawn_0.3_aarch64.deb",
             ZLIB_DEB,
