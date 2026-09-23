@@ -135,7 +135,7 @@ class DeviceShell(
         dest.parentFile?.mkdirs()
         val part = File(dest.parentFile, dest.name + ".part")
         return runCatching {
-            net.download(url, part, AgentNet.MAX_DOWNLOAD_BYTES)
+            net.download(url, part, AgentNet.MAX_FILE_BYTES, 180)
             if (dest.exists() && !dest.delete()) {
                 part.delete()
                 return ShellOutput(1, "Could not replace ${dest.path}", timedOut = false)
