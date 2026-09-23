@@ -8,6 +8,9 @@ sealed interface AgentEvent {
 
     data class Reasoning(val text: String) : AgentEvent
 
+    /** One line of progress so a slow request does not look frozen. */
+    data class Activity(val phase: String, val messages: Int, val chars: Int) : AgentEvent
+
     data class ToolStarted(val name: String, val arguments: String) : AgentEvent
 
     data class ToolFinished(val name: String, val result: ToolResult) : AgentEvent

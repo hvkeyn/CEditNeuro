@@ -366,7 +366,9 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
             if (state.webVisible && state.webUrl.isNotBlank()) {
                 WebPreview(
                     url = state.webUrl,
+                    generation = state.webGeneration,
                     onClose = viewModel::toggleWeb,
+                    onLoaded = viewModel::onBrowseLoaded,
                     modifier = Modifier.fillMaxSize(),
                 )
             }

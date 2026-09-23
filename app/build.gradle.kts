@@ -15,8 +15,8 @@ android {
         // API 29+ forbids executing a program this app just wrote. API 28 stays in the
         // compatibility domain that can run compilers installed into the app's private files.
         targetSdk = 28
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
     }
 
     buildTypes {
@@ -47,6 +47,7 @@ android {
 
     buildFeatures {
         compose = true
+        aidl = true
     }
 
     lint {
@@ -92,7 +93,11 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.slf4j.nop)
     implementation(libs.commons.net)
+    implementation(libs.commons.compress)
+    implementation(libs.xz)
     implementation(libs.jsch)
+    implementation(libs.shizuku.api)
+    implementation(libs.shizuku.provider)
 
     implementation(libs.sora.editor)
 

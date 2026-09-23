@@ -23,11 +23,15 @@ class AgentNet {
         .callTimeout(120, TimeUnit.SECONDS)
         .build()
 
-    fun download(url: String, dest: File, maxBytes: Long) {
+    fun download(url: String, dest: File, maxBytes: Long, timeoutSeconds: Long = 120) {
         val httpUrl = parseUrl(url)
         dest.parentFile?.mkdirs()
         val request = Request.Builder().url(httpUrl).header("User-Agent", USER_AGENT).build()
-        client.newCall(request).execute().use { response ->
+        val caller = client.newBuilder()
+            .callTimeout(timeoutSeconds, TimeUnit.SECONDS)
+            .readTimeout(timeoutSeconds, TimeUnit.SECONDS)
+            .build()
+        caller.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 throw IOException("HTTP ${response.code} for $url")
             }
@@ -60,12 +64,19 @@ class AgentNet {
         val httpUrl = parseUrl(url)
         val verb = method.trim().uppercase().ifBlank { "GET" }
         if (verb !in ALLOWED_METHODS) throw IOException("Unsupported method $verb.")
+        val contentType = headers.entries
+            .firstOrNull { it.key.equals("Content-Type", ignoreCase = true) }
+            ?.value
+            ?.ifBlank { null }
+            ?: "text/plain; charset=utf-8"
         val requestBody = when {
             verb == "GET" || verb == "HEAD" -> null
-            else -> (body ?: "").toRequestBody("text/plain; charset=utf-8".toMediaType())
+            else -> (body ?: "").toRequestBody(contentType.toMediaType())
         }
         val builder = Request.Builder().url(httpUrl).method(verb, requestBody).header("User-Agent", USER_AGENT)
-        headers.forEach { (name, value) -> builder.header(name, value) }
+        headers.forEach { (name, value) ->
+            if (!name.equals("Content-Type", ignoreCase = true)) builder.header(name, value)
+        }
         client.newCall(builder.build()).execute().use { response ->
             val bytes = response.body?.bytes() ?: ByteArray(0)
             if (bytes.size > maxBytes) {

@@ -1,7 +1,15 @@
 package com.hvkeyn.ceditneuro.ui
 
+import android.annotation.SuppressLint
+import android.content.Context
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,7 +32,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 @Composable
 fun WebPreview(
     url: String,
+    generation: Int,
     onClose: () -> Unit,
+    onLoaded: (title: String, text: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(modifier = modifier, color = MaterialTheme.colorScheme.surface) {
@@ -46,18 +56,59 @@ fun WebPreview(
             }
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
-                factory = { context ->
-                    WebView(context).apply {
-                        webViewClient = WebViewClient()
-                        settings.javaScriptEnabled = true
-                        settings.domStorageEnabled = true
-                        loadUrl(url)
-                    }
-                },
+                factory = { context -> PageWebView(context) },
                 update = { view ->
-                    if (view.url != url && view.originalUrl != url) view.loadUrl(url)
+                    view.onLoaded = onLoaded
+                    if (view.generation != generation) {
+                        view.generation = generation
+                        view.loadUrl(url)
+                    }
                 },
             )
         }
     }
 }
+
+@SuppressLint("SetJavaScriptEnabled")
+private class PageWebView(context: Context) : WebView(context) {
+    var onLoaded: (title: String, text: String) -> Unit = { _, _ -> }
+    var generation: Int = -1
+
+    init {
+        settings.javaScriptEnabled = true
+        settings.domStorageEnabled = true
+        webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView, finishedUrl: String) {
+                if (finishedUrl == "about:blank") return
+                evaluateJavascript(PAGE_SCRIPT) { raw ->
+                    val (title, text) = parsePage(raw)
+                    onLoaded(title, text)
+                }
+            }
+
+            override fun onReceivedError(
+                view: WebView,
+                request: WebResourceRequest,
+                error: WebResourceError,
+            ) {
+                if (request.isForMainFrame) onLoaded("", "Browser error: ${error.description}")
+            }
+        }
+    }
+}
+
+private fun parsePage(raw: String?): Pair<String, String> {
+    if (raw.isNullOrBlank() || raw == "null") return "" to ""
+    val inner = runCatching { pageJson.parseToJsonElement(raw) }.getOrNull()
+    val payload = if (inner is JsonPrimitive && inner.isString) inner.content else raw
+    val obj = runCatching { pageJson.parseToJsonElement(payload).jsonObject }.getOrNull() ?: return "" to payload.take(4000)
+    return obj.string("title") to obj.string("text")
+}
+
+private fun JsonObject.string(key: String): String = (this[key] as? JsonPrimitive)?.content.orEmpty()
+
+private val pageJson = Json { ignoreUnknownKeys = true }
+
+private const val PAGE_SCRIPT =
+    "(function(){var t=document.title||'';var b=document.body?document.body.innerText:'';" +
+        "return JSON.stringify({title:t,text:b.slice(0,6000)});})()"
