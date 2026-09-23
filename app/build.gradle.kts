@@ -15,8 +15,8 @@ android {
         // API 29+ forbids executing a program this app just wrote. API 28 stays in the
         // compatibility domain that can run compilers installed into the app's private files.
         targetSdk = 28
-        versionCode = 8
-        versionName = "0.8.0"
+        versionCode = 9
+        versionName = "0.9.0"
     }
 
     buildTypes {
@@ -56,6 +56,9 @@ android {
     }
 
     packaging {
+        jniLibs {
+            pickFirsts += "**/libc++_shared.so"
+        }
         resources {
             excludes += setOf(
                 "META-INF/DEPENDENCIES",
@@ -100,15 +103,14 @@ dependencies {
     implementation(libs.shizuku.provider)
 
     implementation(libs.sora.editor)
-
-    // Milestone 2 (syntax highlighting) needs these, but language-textmate pulls in tm4e,
-    // which is compiled against Java records. AGP 8.7 dexes external libraries without the
-    // global synthetics that record desugaring requires, so the build fails with
-    // "Attempt to create a global synthetic for 'Record desugaring'". Enabling them means
-    // either a newer AGP or dexing the grammars from source instead of as an AAR.
-    // implementation(libs.sora.language.textmate)
-    // implementation(libs.sora.editor.lsp)
-    // implementation(libs.sora.language.treesitter)
+    implementation(libs.sora.editor.lsp)
+    implementation(libs.sora.language.treesitter)
+    implementation("org.eclipse.lsp4j:org.eclipse.lsp4j:0.24.0")
+    implementation("com.itsaky.androidide.treesitter:tree-sitter-java:4.3.1")
+    implementation("com.itsaky.androidide.treesitter:tree-sitter-kotlin:4.3.1")
+    implementation("com.itsaky.androidide.treesitter:tree-sitter-python:4.3.1")
+    implementation("com.itsaky.androidide.treesitter:tree-sitter-json:4.3.1")
+    implementation("com.itsaky.androidide.treesitter:tree-sitter-xml:4.3.1")
 
     implementation(libs.jgit) {
         exclude(group = "com.googlecode.javaewah", module = "JavaEWAH")

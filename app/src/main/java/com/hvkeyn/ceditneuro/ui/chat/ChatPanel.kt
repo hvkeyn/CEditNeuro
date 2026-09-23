@@ -120,10 +120,13 @@ fun ChatPanel(
         if (last >= 0) listState.scrollToItem(last)
     }
 
+    val compact = LocalConfiguration.current.let { it.screenHeightDp < 520 && it.screenWidthDp > it.screenHeightDp }
+
     Surface(modifier = modifier, color = MaterialTheme.colorScheme.surfaceVariant) {
         Column {
             AgentToolbar(
                 settings = settings,
+                compact = compact,
                 onWorkFocus = onWorkFocus,
                 onNetwork = onNetwork,
                 onPrograms = onPrograms,
@@ -145,8 +148,10 @@ fun ChatPanel(
                             .fillMaxHeight()
                             .nestedScroll(userScroll)
                             .padding(horizontal = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 8.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                            vertical = if (compact) 6.dp else 12.dp,
+                        ),
                     ) {
                         if (state.chat.isEmpty()) {
                             item { ChatHint() }
@@ -199,7 +204,7 @@ fun ChatPanel(
 
             state.agentActivity?.let { activity ->
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-                AgentActivityBar(activity)
+                AgentActivityBar(activity, compact = compact)
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
@@ -207,22 +212,24 @@ fun ChatPanel(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 6.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.Bottom,
+                    .padding(horizontal = 6.dp, vertical = if (compact) 2.dp else 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 OutlinedTextField(
                     value = input,
                     onValueChange = { input = it },
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text("Ask the agent…") },
-                    maxLines = if (LocalConfiguration.current.screenHeightDp < 500) 2 else 4,
+                    placeholder = { Text(if (compact) "Message" else "Ask the agent…") },
+                    singleLine = compact,
+                    maxLines = if (compact) 1 else 4,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
                 )
                 RoundAction(
                     icon = Icons.Filled.PlayArrow,
                     description = "Continue",
                     filled = false,
+                    size = if (compact) 32.dp else 40.dp,
                     enabled = !state.agentRunning && state.projectRoot != null && state.chat.isNotEmpty(),
                     onClick = onContinue,
                 )
@@ -231,6 +238,7 @@ fun ChatPanel(
                     description = "Stop",
                     filled = state.agentRunning,
                     danger = true,
+                    size = if (compact) 32.dp else 40.dp,
                     enabled = state.agentRunning,
                     onClick = onCancel,
                 )
@@ -238,6 +246,7 @@ fun ChatPanel(
                     icon = Icons.AutoMirrored.Filled.Send,
                     description = "Send",
                     filled = true,
+                    size = if (compact) 32.dp else 40.dp,
                     enabled = !state.agentRunning && input.isNotBlank() && state.projectRoot != null,
                     onClick = {
                         val prompt = input.trim()
@@ -255,6 +264,7 @@ fun ChatPanel(
 @Composable
 private fun AgentToolbar(
     settings: AgentSettings,
+    compact: Boolean,
     onWorkFocus: (String) -> Unit,
     onNetwork: (Boolean) -> Unit,
     onPrograms: (Boolean) -> Unit,
@@ -277,7 +287,7 @@ private fun AgentToolbar(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Box {
-                Pill(text = settings.modelLabel(), onClick = { modelOpen = true }, maxWidth = 132.dp)
+                Pill(text = settings.modelLabel(), onClick = { modelOpen = true }, maxWidth = if (compact) 108.dp else 132.dp, compact = compact)
                 DropdownMenu(expanded = modelOpen, onDismissRequest = { modelOpen = false }) {
                     settings.providers.forEach { provider ->
                         Text(
@@ -299,7 +309,7 @@ private fun AgentToolbar(
                 }
             }
             Box {
-                Pill(text = workLabel, onClick = { workOpen = true })
+                Pill(text = workLabel, onClick = { workOpen = true }, compact = compact)
                 DropdownMenu(expanded = workOpen, onDismissRequest = { workOpen = false }) {
                     DropdownMenuItem(
                         text = { Text("Edit") },
@@ -324,10 +334,11 @@ private fun AgentToolbar(
                     )
                 }
             }
-            Pill(text = "Net", selected = settings.networkEnabled, onClick = { onNetwork(!settings.networkEnabled) })
+            Pill(text = "Net", selected = settings.networkEnabled, compact = compact, onClick = { onNetwork(!settings.networkEnabled) })
             Pill(
                 text = "Run",
                 selected = settings.execAllowed == true,
+                compact = compact,
                 onClick = { onPrograms(settings.execAllowed != true) },
             )
             Box(modifier = Modifier.weight(1f))
@@ -351,6 +362,7 @@ private fun Pill(
     text: String,
     onClick: () -> Unit,
     selected: Boolean = false,
+    compact: Boolean = false,
     maxWidth: androidx.compose.ui.unit.Dp = 88.dp,
 ) {
     val background = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
@@ -366,7 +378,7 @@ private fun Pill(
             .background(background, RoundedCornerShape(8.dp))
             .border(1.dp, border, RoundedCornerShape(8.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = 8.dp, vertical = if (compact) 2.dp else 4.dp),
     )
 }
 
@@ -378,6 +390,7 @@ private fun RoundAction(
     enabled: Boolean,
     filled: Boolean,
     danger: Boolean = false,
+    size: androidx.compose.ui.unit.Dp = 40.dp,
 ) {
     val background = when {
         !enabled -> Color.Transparent
@@ -395,8 +408,7 @@ private fun RoundAction(
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier
-            .padding(bottom = 4.dp)
-            .size(40.dp)
+            .size(size)
             .background(background, CircleShape),
     ) {
         Icon(icon, contentDescription = description, tint = tint, modifier = Modifier.size(20.dp))
@@ -404,7 +416,7 @@ private fun RoundAction(
 }
 
 @Composable
-private fun AgentActivityBar(activity: AgentActivity) {
+private fun AgentActivityBar(activity: AgentActivity, compact: Boolean) {
     var now by remember(activity.startedAt) { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(activity.startedAt) {
         while (true) {
@@ -445,11 +457,13 @@ private fun AgentActivityBar(activity: AgentActivity) {
                 modifier = Modifier.padding(start = 8.dp).weight(1f),
             )
         }
-        val bars = agentBars(activity.phase)
-        LinearProgressIndicator(
-            progress = { bars.overall / 100f },
-            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-        )
+        if (!compact) {
+            val bars = agentBars(activity.phase)
+            LinearProgressIndicator(
+                progress = { bars.overall / 100f },
+                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+            )
+        }
     }
 }
 
@@ -597,10 +611,15 @@ private fun ThinkingBlock(entry: ChatEntry) {
             }
         }
         if (open) {
+            val compact = LocalConfiguration.current.let {
+                it.screenHeightDp < 520 && it.screenWidthDp > it.screenHeightDp
+            }
             Text(
                 text = entry.text,
                 style = MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = if (compact && entry.streaming) 3 else Int.MAX_VALUE,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 4.dp),
             )
         } else {

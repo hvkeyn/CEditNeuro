@@ -69,15 +69,21 @@ object AppUpdater {
             val tag = json.optString("tag_name").removePrefix("v").trim()
             if (tag.isEmpty() || !isNewer(tag, localVersion)) return null
             val assets = json.optJSONArray("assets") ?: return null
-            var apkUrl = ""
+            var fallback = ""
+            var preferred = ""
             for (index in 0 until assets.length()) {
                 val asset = assets.optJSONObject(index) ?: continue
                 val name = asset.optString("name")
-                if (name.endsWith(".apk", ignoreCase = true)) {
-                    apkUrl = asset.optString("browser_download_url")
-                    if (apkUrl.isNotBlank()) break
+                if (!name.endsWith(".apk", ignoreCase = true)) continue
+                val url = asset.optString("browser_download_url")
+                if (url.isBlank()) continue
+                if (fallback.isBlank()) fallback = url
+                if (name.contains(tag, ignoreCase = true)) {
+                    preferred = url
+                    break
                 }
             }
+            val apkUrl = preferred.ifBlank { fallback }
             if (apkUrl.isBlank()) return null
             val notes = json.optString("body").trim().take(600)
             return AppUpdate(versionName = tag, notes = notes, apkUrl = apkUrl)

@@ -202,12 +202,16 @@ fun ShellPanel(
                 verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                val compact = LocalConfiguration.current.let {
+                    it.screenHeightDp < 520 && it.screenWidthDp > it.screenHeightDp
+                }
                 OutlinedTextField(
                     value = input,
                     onValueChange = { input = it },
                     modifier = Modifier.weight(1f),
                     placeholder = { Text("echo hello") },
-                    maxLines = if (LocalConfiguration.current.screenHeightDp < 500) 2 else 4,
+                    singleLine = compact,
+                    maxLines = if (compact) 1 else 4,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { submit() }),
                 )
