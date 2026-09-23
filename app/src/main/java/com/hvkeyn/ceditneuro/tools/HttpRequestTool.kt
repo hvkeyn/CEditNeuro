@@ -67,7 +67,7 @@ class HttpRequestTool(
                 .getOrElse { return@withContext ToolResult.error(it.message ?: "Bad save_path.") }
             if (file.isDirectory) return@withContext ToolResult.error("$savePath is a directory.")
             file.parentFile?.mkdirs()
-            runCatching { net.download(url, file, SAVE_LIMIT, 180) }
+            runCatching { net.download(url, file, AgentNet.MAX_FILE_BYTES, 180) }
                 .getOrElse { return@withContext ToolResult.error(it.message ?: "Request failed.") }
             onSaved(savePath)
             return@withContext ToolResult.ok("HTTP GET\nSaved ${file.length()} bytes to $savePath")
@@ -93,9 +93,5 @@ class HttpRequestTool(
         val shown = if (text.length <= maxChars) text else text.take(maxChars) + "\n… truncated"
         val type = exchange.contentType.ifBlank { "unknown" }
         ToolResult.ok("HTTP ${exchange.code} ($type)\n$shown")
-    }
-
-    private companion object {
-        const val SAVE_LIMIT = 96L * 1024L * 1024L
     }
 }

@@ -93,6 +93,8 @@ class AgentNet {
     companion object {
         const val USER_AGENT = "CEditNeuro"
         const val MAX_DOWNLOAD_BYTES = 32L * 1024L * 1024L
+        /** A GET that is written straight to disk, including `fetch URL DEST`. */
+        const val MAX_FILE_BYTES = 96L * 1024L * 1024L
         private val ALLOWED_METHODS = setOf("GET", "HEAD", "POST", "PUT", "DELETE")
 
         fun parseUrl(raw: String): okhttp3.HttpUrl {
