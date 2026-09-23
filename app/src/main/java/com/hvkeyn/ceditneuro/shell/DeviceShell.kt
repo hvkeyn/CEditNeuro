@@ -27,13 +27,15 @@ class DeviceShell(
     fun run(command: String, workDir: File, timeoutSeconds: Int): ShellOutput {
         val timeout = timeoutSeconds.coerceIn(5, 900)
         val directory = if (workDir.isDirectory) workDir else home
-        parseFetch(command)?.let { (url, dest) ->
-            return download(url, dest, directory)
+        if (isPlainFetch(command)) {
+            val parsed = parseFetch(command)
+                ?: return ShellOutput(1, "Usage: fetch URL DEST", timedOut = false)
+            return download(parsed.first, parsed.second, directory)
         }
 
         val process = ProcessBuilder(SHELL, "-c", command)
             .directory(directory)
-            .redirectErrorStream(true)
+            .redirectErrorStream(false)
             .apply {
                 environment().apply {
                     put("HOME", home.absolutePath)
@@ -51,40 +53,67 @@ class DeviceShell(
                     put("PATH", "${toolchainBin.absolutePath}:/system/bin:/system/xbin")
                     put("LD_LIBRARY_PATH", libraryPath)
                     if (javaHome.isDirectory) put("JAVA_HOME", javaHome.absolutePath)
+                    val cert = File(toolchain, "etc/tls/cert.pem")
+                    if (cert.isFile) {
+                        put("SSL_CERT_FILE", cert.absolutePath)
+                        put("GIT_SSL_CAINFO", cert.absolutePath)
+                        put("CURL_CA_BUNDLE", cert.absolutePath)
+                    }
+                    val gitExec = File(toolchain, "libexec/git-core")
+                    if (gitExec.isDirectory) put("GIT_EXEC_PATH", gitExec.absolutePath)
+                    val templates = File(toolchain, "share/git-core/templates")
+                    if (templates.isDirectory) put("GIT_TEMPLATE_DIR", templates.absolutePath)
+                    val pythonHome = File(toolchain, "lib").listFiles()?.any {
+                        it.isDirectory && it.name.startsWith("python3.")
+                    } == true
+                    if (pythonHome) {
+                        put("PYTHONHOME", toolchain.absolutePath)
+                        put("PYTHONUNBUFFERED", "1")
+                    }
                 }
             }
             .start()
 
-        val output = StringBuilder()
-        val pump = Thread {
-            val buffer = ByteArray(4096)
-            val stream = process.inputStream
-            while (true) {
-                val read = runCatching { stream.read(buffer) }.getOrDefault(-1)
-                if (read < 0) break
-                if (output.length < MAX_OUTPUT_CHARS) {
+        val stdout = StringBuilder()
+        val stderr = StringBuilder()
+        val truncated = java.util.concurrent.atomic.AtomicBoolean(false)
+        val pumps = listOf(process.inputStream to stdout, process.errorStream to stderr).map { (source, target) ->
+            Thread {
+                val buffer = ByteArray(4096)
+                while (true) {
+                    val read = runCatching { source.read(buffer) }.getOrDefault(-1)
+                    if (read < 0) break
                     val chunk = String(buffer, 0, read)
-                    val room = MAX_OUTPUT_CHARS - output.length
-                    output.append(if (chunk.length <= room) chunk else chunk.take(room))
+                    synchronized(stdout) {
+                        val used = stdout.length + stderr.length
+                        if (used >= MAX_OUTPUT_CHARS) {
+                            truncated.set(true)
+                        } else {
+                            val room = MAX_OUTPUT_CHARS - used
+                            if (chunk.length <= room) target.append(chunk) else {
+                                target.append(chunk.take(room))
+                                truncated.set(true)
+                            }
+                        }
+                    }
                 }
-            }
+            }.also { it.start() }
         }
-        pump.start()
 
         val finished = process.waitFor(timeout.toLong(), TimeUnit.SECONDS)
         if (!finished) {
             process.destroyForcibly()
-            pump.join(1_000)
+            pumps.forEach { it.join(1_000) }
             return ShellOutput(
                 exitCode = null,
-                output = output.toString().trimEnd(),
+                output = renderOutput(stdout, stderr, truncated.get()),
                 timedOut = true,
             )
         }
-        pump.join(2_000)
+        pumps.forEach { it.join(2_000) }
         return ShellOutput(
             exitCode = process.exitValue(),
-            output = output.toString().trimEnd(),
+            output = renderOutput(stdout, stderr, truncated.get()),
             timedOut = false,
         )
     }
@@ -121,14 +150,30 @@ class DeviceShell(
         private const val SHELL = "/system/bin/sh"
         private const val MAX_OUTPUT_CHARS = 20_000
 
-        private fun parseFetch(command: String): Pair<String, String>? {
+        private fun isPlainFetch(command: String): Boolean {
             val trimmed = command.trim()
-            if (!trimmed.startsWith("fetch ") || trimmed.any { it == '\n' || it == ';' || it == '|' || it == '&' }) {
-                return null
-            }
-            val parts = trimmed.split(Regex("\\s+"))
+            if (trimmed.any { it == '\n' || it == ';' || it == '|' || it == '&' }) return false
+            return trimmed == "fetch" || trimmed.startsWith("fetch ")
+        }
+
+        private fun parseFetch(command: String): Pair<String, String>? {
+            val parts = command.trim().split(Regex("\\s+"))
             if (parts.size != 3 || parts[0] != "fetch") return null
             return parts[1] to parts[2]
+        }
+
+        private fun renderOutput(stdout: StringBuilder, stderr: StringBuilder, truncated: Boolean): String {
+            val out = stdout.toString().trimEnd()
+            val err = stderr.toString().trimEnd()
+            val text = buildString {
+                append(out)
+                if (err.isNotEmpty()) {
+                    if (isNotEmpty()) append('\n')
+                    append("--- stderr ---\n")
+                    append(err)
+                }
+            }
+            return if (truncated) "$text\n… truncated" else text
         }
     }
 }

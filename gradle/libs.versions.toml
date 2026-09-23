@@ -18,6 +18,7 @@ commonsNet = "3.11.1"
 commonsCompress = "1.27.1"
 xz = "1.10"
 jsch = "0.2.21"
+shizuku = "13.1.5"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -53,6 +54,8 @@ commons-net = { module = "commons-net:commons-net", version.ref = "commonsNet" }
 commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commonsCompress" }
 xz = { module = "org.tukaani:xz", version.ref = "xz" }
 jsch = { module = "com.github.mwiede:jsch", version.ref = "jsch" }
+shizuku-api = { module = "dev.rikka.shizuku:api", version.ref = "shizuku" }
+shizuku-provider = { module = "dev.rikka.shizuku:provider", version.ref = "shizuku" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
