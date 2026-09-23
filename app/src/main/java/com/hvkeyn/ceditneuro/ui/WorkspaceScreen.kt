@@ -69,6 +69,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -76,6 +77,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -129,38 +133,54 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
         viewModel.restoreLastProject(hasStorageAccess)
     }
 
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.onAppResume()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     LaunchedEffect(Unit) {
         viewModel.checkForUpdate()
     }
 
     state.appUpdate?.let { update ->
         val progress = if (update.total > 0) update.received.toFloat() / update.total else 0f
+        val percent = if (update.total > 0) ((100 * update.received) / update.total).toInt() else null
         AlertDialog(
-            onDismissRequest = { if (!update.downloading) viewModel.dismissUpdate() },
+            onDismissRequest = { if (update.error != null) viewModel.dismissUpdate() },
             title = { Text("Update ${update.versionName}") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("A newer release is on GitHub. Install it only if you confirm.")
-                    if (update.notes.isNotBlank()) Text(update.notes)
-                    if (update.downloading) {
-                        if (update.total > 0) {
+                    Text(
+                        when {
+                            update.error != null -> update.error
+                            update.installing -> "Installing. Confirm the system prompt if Android asks. The app will reopen when it finishes."
+                            percent != null -> "Downloading… $percent%"
+                            else -> "Downloading…"
+                        },
+                    )
+                    if (update.notes.isNotBlank() && update.error == null) Text(update.notes)
+                    if (update.downloading || update.installing) {
+                        if (update.downloading && update.total > 0) {
                             LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
                         } else {
                             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                         }
-                        Text("Downloading…")
                     }
-                    update.error?.let { Text(it) }
                 }
             },
             confirmButton = {
-                TextButton(
-                    onClick = viewModel::confirmUpdate,
-                    enabled = !update.downloading,
-                ) { Text("Install") }
+                if (update.error != null) {
+                    TextButton(onClick = viewModel::retryUpdate) { Text("Retry") }
+                }
             },
             dismissButton = {
-                TextButton(onClick = viewModel::dismissUpdate) { Text("Later") }
+                if (update.error != null) {
+                    TextButton(onClick = viewModel::dismissUpdate) { Text("Close") }
+                }
             },
         )
     }

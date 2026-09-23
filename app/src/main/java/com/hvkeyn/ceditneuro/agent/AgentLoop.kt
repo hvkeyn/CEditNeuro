@@ -43,10 +43,15 @@ class AgentLoop(
         var round = 0
 
         suspend fun remember() {
-            emit(AgentEvent.Context(messages.filter { it.role != "system" }))
+            emit(AgentEvent.Context(ToolTranscript.seal(messages.filter { it.role != "system" })))
         }
 
         while (round < maxToolRounds) {
+            val sealed = ToolTranscript.seal(messages)
+            if (sealed !== messages) {
+                messages.clear()
+                messages.addAll(sealed)
+            }
             val assistantText = StringBuilder()
             val reasoning = StringBuilder()
             var pendingCalls: List<ToolCall> = emptyList()

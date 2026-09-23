@@ -7,12 +7,14 @@ import com.hvkeyn.ceditneuro.agent.AgentNotifications
 import com.hvkeyn.ceditneuro.agent.AgentStatus
 import com.hvkeyn.ceditneuro.update.AppUpdate
 import com.hvkeyn.ceditneuro.update.AppUpdater
+import com.hvkeyn.ceditneuro.update.UpdateBus
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.hvkeyn.ceditneuro.agent.AgentEvent
 import com.hvkeyn.ceditneuro.agent.AgentLoop
 import com.hvkeyn.ceditneuro.agent.ChatMessage
+import com.hvkeyn.ceditneuro.agent.ToolTranscript
 import com.hvkeyn.ceditneuro.agent.buildSystemPrompt
 import com.hvkeyn.ceditneuro.agent.deepseek.DeepSeekBackend
 import com.hvkeyn.ceditneuro.data.AgentSettings
@@ -188,6 +190,23 @@ class WorkspaceViewModel(
     private val treeRefresh = AtomicLong(0)
     private val sessionEpoch = AtomicLong(0)
 
+    init {
+        viewModelScope.launch {
+            UpdateBus.failures.collect { message ->
+                _state.update { current ->
+                    val shown = current.appUpdate ?: return@update current
+                    current.copy(
+                        appUpdate = shown.copy(
+                            downloading = false,
+                            installing = false,
+                            error = message,
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
     /**
      * Opens the last folder after process death, once storage access is granted.
      * Missing folders are dropped from the list. Chat and shell stay with their project.
@@ -235,7 +254,7 @@ class WorkspaceViewModel(
         workspace = opened
         buffers.clear()
         conversation.clear()
-        conversation += session.conversation
+        conversation += ToolTranscript.seal(session.conversation)
         idGenerator.set(session.nextId)
         library.save(canonical.path, session)
 
@@ -716,8 +735,16 @@ class WorkspaceViewModel(
                 val local = AppUpdater.localVersion(appContext)
                 runCatching { AppUpdater.latestNewerThan(local) }.getOrNull()
             } ?: return@launch
-            _state.update { it.copy(appUpdate = offer) }
+            startUpdate(offer)
         }
+    }
+
+    /** Called when the activity is back, so a permission grant can continue the install. */
+    fun onAppResume() {
+        val offer = _state.value.appUpdate ?: return
+        if (!offer.needsInstallPermission || offer.downloading || offer.installing) return
+        if (!AppUpdater.canInstallPackages(appContext)) return
+        startUpdate(offer.copy(needsInstallPermission = false, error = null))
     }
 
     fun dismissUpdate() {
@@ -726,10 +753,38 @@ class WorkspaceViewModel(
         _state.update { it.copy(appUpdate = null) }
     }
 
-    fun confirmUpdate() {
+    fun retryUpdate() {
         val offer = _state.value.appUpdate ?: return
-        if (offer.downloading) return
-        _state.update { it.copy(appUpdate = offer.copy(downloading = true, error = null)) }
+        startUpdate(offer.copy(error = null, downloading = false, installing = false))
+    }
+
+    private fun startUpdate(offer: AppUpdate) {
+        if (offer.downloading || offer.installing) return
+        if (!AppUpdater.canInstallPackages(appContext)) {
+            _state.update {
+                it.copy(
+                    appUpdate = offer.copy(
+                        downloading = false,
+                        installing = false,
+                        needsInstallPermission = true,
+                        error = "Allow this app to install updates, then come back.",
+                    ),
+                )
+            }
+            AppUpdater.requestInstallPermission(appContext)
+            return
+        }
+        _state.update {
+            it.copy(
+                appUpdate = offer.copy(
+                    downloading = true,
+                    installing = false,
+                    needsInstallPermission = false,
+                    error = null,
+                ),
+            )
+        }
+        updateJob?.cancel()
         updateJob = viewModelScope.launch {
             val downloaded = runCatching {
                 withContext(Dispatchers.IO) {
@@ -750,16 +805,21 @@ class WorkspaceViewModel(
                 }
             }
             downloaded.onSuccess { apk ->
-                val installed = runCatching { AppUpdater.install(appContext, apk) }
-                if (installed.isSuccess) {
-                    _state.update { it.copy(appUpdate = null) }
-                } else {
+                _state.update { current ->
+                    val shown = current.appUpdate ?: offer
+                    current.copy(
+                        appUpdate = shown.copy(downloading = false, installing = true, error = null),
+                    )
+                }
+                val installed = withContext(Dispatchers.IO) { runCatching { AppUpdater.install(appContext, apk) } }
+                if (installed.isFailure) {
                     _state.update { current ->
                         val shown = current.appUpdate ?: offer
                         current.copy(
                             appUpdate = shown.copy(
                                 downloading = false,
-                                error = installed.exceptionOrNull()?.message ?: "Could not open the installer.",
+                                installing = false,
+                                error = installed.exceptionOrNull()?.message ?: "Could not start the installer.",
                             ),
                         )
                     }
@@ -771,6 +831,7 @@ class WorkspaceViewModel(
                     current.copy(
                         appUpdate = shown.copy(
                             downloading = false,
+                            installing = false,
                             error = error.message ?: "Download failed.",
                         ),
                     )
@@ -788,7 +849,7 @@ class WorkspaceViewModel(
         runContext = null
         if (saved != null) {
             conversation.clear()
-            conversation.addAll(saved)
+            conversation.addAll(ToolTranscript.seal(saved))
             val alreadyThere = conversation.lastOrNull()?.content == finalText
             if (finalText.isNotBlank() && !alreadyThere) {
                 conversation += ChatMessage.assistant(finalText)
@@ -1252,7 +1313,7 @@ class WorkspaceViewModel(
                     toolName = entry.toolName,
                 )
             },
-            conversation = conversation.takeLast(MAX_STORED_CONVERSATION).toList(),
+            conversation = ToolTranscript.trim(conversation.toList(), MAX_STORED_CONVERSATION),
             shell = current.shellLines.filterNot { it.running }.takeLast(MAX_STORED_SHELL).map { line ->
                 StoredShell(id = line.id, command = line.command, output = line.output)
             },
