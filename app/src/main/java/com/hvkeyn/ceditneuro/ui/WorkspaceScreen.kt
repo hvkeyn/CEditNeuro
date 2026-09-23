@@ -16,8 +16,10 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -65,6 +67,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -188,6 +191,12 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
             },
             confirmButton = {
                 when {
+                    update.replaceInstalled -> TextButton(onClick = viewModel::uninstallForUpdate) {
+                        Text("Uninstall old app")
+                    }
+                    update.needsInstallPermission -> TextButton(onClick = viewModel::allowInstalls) {
+                        Text("Allow installs")
+                    }
                     update.error != null -> TextButton(onClick = viewModel::retryUpdate) { Text("Retry") }
                     waiting -> TextButton(onClick = viewModel::confirmUpdate) { Text("Update") }
                 }
@@ -414,6 +423,12 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                         onOpenProject = { path -> viewModel.openProject(File(path)) },
                         onForgetProject = viewModel::forgetProject,
                         onChooseFolder = { folderPicker.launch(null) },
+                        onCopy = viewModel::stageCopy,
+                        onCut = viewModel::stageCut,
+                        onPaste = viewModel::pasteEntry,
+                        onRename = viewModel::renameEntry,
+                        onDelete = viewModel::deleteEntry,
+                        onClearClipboard = viewModel::clearFileClipboard,
                         modifier = if (panes.splitTree) {
                             Modifier.width(panes.treeWidth).fillMaxHeight()
                         } else {
@@ -715,6 +730,12 @@ private fun FileTreePane(
     onOpenProject: (String) -> Unit,
     onForgetProject: (String) -> Unit,
     onChooseFolder: () -> Unit,
+    onCopy: (String) -> Unit,
+    onCut: (String) -> Unit,
+    onPaste: (String) -> Unit,
+    onRename: (String, String) -> Unit,
+    onDelete: (String) -> Unit,
+    onClearClipboard: () -> Unit,
     projectsMaxHeight: Dp,
     compactHeight: Boolean,
     modifier: Modifier = Modifier,
@@ -793,6 +814,25 @@ private fun FileTreePane(
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
+        state.fileClipboard?.let { clip ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = if (clip.cut) "Cut: ${clip.name}" else "Copied: ${clip.name}",
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                TextButton(onClick = { onPaste("") }) { Text("Paste") }
+                TextButton(onClick = onClearClipboard) { Text("Clear") }
+            }
+        }
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
@@ -816,6 +856,12 @@ private fun FileTreePane(
                 compact = compactHeight,
                 onToggleDir = onToggleDir,
                 onOpenFile = onOpenFile,
+                clipboard = state.fileClipboard,
+                onCopy = onCopy,
+                onCut = onCut,
+                onPaste = onPaste,
+                onRename = onRename,
+                onDelete = onDelete,
             )
         }
     }
@@ -874,6 +920,12 @@ private fun LazyListScope.fileTree(
     compact: Boolean,
     onToggleDir: (String) -> Unit,
     onOpenFile: (String) -> Unit,
+    clipboard: FileClipboard?,
+    onCopy: (String) -> Unit,
+    onCut: (String) -> Unit,
+    onPaste: (String) -> Unit,
+    onRename: (String, String) -> Unit,
+    onDelete: (String) -> Unit,
 ) {
     entries.forEach { entry ->
         item(key = entry.relativePath) {
@@ -884,9 +936,22 @@ private fun LazyListScope.fileTree(
                 active = entry.relativePath == state.activePath,
                 dirty = entry.relativePath in state.dirtyPaths,
                 compact = compact,
+                canPaste = clipboard != null,
                 onClick = {
                     if (entry.isDirectory) onToggleDir(entry.relativePath) else onOpenFile(entry.relativePath)
                 },
+                onCopy = { onCopy(entry.relativePath) },
+                onCut = { onCut(entry.relativePath) },
+                onPaste = {
+                    val dir = if (entry.isDirectory) {
+                        entry.relativePath
+                    } else {
+                        entry.relativePath.substringBeforeLast('/', "")
+                    }
+                    onPaste(dir)
+                },
+                onRename = { name -> onRename(entry.relativePath, name) },
+                onDelete = { onDelete(entry.relativePath) },
             )
         }
         if (entry.isDirectory && entry.relativePath in state.expandedDirs) {
@@ -897,11 +962,18 @@ private fun LazyListScope.fileTree(
                 compact = compact,
                 onToggleDir = onToggleDir,
                 onOpenFile = onOpenFile,
+                clipboard = clipboard,
+                onCopy = onCopy,
+                onCut = onCut,
+                onPaste = onPaste,
+                onRename = onRename,
+                onDelete = onDelete,
             )
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun FileRow(
     entry: FileEntry,
@@ -910,14 +982,25 @@ private fun FileRow(
     active: Boolean,
     dirty: Boolean,
     compact: Boolean,
+    canPaste: Boolean,
     onClick: () -> Unit,
+    onCopy: () -> Unit,
+    onCut: () -> Unit,
+    onPaste: () -> Unit,
+    onRename: (String) -> Unit,
+    onDelete: () -> Unit,
 ) {
+    var menu by remember { mutableStateOf(false) }
+    var renameOpen by remember { mutableStateOf(false) }
+    var deleteOpen by remember { mutableStateOf(false) }
+    var renameText by remember(entry.name) { mutableStateOf(entry.name) }
+    Box(modifier = Modifier.fillMaxWidth()) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = { menu = true })
             .background(
                 if (active) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
             )
@@ -960,6 +1043,73 @@ private fun FileRow(
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+        )
+    }
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            DropdownMenuItem(
+                text = { Text("Rename") },
+                onClick = {
+                    menu = false
+                    renameText = entry.name
+                    renameOpen = true
+                },
+            )
+            DropdownMenuItem(text = { Text("Copy") }, onClick = { menu = false; onCopy() })
+            DropdownMenuItem(text = { Text("Cut") }, onClick = { menu = false; onCut() })
+            if (canPaste) {
+                DropdownMenuItem(
+                    text = { Text(if (entry.isDirectory) "Paste inside" else "Paste here") },
+                    onClick = { menu = false; onPaste() },
+                )
+            }
+            DropdownMenuItem(text = { Text("Delete") }, onClick = { menu = false; deleteOpen = true })
+        }
+    }
+    if (renameOpen) {
+        AlertDialog(
+            onDismissRequest = { renameOpen = false },
+            title = { Text("Rename") },
+            text = {
+                OutlinedTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    singleLine = true,
+                    label = { Text("Name") },
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    renameOpen = false
+                    onRename(renameText)
+                }) { Text("Rename") }
+            },
+            dismissButton = {
+                TextButton(onClick = { renameOpen = false }) { Text("Cancel") }
+            },
+        )
+    }
+    if (deleteOpen) {
+        AlertDialog(
+            onDismissRequest = { deleteOpen = false },
+            title = { Text("Delete") },
+            text = {
+                Text(
+                    if (entry.isDirectory) {
+                        "Delete folder ${entry.name} and everything inside it?"
+                    } else {
+                        "Delete ${entry.name}?"
+                    },
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    deleteOpen = false
+                    onDelete()
+                }) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteOpen = false }) { Text("Cancel") }
+            },
         )
     }
 }

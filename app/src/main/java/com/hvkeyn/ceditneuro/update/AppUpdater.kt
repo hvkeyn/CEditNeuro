@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.provider.Settings
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -22,6 +23,9 @@ data class AppUpdate(
     val downloading: Boolean = false,
     val installing: Boolean = false,
     val needsInstallPermission: Boolean = false,
+    /** The installed app is signed with a different key, so Android refuses an in-place update. */
+    val replaceInstalled: Boolean = false,
+    val exportedApk: String? = null,
     val received: Long = 0L,
     val total: Long = -1L,
     val error: String? = null,
@@ -139,6 +143,24 @@ object AppUpdater {
             Uri.parse("package:${context.packageName}"),
         ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         runCatching { context.startActivity(intent) }
+    }
+
+    /** Copies the downloaded update into Downloads so it survives uninstalling this app. */
+    fun exportUpdateApk(context: Context): File? {
+        val source = File(context.cacheDir, "CEditNeuro-update.apk")
+        if (!source.isFile || source.length() <= 0L) return null
+        val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        if (!dir.exists() && !dir.mkdirs()) return null
+        val dest = File(dir, "CEditNeuro-update.apk")
+        source.copyTo(dest, overwrite = true)
+        return dest.takeIf { it.isFile && it.length() > 0L }
+    }
+
+    fun uninstallSelf(context: Context) {
+        val intent = Intent(Intent.ACTION_DELETE)
+            .setData(Uri.parse("package:${context.packageName}"))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
     }
 
     fun install(context: Context, apk: File) {
