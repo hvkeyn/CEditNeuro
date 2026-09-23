@@ -1,5 +1,6 @@
 package com.hvkeyn.ceditneuro.agent
 
+import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -15,8 +16,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * Keeps the process in the foreground while the agent is running, so leaving
- * the app does not stop the current task.
+ * Keeps the process in the foreground while any project agent is running, so
+ * leaving the app does not stop those tasks. Each project has its own shade card.
  */
 class AgentService : Service() {
 
@@ -30,8 +31,8 @@ class AgentService : Service() {
         ticker = scope.launch {
             while (isActive) {
                 delay(1_000)
-                if (AgentNotifications.latest != null) {
-                    AgentNotifications.notify(this@AgentService)
+                if (AgentNotifications.hasRunning()) {
+                    AgentNotifications.refresh(this@AgentService)
                 }
             }
         }
@@ -41,50 +42,84 @@ class AgentService : Service() {
         val model = (application as CEditNeuroApp).workspaceModel
         when (intent?.action) {
             AgentNotifications.ACTION_STOP -> {
-                startInForeground(AgentNotifications.build(this))
-                model.cancelAgent()
-                return START_NOT_STICKY
+                val existing = AgentNotifications.foregroundNotificationId()
+                    ?: AgentNotifications.NOTIFICATION_ID
+                startInForeground(AgentNotifications.build(this), existing)
+                model.cancelAgent(intent.getStringExtra(AgentNotifications.EXTRA_PROJECT))
+                return bindOrStop()
             }
             AgentNotifications.ACTION_DISMISS -> {
-                AgentNotifications.dismiss(this)
-                return START_NOT_STICKY
+                val key = intent.getStringExtra(AgentNotifications.EXTRA_PROJECT)
+                if (!key.isNullOrBlank()) AgentNotifications.clearResult(this, key)
+                return bindOrStop()
             }
             AgentNotifications.ACTION_CONTINUE -> {
-                startInForeground(AgentNotifications.build(this))
-                model.continueAgent()
-                return START_NOT_STICKY
+                model.continueAgent(intent.getStringExtra(AgentNotifications.EXTRA_PROJECT))
+                return bindOrStop()
+            }
+            AgentNotifications.ACTION_REFRESH -> {
+                val result = bindOrStop()
+                val current = AgentNotifications.foregroundNotificationId()
+                val retire = intent.getIntExtra(AgentNotifications.EXTRA_RETIRE, -1)
+                if (retire >= 0 && retire != current) {
+                    notifications().cancel(retire)
+                }
+                return result
             }
         }
-        if (AgentNotifications.latest == null) {
-            startInForeground(AgentNotifications.build(this))
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
-            return START_NOT_STICKY
-        }
-        startInForeground(AgentNotifications.build(this))
-        return START_NOT_STICKY
+        return bindOrStop()
     }
 
     override fun onDestroy() {
         ticker?.cancel()
         scope.cancel()
+        val restart = AgentNotifications.hasRunning()
         if (Build.VERSION.SDK_INT >= 24) {
             stopForeground(STOP_FOREGROUND_REMOVE)
         }
+        if (restart) AgentNotifications.started = false
         super.onDestroy()
+        if (restart) {
+            val again = Intent(this, AgentService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(again)
+            } else {
+                startService(again)
+            }
+        }
     }
 
-    private fun startInForeground(notification: android.app.Notification) {
+    private fun bindOrStop(): Int {
+        val id = AgentNotifications.foregroundNotificationId()
+        if (id == null) {
+            if (AgentNotifications.started) {
+                startInForeground(AgentNotifications.build(this), AgentNotifications.NOTIFICATION_ID)
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                AgentNotifications.started = false
+            }
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        startInForeground(AgentNotifications.build(this), id)
+        AgentNotifications.started = true
+        AgentNotifications.refresh(this)
+        return START_STICKY
+    }
+
+    private fun startInForeground(notification: android.app.Notification, id: Int) {
         if (Build.VERSION.SDK_INT >= 29) {
             val started = runCatching {
                 startForeground(
-                    AgentNotifications.NOTIFICATION_ID,
+                    id,
                     notification,
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
                 )
             }
             if (started.isSuccess) return
         }
-        startForeground(AgentNotifications.NOTIFICATION_ID, notification)
+        startForeground(id, notification)
     }
+
+    private fun notifications(): NotificationManager =
+        getSystemService(NOTIFICATION_SERVICE) as NotificationManager
 }

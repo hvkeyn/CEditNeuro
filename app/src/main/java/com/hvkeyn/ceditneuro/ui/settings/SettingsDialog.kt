@@ -40,6 +40,8 @@ fun SettingsDialog(
     settings: AgentSettings,
     onSettingsChange: ((AgentSettings) -> AgentSettings) -> Unit,
     onTestRemote: (RemoteServer) -> Unit,
+    versionName: String,
+    onCheckUpdate: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     var draft by remember(settings) { mutableStateOf(settings) }
@@ -198,6 +200,19 @@ fun SettingsDialog(
                 }
 
                 HorizontalDivider()
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Version $versionName",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = onCheckUpdate) { Text("Check for updates") }
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.End,

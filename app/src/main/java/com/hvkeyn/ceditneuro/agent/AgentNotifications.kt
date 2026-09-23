@@ -12,8 +12,10 @@ import androidx.core.app.NotificationCompat
 import com.hvkeyn.ceditneuro.MainActivity
 import com.hvkeyn.ceditneuro.R
 
-/** What the status shade shows while the agent is working. */
+/** What the status shade shows while one project's agent is working. */
 data class AgentStatus(
+    val key: String,
+    val name: String,
     val phase: String,
     val detail: String,
     val focus: String,
@@ -33,19 +35,38 @@ object AgentNotifications {
     const val ACTION_STOP = "com.hvkeyn.ceditneuro.AGENT_STOP"
     const val ACTION_CONTINUE = "com.hvkeyn.ceditneuro.AGENT_CONTINUE"
     const val ACTION_DISMISS = "com.hvkeyn.ceditneuro.AGENT_DISMISS"
+    const val ACTION_REFRESH = "com.hvkeyn.ceditneuro.AGENT_REFRESH"
+    const val EXTRA_PROJECT = "agent_project"
+    const val EXTRA_RETIRE = "retire_id"
+
+    private val running = LinkedHashMap<String, AgentStatus>()
+    private val assignedIds = HashMap<String, Int>()
+    private var nextNotificationId = 1_000
 
     @Volatile
-    var latest: AgentStatus? = null
+    var foregroundKey: String? = null
 
     @Volatile
     var started: Boolean = false
 
+    fun hasRunning(): Boolean = synchronized(running) { running.isNotEmpty() }
+
+    fun foregroundStatus(): AgentStatus? = synchronized(running) {
+        foregroundKey?.let { running[it] } ?: running.values.firstOrNull()
+    }
+
+    fun foregroundNotificationId(): Int? = foregroundStatus()?.key?.let { notificationId(it) }
+
     fun publish(context: Context, status: AgentStatus) {
-        latest = status
         ensureChannel(context)
         val app = context.applicationContext
-        manager(app).cancel(RESULT_ID)
-        if (!started) {
+        val startService = synchronized(running) {
+            running[status.key] = status
+            manager(app).cancel(resultId(status.key))
+            if (foregroundKey == null) foregroundKey = status.key
+            !started
+        }
+        if (startService) {
             started = true
             val intent = Intent(app, AgentService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -54,7 +75,7 @@ object AgentNotifications {
                 app.startService(intent)
             }
         } else {
-            notify(app)
+            refresh(app)
         }
     }
 
@@ -63,48 +84,63 @@ object AgentNotifications {
      * Stop, or a swipe, clears it. A finished task that needs nothing calls [dismiss].
      */
     fun settle(context: Context, status: AgentStatus) {
-        latest = null
-        started = false
         val app = context.applicationContext
         ensureChannel(app)
-        manager(app).notify(RESULT_ID, buildOutcome(app, status))
-        app.stopService(Intent(app, AgentService::class.java))
+        val retire = retireRunning(status.key)
+        manager(app).notify(resultId(status.key), buildOutcome(app, status))
+        handoff(app, retire)
     }
 
-    fun dismiss(context: Context) {
-        latest = null
-        started = false
+    fun dismiss(context: Context, key: String) {
         val app = context.applicationContext
-        app.stopService(Intent(app, AgentService::class.java))
-        val notifications = manager(app)
-        notifications.cancel(NOTIFICATION_ID)
-        notifications.cancel(RESULT_ID)
+        val retire = retireRunning(key)
+        manager(app).cancel(resultId(key))
+        handoff(app, retire)
     }
 
-    fun notify(context: Context) {
-        if (latest == null) return
-        manager(context).notify(NOTIFICATION_ID, build(context))
+    fun clearResult(context: Context, key: String) {
+        manager(context).cancel(resultId(key))
+    }
+
+    fun refresh(context: Context) {
+        val snapshot = synchronized(running) { running.values.toList() }
+        val notifications = manager(context)
+        snapshot.forEach { status ->
+            notifications.notify(notificationId(status.key), build(context, status))
+        }
     }
 
     fun build(context: Context): Notification {
+        val status = foregroundStatus()
+        return if (status == null) {
+            build(
+                context,
+                AgentStatus("foreground", "Agent", "Working", "", "", System.currentTimeMillis(), ""),
+            )
+        } else {
+            build(context, status)
+        }
+    }
+
+    private fun build(context: Context, status: AgentStatus): Notification {
         ensureChannel(context)
-        val status = latest
-        val phase = status?.phase ?: "Working"
-        val clock = clock(status?.startedAt ?: System.currentTimeMillis())
+        val phase = status.phase.ifBlank { "Working" }
+        val clock = clock(status.startedAt)
         val bars = agentBars(phase)
         val detail = listOfNotNull(
-            status?.workLine?.takeIf { it.isNotBlank() },
-            status?.detail?.takeIf { it.isNotBlank() },
-            status?.focus?.takeIf { it.isNotBlank() },
+            status.workLine.takeIf { it.isNotBlank() },
+            status.detail.takeIf { it.isNotBlank() },
+            status.focus.takeIf { it.isNotBlank() },
         ).joinToString("\n")
 
+        val title = "${status.name} · $clock"
         val compact = RemoteViews(context.packageName, R.layout.notification_agent_compact)
-        compact.setTextViewText(R.id.agent_title, "Agent · $clock")
+        compact.setTextViewText(R.id.agent_title, title)
         compact.setTextViewText(R.id.agent_phase, phase)
         compact.setProgressBar(R.id.agent_progress, 100, bars.overall, false)
 
         val expanded = RemoteViews(context.packageName, R.layout.notification_agent)
-        expanded.setTextViewText(R.id.agent_title, "Agent · $clock")
+        expanded.setTextViewText(R.id.agent_title, title)
         expanded.setTextViewText(R.id.agent_phase, phase)
         expanded.setTextViewText(R.id.agent_detail, detail.ifBlank { "Working" })
         expanded.setProgressBar(R.id.agent_progress, 100, bars.overall, false)
@@ -121,15 +157,15 @@ object AgentNotifications {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
-            .setContentTitle("Agent · $clock")
+            .setContentTitle(title)
             .setContentText(phase)
             .setContentIntent(open)
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setCustomContentView(compact)
             .setCustomBigContentView(expanded)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            .addAction(0, "Continue", servicePending(context, ACTION_CONTINUE, 2, foreground = true))
-            .addAction(0, "Stop", servicePending(context, ACTION_STOP, 3, foreground = false))
+            .addAction(0, "Continue", servicePending(context, ACTION_CONTINUE, status.key, foreground = true))
+            .addAction(0, "Stop", servicePending(context, ACTION_STOP, status.key, foreground = false))
             .build()
     }
 
@@ -143,13 +179,14 @@ object AgentNotifications {
             status.focus.takeIf { it.isNotBlank() },
         ).joinToString("\n")
 
+        val title = "${status.name} stopped · $clock"
         val compact = RemoteViews(context.packageName, R.layout.notification_agent_compact)
-        compact.setTextViewText(R.id.agent_title, "Agent stopped · $clock")
+        compact.setTextViewText(R.id.agent_title, title)
         compact.setTextViewText(R.id.agent_phase, reason)
         compact.setProgressBar(R.id.agent_progress, 100, 100, false)
 
         val expanded = RemoteViews(context.packageName, R.layout.notification_agent)
-        expanded.setTextViewText(R.id.agent_title, "Agent stopped · $clock")
+        expanded.setTextViewText(R.id.agent_title, title)
         expanded.setTextViewText(R.id.agent_phase, reason)
         expanded.setTextViewText(R.id.agent_detail, detail.ifBlank { "Swipe to clear, or choose Continue or Stop." })
         expanded.setProgressBar(R.id.agent_progress, 100, 100, false)
@@ -167,15 +204,52 @@ object AgentNotifications {
             .setAutoCancel(false)
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
-            .setContentTitle("Agent stopped")
+            .setContentTitle(title)
             .setContentText(reason)
             .setContentIntent(open)
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setCustomContentView(compact)
             .setCustomBigContentView(expanded)
-            .addAction(0, "Continue", servicePending(context, ACTION_CONTINUE, 5, foreground = true))
-            .addAction(0, "Stop", servicePending(context, ACTION_DISMISS, 6, foreground = false))
+            .addAction(0, "Continue", servicePending(context, ACTION_CONTINUE, status.key, foreground = true))
+            .addAction(0, "Stop", servicePending(context, ACTION_DISMISS, status.key, foreground = false))
             .build()
+    }
+
+    private fun notificationId(key: String): Int = synchronized(assignedIds) {
+        assignedIds.getOrPut(key) { nextNotificationId++ }
+    }
+
+    private fun resultId(key: String): Int = notificationId(key) + 10_000
+
+    private fun retireRunning(key: String): Int? {
+        val id = synchronized(running) {
+            if (running.remove(key) == null && foregroundKey != key) return null
+            val removedId = notificationId(key)
+            if (foregroundKey == key) foregroundKey = running.keys.firstOrNull()
+            removedId
+        }
+        return id
+    }
+
+    private fun handoff(app: Context, retire: Int?) {
+        val empty = synchronized(running) { running.isEmpty() }
+        if (empty) {
+            foregroundKey = null
+            started = false
+            if (retire != null) manager(app).cancel(retire)
+            manager(app).cancel(NOTIFICATION_ID)
+            app.stopService(Intent(app, AgentService::class.java))
+            return
+        }
+        val current = foregroundNotificationId()
+        if (retire != null && retire != current) {
+            manager(app).cancel(retire)
+            refresh(app)
+            return
+        }
+        val intent = Intent(app, AgentService::class.java).setAction(ACTION_REFRESH)
+        if (retire != null) intent.putExtra(EXTRA_RETIRE, retire)
+        app.startService(intent)
     }
 
     private fun clock(startedAt: Long): String {
@@ -186,10 +260,13 @@ object AgentNotifications {
     private fun servicePending(
         context: Context,
         action: String,
-        request: Int,
+        projectKey: String,
         foreground: Boolean,
     ): PendingIntent {
-        val intent = Intent(context, AgentService::class.java).setAction(action)
+        val intent = Intent(context, AgentService::class.java)
+            .setAction(action)
+            .putExtra(EXTRA_PROJECT, projectKey)
+        val request = (action.hashCode() * 31 + projectKey.hashCode()) and 0x7fffffff
         val flags = pendingFlags()
         return if (foreground && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             PendingIntent.getForegroundService(context, request, intent, flags)
