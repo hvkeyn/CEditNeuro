@@ -3,13 +3,19 @@ package com.hvkeyn.ceditneuro.ui.chat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,6 +28,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.CircularProgressIndicator
@@ -40,11 +47,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
@@ -58,6 +72,7 @@ import com.hvkeyn.ceditneuro.ui.ChatEntry
 import com.hvkeyn.ceditneuro.ui.ChatRole
 import com.hvkeyn.ceditneuro.ui.WorkspaceUiState
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun ChatPanel(
@@ -78,8 +93,29 @@ fun ChatPanel(
     val listState = remember(state.projectRoot) {
         LazyListState(state.chat.lastIndex.coerceAtLeast(0), 0)
     }
+    val followEnd = remember(state.projectRoot) { mutableStateOf(true) }
+    val scope = rememberCoroutineScope()
+    val steps = chatSteps(state.chat)
+    val userScroll = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (source == NestedScrollSource.UserInput && available.y > 1f) {
+                    followEnd.value = false
+                }
+                return Offset.Zero
+            }
+        }
+    }
 
-    LaunchedEffect(state.chat.size, lastEntry?.id, lastEntry?.text?.length) {
+    LaunchedEffect(listState, state.projectRoot) {
+        snapshotFlow { listState.canScrollForward to listState.isScrollInProgress }
+            .collect { (canForward, moving) ->
+                if (!canForward && !moving) followEnd.value = true
+            }
+    }
+
+    LaunchedEffect(state.chat.size, lastEntry?.id, lastEntry?.text?.length, followEnd.value) {
+        if (!followEnd.value) return@LaunchedEffect
         val last = state.chat.lastIndex
         if (last >= 0) listState.scrollToItem(last)
     }
@@ -96,19 +132,69 @@ fun ChatPanel(
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
-            LazyColumn(
-                state = listState,
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
-                    .padding(horizontal = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp),
+                    .weight(1f),
             ) {
-                if (state.chat.isEmpty()) {
-                    item { ChatHint() }
+                Row(modifier = Modifier.fillMaxSize()) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .nestedScroll(userScroll)
+                            .padding(horizontal = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp),
+                    ) {
+                        if (state.chat.isEmpty()) {
+                            item { ChatHint() }
+                        }
+                        items(state.chat, key = { it.id }) { entry -> ChatBubble(entry) }
+                    }
+                    if (state.chat.size > 1) {
+                        ChatScrubber(
+                            steps = steps,
+                            itemCount = state.chat.size,
+                            firstVisible = listState.firstVisibleItemIndex,
+                            onJump = { index ->
+                                followEnd.value = index >= state.chat.lastIndex
+                                scope.launch { listState.scrollToItem(index) }
+                            },
+                        )
+                    }
                 }
-                items(state.chat, key = { it.id }) { entry -> ChatBubble(entry) }
+                if (!followEnd.value && state.chat.isNotEmpty()) {
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 8.dp)
+                            .clickable {
+                                followEnd.value = true
+                                scope.launch { listState.scrollToItem(state.chat.lastIndex) }
+                            },
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                Icons.Default.KeyboardArrowDown,
+                                contentDescription = "Jump to latest",
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Text(
+                                text = "End",
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                        }
+                    }
+                }
             }
 
             state.agentActivity?.let { activity ->
@@ -364,6 +450,75 @@ private fun AgentActivityBar(activity: AgentActivity) {
             progress = { bars.overall / 100f },
             modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
         )
+    }
+}
+
+private data class ChatStep(val index: Int, val role: ChatRole)
+
+private fun chatSteps(chat: List<ChatEntry>): List<ChatStep> {
+    val steps = mutableListOf<ChatStep>()
+    chat.forEachIndexed { index, entry ->
+        when (entry.role) {
+            ChatRole.User, ChatRole.Error -> steps += ChatStep(index, entry.role)
+            ChatRole.Tool -> if (steps.lastOrNull()?.role != ChatRole.Tool) steps += ChatStep(index, entry.role)
+            ChatRole.Assistant -> if (!entry.streaming) steps += ChatStep(index, entry.role)
+            ChatRole.Reasoning -> Unit
+        }
+    }
+    return steps
+}
+
+@Composable
+private fun ChatScrubber(
+    steps: List<ChatStep>,
+    itemCount: Int,
+    firstVisible: Int,
+    onJump: (Int) -> Unit,
+) {
+    val active = steps.indexOfLast { it.index <= firstVisible }
+    BoxWithConstraints(
+        modifier = Modifier
+            .width(18.dp)
+            .fillMaxHeight()
+            .padding(end = 4.dp, top = 8.dp, bottom = 8.dp)
+            .pointerInput(itemCount) {
+                detectDragGestures(
+                    onDragStart = { offset ->
+                        val fraction = (offset.y / size.height).coerceIn(0f, 1f)
+                        onJump(((itemCount - 1) * fraction).toInt())
+                    },
+                    onDrag = { change, _ ->
+                        val fraction = (change.position.y / size.height).coerceIn(0f, 1f)
+                        onJump(((itemCount - 1) * fraction).toInt())
+                    },
+                )
+            },
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .width(2.dp)
+                .fillMaxHeight()
+                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)),
+        )
+        steps.forEachIndexed { stepIndex, step ->
+            val fraction = if (itemCount <= 1) 0f else step.index.toFloat() / (itemCount - 1).toFloat()
+            val color = when (step.role) {
+                ChatRole.User -> MaterialTheme.colorScheme.primary
+                ChatRole.Tool -> MaterialTheme.colorScheme.tertiary
+                ChatRole.Error -> MaterialTheme.colorScheme.error
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
+            }
+            val dot = if (stepIndex == active) 10.dp else 7.dp
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = (maxHeight - dot) * fraction)
+                    .size(dot)
+                    .background(color, CircleShape)
+                    .clickable { onJump(step.index) },
+            )
+        }
     }
 }
 

@@ -37,6 +37,7 @@ class InstallJdkTool(
 
     override suspend fun execute(args: JsonObject): ToolResult = withContext(Dispatchers.IO) {
         if (alreadyInstalled()) {
+            if (zlibIsBroken()) return@withContext repairZlib()
             return@withContext ToolResult.ok(ALREADY)
         }
         if (!networkAllowed()) {
@@ -76,6 +77,44 @@ class InstallJdkTool(
         }
     }
 
+    private fun zlibIsBroken(): Boolean {
+        val path = Paths.get(toolchain.absolutePath, "lib", "libz.so.1.3.2")
+        if (!Files.isSymbolicLink(path)) return false
+        val name = runCatching { Files.readSymbolicLink(path).toString() }.getOrDefault("")
+            .substringAfterLast('/')
+        return name == "libz.so.1.3.2"
+    }
+
+    private suspend fun repairZlib(): ToolResult {
+        if (!networkAllowed()) {
+            return ToolResult.error(
+                "java cannot start: lib/libz.so.1.3.2 is a symlink to itself. " +
+                    "Turn on Agent network so install_jdk can replace that file.",
+            )
+        }
+        val allowed = ensureExec("Repair the JDK zlib library inside this app.")
+        if (!allowed) {
+            return ToolResult.error("The user did not allow the zlib repair.")
+        }
+        val staging = File(toolchain, ".jdk-staging").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        val unpacked = longArrayOf(0L)
+        return try {
+            val deb = File(staging, "zlib.deb")
+            net.download(BASE + ZLIB_DEB, deb, MAX_DOWNLOAD, TIMEOUT_SECONDS)
+            extractDeb(deb, toolchain, unpacked)
+            ToolResult.ok("Repaired zlib in the JDK toolchain. java and javac can start again.")
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            ToolResult.error(error.message ?: "Could not repair zlib.")
+        } finally {
+            staging.deleteRecursively()
+        }
+    }
+
     private fun alreadyInstalled(): Boolean {
         val stamp = File(toolchain, STAMP_NAME)
         return stamp.isFile && stamp.readText() == STAMP &&
@@ -110,27 +149,16 @@ class InstallJdkTool(
     }
 
     private fun extractTar(tar: TarArchiveInputStream, destRoot: File, unpacked: LongArray) {
-        val rootPath = destRoot.canonicalFile
         while (true) {
             val entry = tar.nextEntry ?: break
             val rel = toolchainRelative(entry.name) ?: continue
             if (skipEntry(rel)) continue
-            val out = File(rootPath, rel).canonicalFile
-            if (out.path != rootPath.path && !out.path.startsWith(rootPath.path + File.separator)) {
-                throw IllegalStateException("Archive entry escapes the toolchain: ${entry.name}")
-            }
+            val path = ArchivePaths.output(destRoot, rel)
             when {
-                entry.isDirectory -> out.mkdirs()
-                entry.isSymbolicLink -> {
-                    out.parentFile?.mkdirs()
-                    val target = linkTarget(entry.linkName)
-                    val path = out.toPath()
-                    if (Files.exists(path, LinkOption.NOFOLLOW_LINKS)) Files.delete(path)
-                    Files.createSymbolicLink(path, Paths.get(target))
-                }
+                entry.isDirectory -> ArchivePaths.directory(path)
+                entry.isSymbolicLink -> ArchivePaths.symlink(path, toolchain, entry.linkName)
                 entry.isFile -> {
-                    out.parentFile?.mkdirs()
-                    out.outputStream().use { output ->
+                    ArchivePaths.openNewFile(path).use { output ->
                         val buffer = ByteArray(8192)
                         while (true) {
                             val read = tar.read(buffer)
@@ -303,11 +331,12 @@ class InstallJdkTool(
         private const val MAX_DOWNLOAD = 220L * 1024L * 1024L
         private const val MAX_UNPACKED = 700L * 1024L * 1024L
         private val AR_MAGIC = "!<arch>\n".toByteArray(Charsets.US_ASCII)
+        private const val ZLIB_DEB = "pool/main/z/zlib/zlib_1.3.2_aarch64.deb"
         private val DEBS = listOf(
             "pool/main/libc/libc++/libc++_29_aarch64.deb",
             "pool/main/liba/libandroid-shmem/libandroid-shmem_0.7_aarch64.deb",
             "pool/main/liba/libandroid-spawn/libandroid-spawn_0.3_aarch64.deb",
-            "pool/main/z/zlib/zlib_1.3.2_aarch64.deb",
+            ZLIB_DEB,
             "pool/main/l/littlecms/littlecms_2.19.1_aarch64.deb",
             "pool/main/libj/libjpeg-turbo/libjpeg-turbo_3.2.0_aarch64.deb",
             "pool/main/o/openjdk-17/openjdk-17_17.0.20_aarch64.deb",

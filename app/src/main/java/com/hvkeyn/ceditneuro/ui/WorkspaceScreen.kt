@@ -273,11 +273,16 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                     IconButton(onClick = viewModel::toggleChat) {
                         Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Toggle agent chat")
                     }
-                    val siteUrl = settings.remotes.find { it.id == settings.activeRemoteId }?.webUrl.orEmpty()
-                    if (siteUrl.startsWith("http://") || siteUrl.startsWith("https://")) {
-                        IconButton(onClick = viewModel::toggleWeb) {
-                            Icon(Icons.Default.Public, contentDescription = "Open site")
-                        }
+                    IconButton(onClick = viewModel::toggleWeb) {
+                        Icon(
+                            Icons.Default.Public,
+                            contentDescription = "Toggle browser",
+                            tint = if (state.webVisible) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                        )
                     }
                 },
             )
@@ -301,8 +306,15 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                 projectPanelOpen || state.activePath == null
             }
 
+            val webOpen = state.webVisible && state.webUrl.isNotBlank()
+            val webFraction = if (state.chatVisible || state.shellVisible) 0.38f else 0.62f
+            val webPanelHeight = if (webOpen) maxHeight * webFraction else 0.dp
             Box(modifier = Modifier.fillMaxSize()) {
-            Column(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = webPanelHeight),
+            ) {
             Row(
                 modifier = Modifier
                     .weight(1f)
@@ -376,6 +388,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                     settings = settings,
                     modifier = Modifier
                         .fillMaxHeight()
+                        .padding(bottom = webPanelHeight)
                         .then(
                             panes.overlayChatWidth?.let { Modifier.width(it) }
                                 ?: Modifier.fillMaxWidth(),
@@ -394,19 +407,23 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                     onClose = viewModel::toggleShell,
                     modifier = Modifier
                         .fillMaxHeight()
+                        .padding(bottom = webPanelHeight)
                         .then(
                             panes.shellWidth?.let { Modifier.width(it) }
                                 ?: Modifier.fillMaxWidth(),
                         ),
                 )
             }
-            if (state.webVisible && state.webUrl.isNotBlank()) {
+            if (webOpen) {
                 WebPreview(
                     url = state.webUrl,
                     generation = state.webGeneration,
                     onClose = viewModel::toggleWeb,
                     onLoaded = viewModel::onBrowseLoaded,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .fillMaxHeight(webFraction),
                 )
             }
             }

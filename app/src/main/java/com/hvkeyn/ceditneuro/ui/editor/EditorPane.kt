@@ -1,6 +1,8 @@
 package com.hvkeyn.ceditneuro.ui.editor
 
 import android.graphics.Typeface
+import android.util.TypedValue
+import kotlin.math.abs
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -31,7 +33,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.hvkeyn.ceditneuro.ui.WorkspaceUiState
 import io.github.rosemoe.sora.event.ContentChangeEvent
-import io.github.rosemoe.sora.lang.EmptyLanguage
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.schemes.SchemeDarcula
 
@@ -137,6 +138,8 @@ private fun EditorTabs(
 
 private class EditorHolder {
     var editor: CodeEditor? = null
+    var fittedPath: String? = null
+    var fittedWidth: Int = 0
 }
 
 @Composable
@@ -157,13 +160,17 @@ private fun CodeEditorHost(
             CodeEditor(context).apply {
                 typefaceText = Typeface.MONOSPACE
                 setTypefaceLineNumber(Typeface.MONOSPACE)
-                setEditorLanguage(EmptyLanguage())
+                setEditorLanguage(SourceLanguage.forPath(currentPath))
                 colorScheme = SchemeDarcula()
+                setWordwrap(true)
                 props.autoIndent = true
                 props.symbolPairAutoCompletion = true
                 props.deleteEmptyLineFast = false
 
                 setText(contentProvider(currentPath))
+                addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
+                    fitEditorText(view as CodeEditor, holder, currentPath)
+                }
                 subscribeEvent(ContentChangeEvent::class.java) { _, _ ->
                     currentListener(currentPath, text.toString())
                 }
@@ -176,9 +183,32 @@ private fun CodeEditorHost(
     // Pull the file in when the tab changes, or when the agent rewrote the open file.
     LaunchedEffect(activePath, reloadCounter) {
         val editor = holder.editor ?: return@LaunchedEffect
+        editor.setEditorLanguage(SourceLanguage.forPath(activePath))
         val expected = contentProvider(activePath)
         if (editor.text.toString() != expected) {
             editor.setText(expected)
         }
+        fitEditorText(editor, holder, activePath)
     }
+}
+
+/**
+ * First layout of a file picks a pixel size that fits this editor's width.
+ * [CodeEditor.setTextSize] treats the argument as sp, so the pixel size must go
+ * through [CodeEditor.setTextSizePx]. A later pinch is left alone until the pane
+ * width actually changes.
+ */
+private fun fitEditorText(editor: CodeEditor, holder: EditorHolder, path: String) {
+    val width = editor.width
+    if (width <= 0) return
+    if (holder.fittedPath == path && abs(holder.fittedWidth - width) < 80) return
+    holder.fittedPath = path
+    holder.fittedWidth = width
+    val metrics = editor.resources.displayMetrics
+    val minPx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 9f, metrics)
+    val maxPx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 14f, metrics)
+    val gutter = 36f * metrics.density
+    val columns = 40f
+    val size = ((width - gutter) / columns).coerceIn(minPx, maxPx)
+    editor.setTextSizePx(size)
 }

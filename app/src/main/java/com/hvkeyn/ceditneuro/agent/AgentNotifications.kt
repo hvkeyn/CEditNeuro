@@ -27,9 +27,12 @@ data class AgentStatus(
  */
 object AgentNotifications {
     const val CHANNEL_ID = "agent"
+    const val RESULT_CHANNEL_ID = "agent_result"
     const val NOTIFICATION_ID = 42
+    const val RESULT_ID = 43
     const val ACTION_STOP = "com.hvkeyn.ceditneuro.AGENT_STOP"
     const val ACTION_CONTINUE = "com.hvkeyn.ceditneuro.AGENT_CONTINUE"
+    const val ACTION_DISMISS = "com.hvkeyn.ceditneuro.AGENT_DISMISS"
 
     @Volatile
     var latest: AgentStatus? = null
@@ -41,6 +44,7 @@ object AgentNotifications {
         latest = status
         ensureChannel(context)
         val app = context.applicationContext
+        manager(app).cancel(RESULT_ID)
         if (!started) {
             started = true
             val intent = Intent(app, AgentService::class.java)
@@ -54,12 +58,27 @@ object AgentNotifications {
         }
     }
 
+    /**
+     * Leaves a swipeable result in the shade. Continue resumes the task.
+     * Stop, or a swipe, clears it. A finished task that needs nothing calls [dismiss].
+     */
+    fun settle(context: Context, status: AgentStatus) {
+        latest = null
+        started = false
+        val app = context.applicationContext
+        ensureChannel(app)
+        manager(app).notify(RESULT_ID, buildOutcome(app, status))
+        app.stopService(Intent(app, AgentService::class.java))
+    }
+
     fun dismiss(context: Context) {
         latest = null
         started = false
         val app = context.applicationContext
         app.stopService(Intent(app, AgentService::class.java))
-        manager(app).cancel(NOTIFICATION_ID)
+        val notifications = manager(app)
+        notifications.cancel(NOTIFICATION_ID)
+        notifications.cancel(RESULT_ID)
     }
 
     fun notify(context: Context) {
@@ -109,8 +128,53 @@ object AgentNotifications {
             .setCustomContentView(compact)
             .setCustomBigContentView(expanded)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            .addAction(0, "Continue", servicePending(context, ACTION_CONTINUE, 2))
-            .addAction(0, "Stop", servicePending(context, ACTION_STOP, 3))
+            .addAction(0, "Continue", servicePending(context, ACTION_CONTINUE, 2, foreground = true))
+            .addAction(0, "Stop", servicePending(context, ACTION_STOP, 3, foreground = false))
+            .build()
+    }
+
+    private fun buildOutcome(context: Context, status: AgentStatus): Notification {
+        ensureChannel(context)
+        val clock = clock(status.startedAt)
+        val reason = status.phase.ifBlank { "Stopped" }
+        val detail = listOfNotNull(
+            status.workLine.takeIf { it.isNotBlank() },
+            status.detail.takeIf { it.isNotBlank() },
+            status.focus.takeIf { it.isNotBlank() },
+        ).joinToString("\n")
+
+        val compact = RemoteViews(context.packageName, R.layout.notification_agent_compact)
+        compact.setTextViewText(R.id.agent_title, "Agent stopped · $clock")
+        compact.setTextViewText(R.id.agent_phase, reason)
+        compact.setProgressBar(R.id.agent_progress, 100, 100, false)
+
+        val expanded = RemoteViews(context.packageName, R.layout.notification_agent)
+        expanded.setTextViewText(R.id.agent_title, "Agent stopped · $clock")
+        expanded.setTextViewText(R.id.agent_phase, reason)
+        expanded.setTextViewText(R.id.agent_detail, detail.ifBlank { "Swipe to clear, or choose Continue or Stop." })
+        expanded.setProgressBar(R.id.agent_progress, 100, 100, false)
+        expanded.setProgressBar(R.id.agent_phase_bar, 100, 100, false)
+
+        val open = PendingIntent.getActivity(
+            context,
+            4,
+            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            pendingFlags(),
+        )
+        return NotificationCompat.Builder(context, RESULT_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_agent)
+            .setOngoing(false)
+            .setAutoCancel(false)
+            .setOnlyAlertOnce(true)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setContentTitle("Agent stopped")
+            .setContentText(reason)
+            .setContentIntent(open)
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+            .setCustomContentView(compact)
+            .setCustomBigContentView(expanded)
+            .addAction(0, "Continue", servicePending(context, ACTION_CONTINUE, 5, foreground = true))
+            .addAction(0, "Stop", servicePending(context, ACTION_DISMISS, 6, foreground = false))
             .build()
     }
 
@@ -119,9 +183,19 @@ object AgentNotifications {
         return "%d:%02d".format(elapsed / 60, elapsed % 60)
     }
 
-    private fun servicePending(context: Context, action: String, request: Int): PendingIntent {
+    private fun servicePending(
+        context: Context,
+        action: String,
+        request: Int,
+        foreground: Boolean,
+    ): PendingIntent {
         val intent = Intent(context, AgentService::class.java).setAction(action)
-        return PendingIntent.getService(context, request, intent, pendingFlags())
+        val flags = pendingFlags()
+        return if (foreground && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            PendingIntent.getForegroundService(context, request, intent, flags)
+        } else {
+            PendingIntent.getService(context, request, intent, flags)
+        }
     }
 
     private fun pendingFlags(): Int {
@@ -138,7 +212,16 @@ object AgentNotifications {
         )
         channel.description = "Shows what the agent is doing while the app is in the background."
         channel.setShowBadge(false)
-        manager(context).createNotificationChannel(channel)
+        val notifications = manager(context)
+        notifications.createNotificationChannel(channel)
+        val result = NotificationChannel(
+            RESULT_CHANNEL_ID,
+            "Agent result",
+            NotificationManager.IMPORTANCE_DEFAULT,
+        )
+        result.description = "Stays after the agent stops, until you continue, confirm, or swipe it away."
+        result.setShowBadge(false)
+        notifications.createNotificationChannel(result)
     }
 
     private fun manager(context: Context): NotificationManager =
