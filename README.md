@@ -4,8 +4,9 @@
 the Zed desktop workflow: edit files by hand, slide the agent panel open when you want a
 change made, let it work, read the report, close the panel, keep editing.
 
-The agent runs on **DeepSeek** through its OpenAI-compatible API. Everything else — the
-workspace, the tools, the conversation — stays on the device.
+The built-in provider is **DeepSeek** through its OpenAI-compatible API. Other providers can
+be added in **Language models** settings. The workspace, the tools, and the conversation stay
+on the device. API keys stay on the device too.
 
 ## Status
 
@@ -24,9 +25,13 @@ layer is wired end to end.
 | Built-in shell (`run_command`, mksh/toybox) | done |
 | FTP, FTPS, and SFTP (`remote_list`, `remote_read`, `remote_write`, `remote_put`, `remote_get`) | done |
 | SSH command on the selected SFTP server (`ssh_exec`) and in-app site preview | done |
-| Collapsible chat panel | done |
-| Syntax highlighting (TextMate grammars) | **not yet** — blocked on record desugaring, see `docs/ARCHITECTURE.md` |
-| LSP, tree-sitter | not yet |
+| Collapsible chat panel, shell, and in-app page preview | done |
+| Tree-sitter highlighting for Java, Kotlin, Python, JSON, and XML | done |
+| In-process completion and syntax diagnostics for those languages | done |
+| TextMate grammars | **not yet** — blocked on record desugaring, see `docs/ARCHITECTURE.md` |
+| One agent per open project, with its own shade card | done |
+| Update check at the bottom of Language models settings | done — install starts only after confirmation |
+| `install_jdk`, `install_android_sdk`, `install_runtime` from the Termux mirror | done |
 | Zed-style per-edit Accept/Reject diffs | not yet — edits apply immediately |
 
 ## Requirements
@@ -46,17 +51,23 @@ echo "sdk.dir=/path/to/Android/Sdk" > local.properties
 
 The APK lands in `app/build/outputs/apk/debug/`. Or just open the folder in Android Studio.
 
-The debug APK is around 20 MB, mostly `material-icons-extended` and JGit. Trimming the icon
-dependency to the handful actually used, or building a minified release, brings that down.
+```sh
+./gradlew assembleRelease
+```
+
+The release APK is about 38 MB. Most of that is the native tree-sitter libraries and JGit.
+Published builds are on the [GitHub releases](https://github.com/hvkeyn/CEditNeuro/releases) page.
 
 ## First run
 
 1. The app asks for all-files access. It is required: the app edits project folders on shared
    storage. This is why CEditNeuro is a sideloaded tool and not a Play Store app.
 2. Tap **Choose folder** and point it at a project.
-3. Open **Settings** and paste your DeepSeek API key. Base URL and model default to
-   `https://api.deepseek.com` and `deepseek-flash`.
-4. Tap the chat icon to slide the agent panel in.
+3. Open **Settings** (**Language models**) and paste your DeepSeek API key. The built-in
+   provider defaults to `https://api.deepseek.com/v1` and `deepseek-flash`. The version name
+   and **Check for updates** are at the bottom of that screen.
+4. Tap the chat icon to slide the agent panel in. Opening another project does not stop the
+   agent you left running.
 
 ## Built-in shell
 
@@ -64,10 +75,32 @@ dependency to the handful actually used, or building a minified release, brings 
 toybox (`ls`, `mkdir`, `grep`, `find`, and the other applets on the device). Nothing else
 has to be installed.
 
-This is not the Termux distribution. Termux packages are built for the hardcoded prefix
-`/data/data/com.termux/files/usr`, so they cannot be executed under this application id.
-`pkg`, `apt`, `git`, and compilers are not part of the shell. Git status and diff still go
-through JGit.
+This is not the Termux distribution. Termux packages expect the prefix
+`/data/data/com.termux/files/usr`, so `pkg` and `apt` are not part of the shell. Git status
+and diff still go through JGit. The agent can still install a JDK, the Android SDK tools,
+and other runtimes into this app's toolchain with `install_jdk`, `install_android_sdk`, and
+`install_runtime`. Those tools download Debian packages from the Termux mirror and unpack
+them here.
+
+## Several projects
+
+Each open folder keeps its own chat and its own agent. Switching folders leaves the other
+run going. A strip under the editor, and the project menu, show what the other projects are
+doing.
+
+The Android status shade shows one ongoing card per running project: the folder name, the
+elapsed time, and that project's phase. **Stop** and **Continue** on a card apply only to
+that project. When the last agent finishes, the foreground notification goes away. A stopped
+or failed run leaves a separate card you can continue or swipe away.
+
+On a short landscape screen the chat, shell, and page preview open across the editor instead
+of docking into a column that is not on screen.
+
+## Updates
+
+**Check for updates** at the bottom of **Language models** compares this install with the
+latest GitHub release. If a newer version is published, the app asks before it downloads.
+Confirming starts the download and the system installer. An equal version is left as is.
 
 ## Layout
 
