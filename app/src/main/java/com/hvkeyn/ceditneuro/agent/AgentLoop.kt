@@ -22,9 +22,10 @@ class AgentLoop(
     private val maxToolRounds: Int = 40,
 ) {
     private companion object {
-        const val MAX_LENGTH_CONTINUES = 4
+        const val MAX_LENGTH_CONTINUES = 12
         const val MAX_EMPTY_CONTINUES = 1
         const val MAX_NET_RETRIES = 2
+        const val MAX_AUTO_BATCHES = 15
     }
 
     private val json = Json {
@@ -40,12 +41,14 @@ class AgentLoop(
 
         var lengthContinues = 0
         var emptyContinues = 0
-        var round = 0
+        var batch = 0
 
         suspend fun remember() {
             emit(AgentEvent.Context(ToolTranscript.seal(messages.filter { it.role != "system" })))
         }
 
+        while (batch < MAX_AUTO_BATCHES) {
+        var round = 0
         while (round < maxToolRounds) {
             val sealed = ToolTranscript.seal(messages)
             if (sealed !== messages) {
@@ -153,6 +156,14 @@ class AgentLoop(
                 remember()
             }
             round++
+        }
+            batch++
+            if (batch >= MAX_AUTO_BATCHES) break
+            emit(activity(messages, batch * maxToolRounds, "Step limit reached, continuing"))
+            messages += ChatMessage.user(
+                "Continue the same task from the latest step. Do not repeat work that already finished.",
+            )
+            remember()
         }
 
         remember()

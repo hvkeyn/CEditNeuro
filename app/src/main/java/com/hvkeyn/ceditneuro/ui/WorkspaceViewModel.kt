@@ -107,6 +107,12 @@ data class ShellLine(
     val running: Boolean = false,
 )
 
+data class FileClipboard(
+    val absolutePath: String,
+    val name: String,
+    val cut: Boolean,
+)
+
 data class HostTrustPrompt(val serverId: String, val host: String, val fingerprint: String)
 
 data class WorkspaceUiState(
@@ -133,6 +139,7 @@ data class WorkspaceUiState(
     val webUrl: String = "",
     val webGeneration: Int = 0,
     val appUpdate: AppUpdate? = null,
+    val fileClipboard: FileClipboard? = null,
     val otherRuns: List<ProjectRunStatus> = emptyList(),
 ) {
     val projectName: String?
@@ -209,13 +216,41 @@ class WorkspaceViewModel(
     init {
         viewModelScope.launch {
             UpdateBus.failures.collect { message ->
+                val replace = message.contains("UPDATE_INCOMPATIBLE", ignoreCase = true) ||
+                    message.contains("VERSION_DOWNGRADE", ignoreCase = true) ||
+                    message.contains("signatures do not match", ignoreCase = true)
+                val permission = !replace && (
+                    message.contains("USER_RESTRICTED", ignoreCase = true) ||
+                    message.contains("not allowed", ignoreCase = true) ||
+                    !AppUpdater.canInstallPackages(appContext)
+                    )
+                val exported = if (replace) {
+                    withContext(Dispatchers.IO) { AppUpdater.exportUpdateApk(appContext)?.absolutePath }
+                } else {
+                    null
+                }
+                val text = when {
+                    replace && exported != null ->
+                        "This phone already has CEditNeuro signed with a different key, so Android will not replace it. " +
+                            "The new APK is in Downloads:\n$exported\n" +
+                            "Uninstall this app, then open that file. The API key saved in this app is removed with the uninstall."
+                    replace ->
+                        "This phone already has CEditNeuro signed with a different key, so Android will not replace it. " +
+                            "Uninstall this app, then install the new APK. The API key saved in this app is removed with the uninstall."
+                    permission ->
+                        "Android is not letting this app install updates. Allow installs for CEditNeuro, then come back."
+                    else -> message
+                }
                 _state.update { current ->
-                    val shown = current.appUpdate ?: return@update current
+                    val shown = current.appUpdate ?: AppUpdate(versionName = "", notes = "", apkUrl = "")
                     current.copy(
                         appUpdate = shown.copy(
                             downloading = false,
                             installing = false,
-                            error = message,
+                            error = text,
+                            needsInstallPermission = permission,
+                            replaceInstalled = replace,
+                            exportedApk = exported,
                         ),
                     )
                 }
@@ -871,7 +906,191 @@ class WorkspaceViewModel(
 
     fun retryUpdate() {
         val offer = _state.value.appUpdate ?: return
-        startUpdate(offer.copy(error = null, downloading = false, installing = false))
+        startUpdate(offer.copy(error = null, downloading = false, installing = false, replaceInstalled = false))
+    }
+
+    fun allowInstalls() {
+        AppUpdater.requestInstallPermission(appContext)
+    }
+
+    /** Copies the update into Downloads, then asks Android to uninstall this signed copy. */
+    fun uninstallForUpdate() {
+        val ready = _state.value.appUpdate?.exportedApk?.let { File(it) }?.takeIf { it.isFile }
+            ?: AppUpdater.exportUpdateApk(appContext)
+        if (ready == null) {
+            showMessage("Could not copy the update into Downloads.")
+            return
+        }
+        _state.update { current ->
+            val shown = current.appUpdate ?: return@update current
+            current.copy(appUpdate = shown.copy(exportedApk = ready.absolutePath))
+        }
+        runCatching { AppUpdater.uninstallSelf(appContext) }
+            .onFailure { showMessage(it.message ?: "Could not open the uninstall screen.") }
+    }
+
+    fun stageCopy(path: String) = stageFile(path, cut = false)
+
+    fun stageCut(path: String) = stageFile(path, cut = true)
+
+    fun clearFileClipboard() {
+        _state.update { it.copy(fileClipboard = null) }
+    }
+
+    fun renameEntry(path: String, newName: String) {
+        val project = current ?: return
+        val cleaned = newName.trim().replace('\\', '/').trim('/')
+        if (cleaned.isEmpty() || cleaned.contains('/') || cleaned.contains('\u0000')) {
+            showMessage("Use a single name without slashes.")
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = runCatching {
+                val source = project.workspace.resolve(path)
+                if (!source.exists()) error("That item is gone.")
+                if (isProtectedFile(source, project)) error("That folder cannot be renamed.")
+                val dest = File(source.parentFile, cleaned)
+                if (dest.exists()) error("$cleaned already exists.")
+                val from = project.workspace.relativize(source)
+                if (!source.renameTo(dest)) error("Could not rename ${source.name}.")
+                from to project.workspace.relativize(dest)
+            }
+            withContext(Dispatchers.Main) {
+                result.onSuccess { (from, to) ->
+                    retargetPaths(project, from, to)
+                    refreshProjectTree(project, to)
+                    showMessage("Renamed to ${to.substringAfterLast('/')}")
+                }.onFailure { showMessage(it.message ?: "Could not rename.") }
+            }
+        }
+    }
+
+    fun deleteEntry(path: String) {
+        val project = current ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = runCatching {
+                val source = project.workspace.resolve(path)
+                if (!source.exists()) error("That item is gone.")
+                if (isProtectedFile(source, project)) error("That folder cannot be deleted.")
+                val from = project.workspace.relativize(source)
+                val removed = if (source.isDirectory) source.deleteRecursively() else source.delete()
+                if (!removed) error("Could not delete ${source.name}.")
+                from
+            }
+            withContext(Dispatchers.Main) {
+                result.onSuccess { from ->
+                    forgetPaths(project, from)
+                    refreshProjectTree(project, from.substringBeforeLast('/', ""))
+                    showMessage("Deleted ${from.substringAfterLast('/')}")
+                }.onFailure { showMessage(it.message ?: "Could not delete.") }
+            }
+        }
+    }
+
+    fun pasteEntry(intoDir: String) {
+        val clip = _state.value.fileClipboard ?: return
+        val project = current ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = runCatching {
+                val source = File(clip.absolutePath)
+                if (!source.exists()) error("The copied item is gone.")
+                val dir = project.workspace.resolve(intoDir)
+                if (!dir.isDirectory) error("Choose a folder to paste into.")
+                val dest = File(dir, source.name)
+                if (dest.exists()) error("${source.name} already exists here.")
+                val sourceCanon = source.canonicalFile
+                val destCanon = dest.canonicalFile
+                if (sourceCanon.isDirectory &&
+                    (destCanon.path == sourceCanon.path || destCanon.path.startsWith(sourceCanon.path + File.separator))
+                ) {
+                    error("Cannot paste a folder into itself.")
+                }
+                val from = runCatching { project.workspace.relativize(source) }.getOrDefault(source.path)
+                if (clip.cut) {
+                    if (!source.renameTo(dest)) {
+                        source.copyRecursively(dest, overwrite = false)
+                        if (!source.deleteRecursively()) error("Could not finish the move.")
+                    }
+                } else {
+                    source.copyRecursively(dest, overwrite = false)
+                }
+                from to project.workspace.relativize(dest)
+            }
+            withContext(Dispatchers.Main) {
+                result.onSuccess { (from, to) ->
+                    if (clip.cut) {
+                        retargetPaths(project, from, to)
+                        _state.update { it.copy(fileClipboard = null) }
+                    }
+                    refreshProjectTree(project, to)
+                    showMessage(if (clip.cut) "Moved ${to.substringAfterLast('/')}" else "Pasted ${to.substringAfterLast('/')}")
+                }.onFailure { showMessage(it.message ?: "Could not paste.") }
+            }
+        }
+    }
+
+    private fun stageFile(path: String, cut: Boolean) {
+        val project = current ?: return
+        val file = runCatching { project.workspace.resolve(path) }.getOrElse {
+            showMessage(it.message ?: "Bad path.")
+            return
+        }
+        if (!file.exists()) {
+            showMessage("That item is gone.")
+            return
+        }
+        val absolute = runCatching { file.canonicalPath }.getOrElse {
+            showMessage(it.message ?: "Bad path.")
+            return
+        }
+        _state.update {
+            it.copy(fileClipboard = FileClipboard(absolute, file.name, cut))
+        }
+        showMessage(if (cut) "Cut ${file.name}. Long-press a folder to paste." else "Copied ${file.name}. Long-press a folder to paste.")
+    }
+
+    private fun isProtectedFile(target: File, project: LiveProject): Boolean {
+        val path = runCatching { target.canonicalPath }.getOrDefault(target.path)
+        if (path == project.workspace.root.canonicalPath) return true
+        return path in setOf("/", "/sdcard", "/storage", "/storage/emulated", "/storage/emulated/0")
+    }
+
+    private fun retargetPaths(project: LiveProject, from: String, to: String) {
+        if (from == to) return
+        project.buffers.keys.toList().forEach { key ->
+            val mapped = mapStoredPath(key, from, to)
+            if (mapped != key) project.buffers.remove(key)?.let { project.buffers[mapped] = it }
+        }
+        editProject(project) { shown ->
+            shown.copy(
+                openFiles = shown.openFiles.map { file ->
+                    val mapped = mapStoredPath(file.path, from, to)
+                    if (mapped == file.path) file else file.copy(path = mapped)
+                },
+                activePath = shown.activePath?.let { mapStoredPath(it, from, to) },
+                dirtyPaths = shown.dirtyPaths.map { mapStoredPath(it, from, to) }.toSet(),
+                expandedDirs = shown.expandedDirs.map { mapStoredPath(it, from, to) }.toSet(),
+            )
+        }
+    }
+
+    private fun forgetPaths(project: LiveProject, from: String) {
+        project.buffers.keys.removeAll { it == from || it.startsWith("$from/") }
+        editProject(project) { shown ->
+            val open = shown.openFiles.filterNot { it.path == from || it.path.startsWith("$from/") }
+            val activeGone = shown.activePath == from || shown.activePath?.startsWith("$from/") == true
+            shown.copy(
+                openFiles = open,
+                activePath = if (activeGone) open.lastOrNull()?.path else shown.activePath,
+                dirtyPaths = shown.dirtyPaths.filterNot { it == from || it.startsWith("$from/") }.toSet(),
+            )
+        }
+    }
+
+    private fun mapStoredPath(path: String, from: String, to: String): String = when {
+        path == from -> to
+        path.startsWith("$from/") -> to + path.removePrefix(from)
+        else -> path
     }
 
     private fun startUpdate(offer: AppUpdate) {
