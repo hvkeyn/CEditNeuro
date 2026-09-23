@@ -725,6 +725,10 @@ class WorkspaceViewModel(
             showMessage("Open a project folder first.")
             return
         }
+        startPrompt(project, prompt)
+    }
+
+    private fun startPrompt(project: LiveProject, prompt: String) {
         if (prompt.isBlank() || project.agentJob?.isActive == true) return
 
         appendChat(project, ChatRole.User, prompt)
@@ -783,18 +787,13 @@ class WorkspaceViewModel(
                     ?: "Finished"
             }
             editProject(project) { it.copy(agentRunning = false, agentActivity = null) }
+            val key = project.workspace.root.canonicalPath
             if (outcome == null) {
-                if (current === project) AgentNotifications.dismiss(appContext)
+                AgentNotifications.dismiss(appContext, key)
             } else {
                 AgentNotifications.settle(
                     appContext,
-                    AgentStatus(
-                        phase = "${project.workspace.root.name}: $outcome",
-                        detail = workLine(),
-                        focus = "",
-                        startedAt = started,
-                        workLine = workLine(),
-                    ),
+                    agentStatus(project, outcome, workLine(), "", started),
                 )
             }
             persistNow(project)
@@ -802,8 +801,8 @@ class WorkspaceViewModel(
     }
 
     /** Sends a short follow-up so a stopped task can pick up from the chat history. */
-    fun continueAgent() {
-        val project = current
+    fun continueAgent(path: String? = null) {
+        val project = projectFor(path)
         if (project == null) {
             showMessage("Open a project folder first.")
             return
@@ -813,12 +812,20 @@ class WorkspaceViewModel(
             showMessage("Nothing to continue yet.")
             return
         }
-        sendPrompt("Continue the previous task from where it stopped. Do not repeat steps that already finished.")
+        startPrompt(
+            project,
+            "Continue the previous task from where it stopped. Do not repeat steps that already finished.",
+        )
     }
 
-    fun cancelAgent() {
-        val project = current ?: return
+    fun cancelAgent(path: String? = null) {
+        val project = projectFor(path) ?: return
         abandonAgent(project, announce = true)
+    }
+
+    private fun projectFor(path: String?): LiveProject? {
+        if (path.isNullOrBlank()) return current
+        return projects[path]
     }
 
     fun checkForUpdate(manual: Boolean = false) {
@@ -989,16 +996,10 @@ class WorkspaceViewModel(
             project.runOutcome = note
             AgentNotifications.settle(
                 appContext,
-                AgentStatus(
-                    phase = "${project.workspace.root.name}: $note",
-                    detail = "Continue resumes, or swipe this away.",
-                    focus = "",
-                    startedAt = started,
-                    workLine = workLine(),
-                ),
+                agentStatus(project, note, "Continue resumes, or swipe this away.", "", started),
             )
-        } else if (current === project) {
-            AgentNotifications.dismiss(appContext)
+        } else if (wasRunning) {
+            AgentNotifications.dismiss(appContext, project.workspace.root.canonicalPath)
         }
     }
 
@@ -1132,15 +1133,25 @@ class WorkspaceViewModel(
         project.lastNoticePhase = activity.phase
         AgentNotifications.publish(
             appContext,
-            AgentStatus(
-                phase = "${project.workspace.root.name}: ${activity.phase}",
-                detail = activity.context,
-                focus = activity.focus,
-                startedAt = activity.startedAt,
-                workLine = workLine(),
-            ),
+            agentStatus(project, activity.phase, activity.context, activity.focus, activity.startedAt),
         )
     }
+
+    private fun agentStatus(
+        project: LiveProject,
+        phase: String,
+        detail: String,
+        focus: String,
+        startedAt: Long,
+    ): AgentStatus = AgentStatus(
+        key = project.workspace.root.canonicalPath,
+        name = project.workspace.root.name.ifBlank { "Agent" },
+        phase = phase,
+        detail = detail,
+        focus = focus,
+        startedAt = startedAt,
+        workLine = workLine(),
+    )
 
     private fun workLine(): String {
         val settings = settingsStore.current

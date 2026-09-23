@@ -251,6 +251,8 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
             settings = settings,
             onSettingsChange = viewModel::updateSettings,
             onTestRemote = viewModel::testRemote,
+            versionName = versionName,
+            onCheckUpdate = { viewModel.checkForUpdate(manual = true) },
             onDismiss = { showSettings = false },
         )
     }
@@ -298,10 +300,8 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                 title = {
                     ProjectTitleMenu(
                         state = state,
-                        versionName = versionName,
                         onOpenProject = { path -> viewModel.openProject(File(path)) },
                         onChooseFolder = { folderPicker.launch(null) },
-                        onCheckUpdate = { viewModel.checkForUpdate(manual = true) },
                     )
                 },
                 actions = {
@@ -644,10 +644,8 @@ private fun EditorSurface(
 @Composable
 private fun ProjectTitleMenu(
     state: WorkspaceUiState,
-    versionName: String,
     onOpenProject: (String) -> Unit,
     onChooseFolder: () -> Unit,
-    onCheckUpdate: () -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
     Box {
@@ -702,18 +700,6 @@ private fun ProjectTitleMenu(
                 onClick = {
                     open = false
                     onChooseFolder()
-                },
-            )
-            DropdownMenuItem(
-                text = { Text("Version $versionName") },
-                onClick = {},
-                enabled = false,
-            )
-            DropdownMenuItem(
-                text = { Text("Check for updates") },
-                onClick = {
-                    open = false
-                    onCheckUpdate()
                 },
             )
         }
