@@ -735,8 +735,14 @@ class WorkspaceViewModel(
                 val local = AppUpdater.localVersion(appContext)
                 runCatching { AppUpdater.latestNewerThan(local) }.getOrNull()
             } ?: return@launch
-            startUpdate(offer)
+            _state.update { it.copy(appUpdate = offer) }
         }
+    }
+
+    /** Starts download and install after the user confirms the offered version. */
+    fun confirmUpdate() {
+        val offer = _state.value.appUpdate ?: return
+        startUpdate(offer.copy(error = null, downloading = false, installing = false))
     }
 
     /** Called when the activity is back, so a permission grant can continue the install. */

@@ -1,0 +1,2 @@
+(object) @scope
+(array) @scope

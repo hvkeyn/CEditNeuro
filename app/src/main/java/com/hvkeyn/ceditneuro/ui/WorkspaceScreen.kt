@@ -54,6 +54,7 @@ import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -82,6 +83,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -149,8 +151,11 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
     state.appUpdate?.let { update ->
         val progress = if (update.total > 0) update.received.toFloat() / update.total else 0f
         val percent = if (update.total > 0) ((100 * update.received) / update.total).toInt() else null
+        val waiting = !update.downloading && !update.installing && update.error == null
         AlertDialog(
-            onDismissRequest = { if (update.error != null) viewModel.dismissUpdate() },
+            onDismissRequest = {
+                if (!update.downloading && !update.installing) viewModel.dismissUpdate()
+            },
             title = { Text("Update ${update.versionName}") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -158,11 +163,14 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                         when {
                             update.error != null -> update.error
                             update.installing -> "Installing. Confirm the system prompt if Android asks. The app will reopen when it finishes."
-                            percent != null -> "Downloading… $percent%"
-                            else -> "Downloading…"
+                            update.downloading && percent != null -> "Downloading… $percent%"
+                            update.downloading -> "Downloading…"
+                            else -> "Version ${update.versionName} is available. Download and install it?"
                         },
                     )
-                    if (update.notes.isNotBlank() && update.error == null) Text(update.notes)
+                    if (update.notes.isNotBlank() && update.error == null && !update.downloading) {
+                        Text(update.notes)
+                    }
                     if (update.downloading || update.installing) {
                         if (update.downloading && update.total > 0) {
                             LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
@@ -173,13 +181,16 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                 }
             },
             confirmButton = {
-                if (update.error != null) {
-                    TextButton(onClick = viewModel::retryUpdate) { Text("Retry") }
+                when {
+                    update.error != null -> TextButton(onClick = viewModel::retryUpdate) { Text("Retry") }
+                    waiting -> TextButton(onClick = viewModel::confirmUpdate) { Text("Update") }
                 }
             },
             dismissButton = {
-                if (update.error != null) {
-                    TextButton(onClick = viewModel::dismissUpdate) { Text("Close") }
+                if (!update.downloading && !update.installing) {
+                    TextButton(onClick = viewModel::dismissUpdate) {
+                        Text(if (update.error != null) "Close" else "Later")
+                    }
                 }
             },
         )
@@ -257,6 +268,9 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
         )
     }
 
+    val screen = LocalConfiguration.current
+    val shortLandscape = screen.screenHeightDp < 520 && screen.screenWidthDp > screen.screenHeightDp
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         contentWindowInsets = WindowInsets.safeDrawing,
@@ -269,7 +283,10 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                     containerColor = MaterialTheme.colorScheme.surface,
                 ),
                 navigationIcon = {
-                    IconButton(onClick = { projectPanelOpen = !projectPanelOpen }) {
+                    IconButton(
+                        onClick = { projectPanelOpen = !projectPanelOpen },
+                        modifier = if (shortLandscape) Modifier.size(40.dp) else Modifier,
+                    ) {
                         Icon(Icons.Default.Menu, contentDescription = "Project files")
                     }
                 },
@@ -281,19 +298,34 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                     )
                 },
                 actions = {
-                    IconButton(onClick = viewModel::saveActiveFile) {
+                    IconButton(
+                        onClick = viewModel::saveActiveFile,
+                        modifier = if (shortLandscape) Modifier.size(40.dp) else Modifier,
+                    ) {
                         Icon(Icons.Default.Save, contentDescription = "Save file")
                     }
-                    IconButton(onClick = { showSettings = true }) {
+                    IconButton(
+                        onClick = { showSettings = true },
+                        modifier = if (shortLandscape) Modifier.size(40.dp) else Modifier,
+                    ) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
-                    IconButton(onClick = viewModel::toggleShell) {
+                    IconButton(
+                        onClick = viewModel::toggleShell,
+                        modifier = if (shortLandscape) Modifier.size(40.dp) else Modifier,
+                    ) {
                         Icon(Icons.Default.Terminal, contentDescription = "Toggle shell")
                     }
-                    IconButton(onClick = viewModel::toggleChat) {
+                    IconButton(
+                        onClick = viewModel::toggleChat,
+                        modifier = if (shortLandscape) Modifier.size(40.dp) else Modifier,
+                    ) {
                         Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Toggle agent chat")
                     }
-                    IconButton(onClick = viewModel::toggleWeb) {
+                    IconButton(
+                        onClick = viewModel::toggleWeb,
+                        modifier = if (shortLandscape) Modifier.size(40.dp) else Modifier,
+                    ) {
                         Icon(
                             Icons.Default.Public,
                             contentDescription = "Toggle browser",
@@ -313,12 +345,13 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            val compactHeight = maxHeight < 440.dp
+            val compactHeight = maxHeight < 520.dp && maxWidth > maxHeight
             val panes = adaptivePanes(
                 maxWidth = maxWidth,
                 maxHeight = maxHeight,
                 chatVisible = state.chatVisible,
                 shellVisible = state.shellVisible,
+                treeOpen = projectPanelOpen,
             )
             val showTree = if (panes.splitTree) {
                 projectPanelOpen
@@ -327,7 +360,12 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
             }
 
             val webOpen = state.webVisible && state.webUrl.isNotBlank()
-            val webFraction = if (state.chatVisible || state.shellVisible) 0.38f else 0.62f
+            val webFraction = when {
+                compactHeight && (state.chatVisible || state.shellVisible) -> 0.34f
+                compactHeight -> 0.46f
+                state.chatVisible || state.shellVisible -> 0.38f
+                else -> 0.62f
+            }
             val webPanelHeight = if (webOpen) maxHeight * webFraction else 0.dp
             Box(modifier = Modifier.fillMaxSize()) {
             Column(
@@ -370,30 +408,50 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                 }
 
                 if (panes.splitTree || !showTree) {
-                    EditorStage(
-                        viewModel = viewModel,
-                        state = state,
-                        settings = settings,
-                        chatWidth = panes.chatWidth,
+                    Column(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight(),
-                    )
+                    ) {
+                        EditorSurface(
+                            viewModel,
+                            state,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                        )
+                        AnimatedVisibility(
+                            visible = state.shellVisible && panes.shellHeight != null,
+                            enter = slideInVertically { height -> height },
+                            exit = slideOutVertically { height -> height },
+                        ) {
+                            ShellPanel(
+                                state = state,
+                                onRun = viewModel::runShellCommand,
+                                onClose = viewModel::toggleShell,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(panes.shellHeight ?: 140.dp),
+                            )
+                        }
+                    }
+                    if (panes.chatWidth != null) {
+                        Box(
+                            modifier = Modifier
+                                .width(1.dp)
+                                .fillMaxHeight()
+                                .background(MaterialTheme.colorScheme.outline),
+                        )
+                        AgentChat(
+                            viewModel = viewModel,
+                            state = state,
+                            settings = settings,
+                            modifier = Modifier
+                                .width(panes.chatWidth)
+                                .fillMaxHeight(),
+                        )
+                    }
                 }
-            }
-            AnimatedVisibility(
-                visible = state.shellVisible && panes.shellHeight != null,
-                enter = slideInVertically { height -> height },
-                exit = slideOutVertically { height -> height },
-            ) {
-                ShellPanel(
-                    state = state,
-                    onRun = viewModel::runShellCommand,
-                    onClose = viewModel::toggleShell,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(panes.shellHeight ?: 180.dp),
-                )
             }
             }
             AnimatedVisibility(
@@ -462,83 +520,62 @@ private data class AdaptivePanes(
 )
 
 /**
- * Splits the screen from the space that is actually available. A landscape phone is
- * wide and short, so the shell docks to the bottom or the side instead of covering
- * the editor. A portrait phone keeps full-screen chat and shell.
+ * Gives the editor a real share of a short landscape screen. Chat docks beside it
+ * instead of covering it, and the shell sits under the editor. A portrait phone
+ * keeps full-screen chat and shell.
  */
 private fun adaptivePanes(
     maxWidth: Dp,
     maxHeight: Dp,
     chatVisible: Boolean,
     shellVisible: Boolean,
+    treeOpen: Boolean,
 ): AdaptivePanes {
-    val treeWidth = (maxWidth * 0.34f).coerceIn(200.dp, 320.dp)
-    val splitTree = maxWidth >= 600.dp && maxWidth - treeWidth >= 280.dp
-    val editorWidth = if (splitTree) maxWidth - treeWidth else maxWidth
-    val chatWidth = if (
-        chatVisible && !shellVisible && splitTree && editorWidth >= 560.dp
-    ) {
-        (editorWidth * 0.42f).coerceIn(240.dp, 420.dp)
+    val short = maxHeight < 520.dp && maxWidth > maxHeight
+    val minEditor = if (short) 220.dp else 300.dp
+    val wantTree = if (short) {
+        (maxWidth * 0.22f).coerceIn(148.dp, 196.dp)
+    } else {
+        (maxWidth * 0.28f).coerceIn(200.dp, 280.dp)
+    }
+    val splitTree = treeOpen && maxWidth >= 560.dp && maxWidth - wantTree >= minEditor
+    val treeWidth = if (splitTree) wantTree else 0.dp
+    val wantChat = if (short) {
+        (maxWidth * 0.32f).coerceIn(210.dp, 280.dp)
+    } else {
+        (maxWidth * 0.34f).coerceIn(280.dp, 400.dp)
+    }
+    val chatRoom = maxWidth - treeWidth - minEditor
+    val chatWidth = if (chatVisible && maxWidth >= 560.dp && chatRoom >= 200.dp) {
+        wantChat.coerceAtMost(chatRoom)
     } else {
         null
     }
     val overlayChatWidth = when {
-        !chatVisible || shellVisible || chatWidth != null -> null
+        chatWidth != null || !chatVisible || shellVisible -> null
         maxWidth >= 600.dp -> (maxWidth * 0.42f).coerceIn(260.dp, 440.dp)
         else -> null
     }
     val shellHeight = when {
         !shellVisible -> null
-        maxHeight >= 440.dp && maxWidth >= 600.dp -> (maxHeight * 0.40f).coerceIn(150.dp, 280.dp)
+        short && maxWidth >= 560.dp -> (maxHeight * 0.30f).coerceIn(104.dp, 148.dp)
+        maxHeight >= 440.dp && maxWidth >= 600.dp -> (maxHeight * 0.32f).coerceIn(140.dp, 240.dp)
         else -> null
     }
     val shellWidth = when {
         !shellVisible || shellHeight != null -> null
-        maxWidth >= 600.dp -> (maxWidth * 0.46f).coerceIn(260.dp, 480.dp)
+        maxWidth >= 600.dp -> (maxWidth * 0.42f).coerceIn(260.dp, 420.dp)
         else -> null
     }
     return AdaptivePanes(
         splitTree = splitTree,
-        treeWidth = treeWidth,
+        treeWidth = if (splitTree) treeWidth else wantTree,
         chatWidth = chatWidth,
         overlayChatWidth = overlayChatWidth,
         shellWidth = shellWidth,
         shellHeight = shellHeight,
-        projectsMaxHeight = if (maxHeight < 440.dp) {
-            56.dp
-        } else {
-            (maxHeight * 0.28f).coerceIn(96.dp, 220.dp)
-        },
+        projectsMaxHeight = if (short) 52.dp else (maxHeight * 0.28f).coerceIn(96.dp, 220.dp),
     )
-}
-
-@Composable
-private fun EditorStage(
-    viewModel: WorkspaceViewModel,
-    state: WorkspaceUiState,
-    settings: AgentSettings,
-    chatWidth: Dp?,
-    modifier: Modifier = Modifier,
-) {
-    Box(modifier = modifier) {
-        if (chatWidth != null) {
-            Row(modifier = Modifier.fillMaxSize()) {
-                EditorSurface(
-                    viewModel,
-                    state,
-                    modifier = Modifier.fillMaxHeight().weight(1f),
-                )
-                AgentChat(
-                    viewModel = viewModel,
-                    state = state,
-                    settings = settings,
-                    modifier = Modifier.fillMaxHeight().width(chatWidth),
-                )
-            }
-        } else {
-            EditorSurface(viewModel, state, modifier = Modifier.fillMaxSize())
-        }
-    }
 }
 
 @Composable
@@ -649,13 +686,20 @@ private fun FileTreePane(
     ) {
         Column(
             modifier = Modifier.padding(
-                start = 16.dp,
-                end = 16.dp,
-                top = if (compactHeight) 8.dp else 16.dp,
-                bottom = if (compactHeight) 4.dp else 8.dp,
+                start = 12.dp,
+                end = 12.dp,
+                top = if (compactHeight) 4.dp else 16.dp,
+                bottom = if (compactHeight) 2.dp else 8.dp,
             ),
         ) {
-            Text("Projects", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "Projects",
+                style = if (compactHeight) {
+                    MaterialTheme.typography.titleSmall
+                } else {
+                    MaterialTheme.typography.titleMedium
+                },
+            )
             if (!compactHeight) {
                 Text(
                     text = "Chat and shell stay with each folder.",
@@ -683,6 +727,7 @@ private fun FileTreePane(
                 ProjectRow(
                     path = path,
                     selected = path == state.projectRoot,
+                    compact = compactHeight,
                     onOpen = { onOpenProject(path) },
                     onForget = { onForgetProject(path) },
                 )
@@ -690,14 +735,21 @@ private fun FileTreePane(
         }
         Button(
             onClick = onChooseFolder,
-            modifier = Modifier.padding(
-                start = 16.dp,
-                end = 16.dp,
-                top = if (compactHeight) 4.dp else 8.dp,
-                bottom = if (compactHeight) 8.dp else 12.dp,
-            ),
+            contentPadding = if (compactHeight) {
+                PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+            } else {
+                ButtonDefaults.ContentPadding
+            },
+            modifier = Modifier
+                .padding(
+                    start = 12.dp,
+                    end = 12.dp,
+                    top = if (compactHeight) 2.dp else 8.dp,
+                    bottom = if (compactHeight) 4.dp else 12.dp,
+                )
+                .height(if (compactHeight) 32.dp else 40.dp),
         ) {
-            Text("Choose folder")
+            Text("Choose folder", style = MaterialTheme.typography.labelLarge)
         }
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
@@ -722,6 +774,7 @@ private fun FileTreePane(
                 entries = state.rootEntries,
                 depth = 0,
                 state = state,
+                compact = compactHeight,
                 onToggleDir = onToggleDir,
                 onOpenFile = onOpenFile,
             )
@@ -733,6 +786,7 @@ private fun FileTreePane(
 private fun ProjectRow(
     path: String,
     selected: Boolean,
+    compact: Boolean,
     onOpen: () -> Unit,
     onForget: () -> Unit,
 ) {
@@ -744,7 +798,7 @@ private fun ProjectRow(
             .background(
                 if (selected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
             )
-            .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+            .padding(start = 12.dp, end = 0.dp, top = if (compact) 2.dp else 4.dp, bottom = if (compact) 2.dp else 4.dp),
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -754,13 +808,15 @@ private fun ProjectRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                text = path,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            if (!compact) {
+                Text(
+                    text = path,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         IconButton(onClick = onForget) {
             Icon(
@@ -776,6 +832,7 @@ private fun LazyListScope.fileTree(
     entries: List<FileEntry>,
     depth: Int,
     state: WorkspaceUiState,
+    compact: Boolean,
     onToggleDir: (String) -> Unit,
     onOpenFile: (String) -> Unit,
 ) {
@@ -787,6 +844,7 @@ private fun LazyListScope.fileTree(
                 expanded = entry.relativePath in state.expandedDirs,
                 active = entry.relativePath == state.activePath,
                 dirty = entry.relativePath in state.dirtyPaths,
+                compact = compact,
                 onClick = {
                     if (entry.isDirectory) onToggleDir(entry.relativePath) else onOpenFile(entry.relativePath)
                 },
@@ -797,6 +855,7 @@ private fun LazyListScope.fileTree(
                 entries = state.dirContents[entry.relativePath].orEmpty(),
                 depth = depth + 1,
                 state = state,
+                compact = compact,
                 onToggleDir = onToggleDir,
                 onOpenFile = onOpenFile,
             )
@@ -811,6 +870,7 @@ private fun FileRow(
     expanded: Boolean,
     active: Boolean,
     dirty: Boolean,
+    compact: Boolean,
     onClick: () -> Unit,
 ) {
     Row(
@@ -822,7 +882,12 @@ private fun FileRow(
             .background(
                 if (active) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
             )
-            .padding(start = (12 + depth * 16).dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
+            .padding(
+                start = (8 + depth * 14).dp,
+                end = 8.dp,
+                top = if (compact) 3.dp else 8.dp,
+                bottom = if (compact) 3.dp else 8.dp,
+            ),
     ) {
         if (entry.isDirectory) {
             Icon(

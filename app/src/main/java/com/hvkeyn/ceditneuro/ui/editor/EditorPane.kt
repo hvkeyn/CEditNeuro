@@ -22,10 +22,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -33,8 +35,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.hvkeyn.ceditneuro.ui.WorkspaceUiState
 import io.github.rosemoe.sora.event.ContentChangeEvent
+import io.github.rosemoe.sora.lsp.editor.LspEditor
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.schemes.SchemeDarcula
+import java.io.File
 
 /**
  * The editing surface: an open-file tab strip over a single Sora editor instance.
@@ -64,6 +68,7 @@ fun EditorPane(
         }
         CodeEditorHost(
             activePath = activePath,
+            projectRoot = state.projectRoot,
             contentProvider = contentProvider,
             reloadCounter = state.reloadCounter,
             onContentChanged = onContentChanged,
@@ -138,6 +143,7 @@ private fun EditorTabs(
 
 private class EditorHolder {
     var editor: CodeEditor? = null
+    var lspEditor: LspEditor? = null
     var fittedPath: String? = null
     var fittedWidth: Int = 0
 }
@@ -145,11 +151,13 @@ private class EditorHolder {
 @Composable
 private fun CodeEditorHost(
     activePath: String,
+    projectRoot: String?,
     contentProvider: (String) -> String,
     reloadCounter: Long,
     onContentChanged: (String, String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     val holder = remember { EditorHolder() }
     val currentPath by rememberUpdatedState(activePath)
     val currentListener by rememberUpdatedState(onContentChanged)
@@ -180,10 +188,46 @@ private fun CodeEditorHost(
         },
     )
 
+    DisposableEffect(Unit) {
+        onDispose {
+            val lsp = holder.lspEditor
+            holder.lspEditor = null
+            if (lsp != null) runCatching { lsp.dispose() }
+        }
+    }
+
+    LaunchedEffect(activePath, projectRoot) {
+        val editor = holder.editor ?: return@LaunchedEffect
+        holder.lspEditor?.let { previous ->
+            holder.lspEditor = null
+            runCatching { previous.dispose() }
+        }
+        val highlight = TreeSitterSupport.language(context, activePath)
+        val root = projectRoot
+        val lsp = if (root.isNullOrBlank()) {
+            null
+        } else {
+            val absolute = File(root, activePath).absolutePath
+            runCatching { LspHost.open(root, absolute, highlight) }.getOrNull()
+        }
+        if (lsp == null) {
+            editor.setEditorLanguage(highlight)
+        } else {
+            val connected = runCatching { lsp.connect(false) }.getOrDefault(false)
+            if (connected) {
+                lsp.editor = editor
+                holder.lspEditor = lsp
+            } else {
+                lsp.wrapperLanguage = null
+                runCatching { lsp.dispose() }
+                editor.setEditorLanguage(highlight)
+            }
+        }
+    }
+
     // Pull the file in when the tab changes, or when the agent rewrote the open file.
     LaunchedEffect(activePath, reloadCounter) {
         val editor = holder.editor ?: return@LaunchedEffect
-        editor.setEditorLanguage(SourceLanguage.forPath(activePath))
         val expected = contentProvider(activePath)
         if (editor.text.toString() != expected) {
             editor.setText(expected)
