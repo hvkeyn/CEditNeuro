@@ -42,6 +42,10 @@ class AgentLoop(
         var emptyContinues = 0
         var round = 0
 
+        suspend fun remember() {
+            emit(AgentEvent.Context(messages.filter { it.role != "system" }))
+        }
+
         while (round < maxToolRounds) {
             val assistantText = StringBuilder()
             val reasoning = StringBuilder()
@@ -99,6 +103,7 @@ class AgentLoop(
                 assistantMessage.toolCalls != null ||
                 assistantMessage.reasoningContent != null
             if (hasBody) messages += assistantMessage
+            remember()
 
             val cutOff = finishReason == "length" || finishReason == "connection"
             if (pendingCalls.isEmpty()) {
@@ -109,6 +114,7 @@ class AgentLoop(
                     messages += ChatMessage.user(
                         "The previous reply was cut off. Continue from that exact point. Do not repeat finished steps.",
                     )
+                    remember()
                     round++
                     continue
                 }
@@ -119,6 +125,7 @@ class AgentLoop(
                     messages += ChatMessage.user(
                         "Continue. If the task is finished, write the short summary. If not, take the next step.",
                     )
+                    remember()
                     round++
                     continue
                 }
@@ -128,6 +135,7 @@ class AgentLoop(
                     assistantText.isBlank() && !usedATool -> "empty"
                     else -> "stop"
                 }
+                remember()
                 emit(AgentEvent.TurnFinished(reason))
                 return@flow
             }
@@ -137,10 +145,12 @@ class AgentLoop(
                 val result = executeTool(call)
                 emit(AgentEvent.ToolFinished(call.function.name, result))
                 messages += ChatMessage.tool(call.id, call.function.name, result.content)
+                remember()
             }
             round++
         }
 
+        remember()
         emit(AgentEvent.TurnFinished("max_tool_rounds"))
     }
 

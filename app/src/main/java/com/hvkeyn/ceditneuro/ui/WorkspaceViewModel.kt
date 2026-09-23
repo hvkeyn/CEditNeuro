@@ -174,6 +174,8 @@ class WorkspaceViewModel(
 
     private var agentJob: Job? = null
     private val liveAnswer = StringBuilder()
+    private var runContext: List<ChatMessage>? = null
+    private var runOutcome: String? = null
     private var thoughtTail = ""
     private var lastThoughtUi = 0L
     private var lastNoticeAt = 0L
@@ -369,31 +371,33 @@ class WorkspaceViewModel(
     }
 
     fun toggleChat() {
-        _state.update { it.copy(chatVisible = !it.chatVisible, shellVisible = false, webVisible = false) }
+        _state.update { it.copy(chatVisible = !it.chatVisible, shellVisible = false) }
     }
 
     fun toggleShell() {
-        _state.update { it.copy(shellVisible = !it.shellVisible, chatVisible = false, webVisible = false) }
+        _state.update { it.copy(shellVisible = !it.shellVisible, chatVisible = false) }
     }
 
     fun toggleWeb() {
-        if (_state.value.webVisible) {
-            finishBrowse("The user closed the browser before the page finished.")
+        val current = _state.value
+        if (current.webVisible) {
+            if (browseWaiter?.isCompleted == false) {
+                finishBrowse("The browser panel was hidden before the page finished.")
+            }
             _state.update { it.copy(webVisible = false) }
             return
         }
-        val url = activeRemote()?.webUrl.orEmpty()
+        val url = current.webUrl.ifBlank { activeRemote()?.webUrl.orEmpty() }
         if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            showMessage("Set an http or https site URL on the selected server.")
+            showMessage("Set an http or https site URL on the selected server, or ask the agent to open a page.")
             return
         }
+        val reload = current.webUrl != url
         _state.update {
             it.copy(
                 webVisible = true,
                 webUrl = url,
-                webGeneration = it.webGeneration + 1,
-                chatVisible = false,
-                shellVisible = false,
+                webGeneration = if (reload) it.webGeneration + 1 else it.webGeneration,
             )
         }
     }
@@ -417,7 +421,7 @@ class WorkspaceViewModel(
         }
     }
 
-    suspend fun browsePage(url: String): String {
+    suspend fun browsePage(url: String, timeoutSec: Int = 25): String {
         val trimmed = url.trim()
         if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
             return "Only http and https pages can be opened in the browser."
@@ -433,10 +437,11 @@ class WorkspaceViewModel(
                 shellVisible = false,
             )
         }
+        val waitMs = timeoutSec.coerceIn(5, 90) * 1000L
         return try {
-            withTimeout(25_000) { waiter.await() }
+            withTimeout(waitMs) { waiter.await() }
         } catch (error: TimeoutCancellationException) {
-            "The browser did not finish loading $trimmed."
+            "The browser did not finish loading $trimmed within ${waitMs / 1000} seconds."
         }
     }
 
@@ -618,6 +623,7 @@ class WorkspaceViewModel(
 
         appendChat(ChatRole.User, prompt)
         val history = conversation.toList()
+        runContext = null
         conversation += ChatMessage.user(prompt)
         val epoch = sessionEpoch.get()
         val openFile = _state.value.activePath?.substringAfterLast('/').orEmpty()
@@ -626,6 +632,7 @@ class WorkspaceViewModel(
         val loop = buildAgentLoop(ws)
         val finalText = StringBuilder()
         liveAnswer.clear()
+        runOutcome = null
         thoughtTail = ""
         _state.update {
             it.copy(
@@ -651,18 +658,34 @@ class WorkspaceViewModel(
             }.onFailure { error ->
                 if (error is kotlinx.coroutines.CancellationException) throw error
                 if (sessionEpoch.get() == epoch) {
-                    appendChat(ChatRole.Error, error.message ?: error.toString())
+                    val message = error.message?.lineSequence()?.firstOrNull { it.isNotBlank() }?.take(180)
+                        ?: "The agent stopped."
+                    appendChat(ChatRole.Error, message)
+                    runOutcome = message
                 }
             }
 
             if (sessionEpoch.get() != epoch) return@launch
             val text = finalText.toString()
             liveAnswer.clear()
-            if (text.isNotBlank()) {
-                conversation += ChatMessage.assistant(text)
-            }
+            commitRunContext(text)
+            val outcome = runOutcome
+            val started = _state.value.agentActivity?.startedAt ?: System.currentTimeMillis()
             _state.update { it.copy(agentRunning = false, agentActivity = null) }
-            AgentNotifications.dismiss(appContext)
+            if (outcome == null) {
+                AgentNotifications.dismiss(appContext)
+            } else {
+                AgentNotifications.settle(
+                    appContext,
+                    AgentStatus(
+                        phase = outcome,
+                        detail = workLine(),
+                        focus = "",
+                        startedAt = started,
+                        workLine = workLine(),
+                    ),
+                )
+            }
             persistNow()
         }
     }
@@ -756,21 +779,54 @@ class WorkspaceViewModel(
         }
     }
 
+    /**
+     * Keeps tool calls and tool results for the next Continue. The chat bubbles
+     * are already on screen; this is the transcript the model actually sees.
+     */
+    private fun commitRunContext(finalText: String) {
+        val saved = runContext
+        runContext = null
+        if (saved != null) {
+            conversation.clear()
+            conversation.addAll(saved)
+            val alreadyThere = conversation.lastOrNull()?.content == finalText
+            if (finalText.isNotBlank() && !alreadyThere) {
+                conversation += ChatMessage.assistant(finalText)
+            }
+            return
+        }
+        if (finalText.isNotBlank()) {
+            conversation += ChatMessage.assistant(finalText)
+        }
+    }
+
     private fun abandonAgent(announce: Boolean) {
         val wasRunning = agentJob?.isActive == true || _state.value.agentRunning
         val partial = liveAnswer.toString()
         liveAnswer.clear()
-        if (partial.isNotBlank()) {
-            conversation += ChatMessage.assistant(partial)
-        }
+        commitRunContext(partial)
         agentJob?.cancel()
         agentJob = null
         thoughtTail = ""
         lastNoticePhase = ""
+        val started = _state.value.agentActivity?.startedAt ?: System.currentTimeMillis()
         _state.update { it.copy(agentRunning = false, agentActivity = null) }
-        AgentNotifications.dismiss(appContext)
         if (announce && wasRunning) {
-            appendChat(ChatRole.Error, "Stopped by the user.")
+            val note = "Stopped by the user."
+            appendChat(ChatRole.Error, note)
+            runOutcome = note
+            AgentNotifications.settle(
+                appContext,
+                AgentStatus(
+                    phase = note,
+                    detail = "Continue resumes, or swipe this away.",
+                    focus = "",
+                    startedAt = started,
+                    workLine = workLine(),
+                ),
+            )
+        } else {
+            AgentNotifications.dismiss(appContext)
         }
     }
 
@@ -832,9 +888,13 @@ class WorkspaceViewModel(
                     "empty" -> "Stopped: the model returned an empty reply."
                     else -> null
                 }
-                if (note != null) appendChat(ChatRole.Error, note)
+                if (note != null) {
+                    appendChat(ChatRole.Error, note)
+                    runOutcome = note
+                }
             }
 
+            is AgentEvent.Context -> runContext = event.messages
             is AgentEvent.Failed -> appendChat(ChatRole.Error, event.message)
         }
     }

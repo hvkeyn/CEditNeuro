@@ -45,6 +45,10 @@ class AgentService : Service() {
                 model.cancelAgent()
                 return START_NOT_STICKY
             }
+            AgentNotifications.ACTION_DISMISS -> {
+                AgentNotifications.dismiss(this)
+                return START_NOT_STICKY
+            }
             AgentNotifications.ACTION_CONTINUE -> {
                 startInForeground(AgentNotifications.build(this))
                 model.continueAgent()
@@ -64,6 +68,9 @@ class AgentService : Service() {
     override fun onDestroy() {
         ticker?.cancel()
         scope.cancel()
+        if (Build.VERSION.SDK_INT >= 24) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        }
         super.onDestroy()
     }
 

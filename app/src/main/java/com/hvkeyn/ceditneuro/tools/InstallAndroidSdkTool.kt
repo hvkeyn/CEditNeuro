@@ -189,26 +189,16 @@ class InstallAndroidSdkTool(
     }
 
     private fun extractTar(tar: TarArchiveInputStream, destRoot: File, unpacked: LongArray) {
-        val rootPath = destRoot.canonicalFile
         while (true) {
             val entry = tar.nextEntry ?: break
             val rel = toolchainRelative(entry.name) ?: continue
             if (skipEntry(rel)) continue
-            val out = File(rootPath, rel).canonicalFile
-            if (out.path != rootPath.path && !out.path.startsWith(rootPath.path + File.separator)) {
-                throw IllegalStateException("Archive entry escapes the toolchain: ${entry.name}")
-            }
+            val path = ArchivePaths.output(destRoot, rel)
             when {
-                entry.isDirectory -> out.mkdirs()
-                entry.isSymbolicLink -> {
-                    out.parentFile?.mkdirs()
-                    val path = out.toPath()
-                    if (Files.exists(path, LinkOption.NOFOLLOW_LINKS)) Files.delete(path)
-                    Files.createSymbolicLink(path, Paths.get(linkTarget(entry.linkName)))
-                }
+                entry.isDirectory -> ArchivePaths.directory(path)
+                entry.isSymbolicLink -> ArchivePaths.symlink(path, toolchain, entry.linkName)
                 entry.isFile -> {
-                    out.parentFile?.mkdirs()
-                    out.outputStream().use { output ->
+                    ArchivePaths.openNewFile(path).use { output ->
                         val buffer = ByteArray(8192)
                         while (true) {
                             val read = tar.read(buffer)
