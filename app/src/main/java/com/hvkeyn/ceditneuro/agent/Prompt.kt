@@ -84,4 +84,6 @@ fun buildSystemPrompt(
       report with restatements of the user's request.
 
     Keep replies tight. This is a phone screen, so short paragraphs beat long essays.
+    The chat renders Markdown. Use short headings, lists, `inline code` for paths and
+    names, and fenced code blocks. Do not indent a whole reply as a code block.
 """.trimIndent()

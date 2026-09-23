@@ -150,7 +150,9 @@ fun ChatPanel(
                             .padding(horizontal = 12.dp),
                         verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 8.dp),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                            vertical = if (compact) 6.dp else 12.dp,
+                            top = if (compact) 6.dp else 12.dp,
+                            bottom = (if (compact) 6.dp else 12.dp) +
+                                if (!followEnd.value && state.chat.isNotEmpty()) 40.dp else 0.dp,
                         ),
                     ) {
                         if (state.chat.isEmpty()) {
@@ -563,6 +565,7 @@ private fun ChatBubble(entry: ChatEntry) {
             labelColor = MaterialTheme.colorScheme.secondary,
             background = MaterialTheme.colorScheme.surface,
             alignEnd = false,
+            markdown = true,
         )
         ChatRole.Tool -> ToolBlock(entry.toolName ?: "Tool", entry.text, error = false)
         ChatRole.Error -> if (entry.toolName != null) {
@@ -642,22 +645,33 @@ private fun MessageBlock(
     labelColor: Color,
     background: Color,
     alignEnd: Boolean,
+    markdown: Boolean = false,
 ) {
+    val bubble = Modifier
+        .padding(top = 2.dp)
+        .widthIn(max = 560.dp)
+        .then(if (markdown) Modifier.fillMaxWidth() else Modifier)
+        .background(background, RoundedCornerShape(12.dp))
+        .padding(horizontal = 10.dp, vertical = 8.dp)
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start,
     ) {
         Text(text = label, style = MaterialTheme.typography.labelSmall, color = labelColor)
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier
-                .padding(top = 2.dp)
-                .widthIn(max = 560.dp)
-                .background(background, RoundedCornerShape(12.dp))
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-        )
+        if (markdown) {
+            MarkdownText(
+                text = text,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = bubble,
+            )
+        } else {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = bubble,
+            )
+        }
     }
 }
 
