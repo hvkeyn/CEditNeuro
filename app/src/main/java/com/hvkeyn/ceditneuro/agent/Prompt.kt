@@ -49,7 +49,8 @@ fun buildSystemPrompt(
     - install_module downloads a file or zip into the project (default modules/<name>) and
       unpacks zip archives. Use it for libraries, sources and assets. Those files are not executable.
     - install_jdk downloads OpenJDK 17 and the Kotlin compiler. Call it once before java,
-      javac, or kotlinc. Then compile in the project, for example
+      javac, or kotlinc. Do not build a private toolchain by hand. If a Termux package
+      file was replaced on the mirror, the installer fetches the current file. Then compile, for example
       kotlinc src/main.kt -include-runtime -d app.jar && java -jar app.jar.
       kotlinc may print that libjansi could not load libc.so.6. Exit code 0 still means it compiled.
     - install_android_sdk downloads aapt2, aidl, d8, apksigner, zipalign, Gradle 9.7.1,

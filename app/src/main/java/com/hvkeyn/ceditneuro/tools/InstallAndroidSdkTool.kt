@@ -12,7 +12,6 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FilterInputStream
 import java.io.InputStream
-import java.net.URLEncoder
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Paths
@@ -62,7 +61,7 @@ class InstallAndroidSdkTool(
             for (path in DEBS) {
                 val deb = File(staging, path.substringAfterLast('/').replace(':', '_'))
                 val limit = if (path.contains("/gradle/")) GRADLE_DOWNLOAD else MAX_DOWNLOAD
-                net.download(packageUrl(path), deb, limit, TIMEOUT_SECONDS)
+                TermuxRepo.download(net, path, deb, limit, TIMEOUT_SECONDS)
                 extractDeb(deb, toolchain, unpacked)
                 deb.delete()
             }
@@ -144,10 +143,10 @@ class InstallAndroidSdkTool(
         ZipInputStream(zip.inputStream()).use { zipIn ->
             while (true) {
                 val entry = zipIn.nextEntry ?: break
-                val name = entry.name.replace('\\', '/')
-                val fileName = name.substringAfterLast('/')
-                if (!entry.isDirectory && fileName in PLATFORM_FILES && name.count { it == '/' } <= 1) {
-                    File(dest, fileName).outputStream().use { output -> zipIn.copyTo(output) }
+                val fileName = entry.name.replace('\\', '/').substringAfterLast('/')
+                val out = File(dest, fileName)
+                if (!entry.isDirectory && fileName in PLATFORM_FILES && !out.exists()) {
+                    out.outputStream().use { output -> zipIn.copyTo(output) }
                 }
                 zipIn.closeEntry()
             }
@@ -156,11 +155,6 @@ class InstallAndroidSdkTool(
             throw IllegalStateException("Platform archive did not contain android.jar.")
         }
     }
-
-    private fun packageUrl(path: String): String =
-        BASE + path.split('/').joinToString("/") { segment ->
-            URLEncoder.encode(segment, Charsets.UTF_8).replace("+", "%20")
-        }
 
     private fun extractDeb(deb: File, destRoot: File, unpacked: LongArray) {
         FileInputStream(deb).use { input ->
@@ -381,7 +375,6 @@ class InstallAndroidSdkTool(
     }
 
     companion object {
-        private const val BASE = "https://packages.termux.dev/apt/termux-main/"
         private const val PLATFORM_URL = "https://dl.google.com/android/repository/platform-36_r02.zip"
         private const val API = "36"
         private const val BUILD_TOOLS = "36.0.0"
@@ -403,7 +396,7 @@ class InstallAndroidSdkTool(
         )
         private val DEBS = listOf(
             "pool/main/z/zlib/zlib_1.3.2_aarch64.deb",
-            "pool/main/libc/libc++/libc++_29_aarch64.deb",
+            "pool/main/libc/libc++/libc++_30_aarch64.deb",
             "pool/main/libp/libpng/libpng_1.6.58_aarch64.deb",
             "pool/main/libe/libexpat/libexpat_2.8.5_aarch64.deb",
             "pool/main/libz/libzopfli/libzopfli_1.0.3-5_aarch64.deb",
