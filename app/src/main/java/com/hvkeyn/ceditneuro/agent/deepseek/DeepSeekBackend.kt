@@ -5,6 +5,7 @@ import com.hvkeyn.ceditneuro.agent.BackendChunk
 import com.hvkeyn.ceditneuro.agent.ChatMessage
 import com.hvkeyn.ceditneuro.agent.FunctionCall
 import com.hvkeyn.ceditneuro.agent.ToolCall
+import com.hvkeyn.ceditneuro.agent.ToolTranscript
 import com.hvkeyn.ceditneuro.data.AgentSettings
 import com.hvkeyn.ceditneuro.tools.Tool
 import kotlinx.coroutines.Dispatchers
@@ -53,12 +54,13 @@ class DeepSeekBackend(
             throw IOException("No API key for ${settings.provider.name}. Add one in Settings.")
         }
 
+        val safeMessages = ToolTranscript.seal(messages)
         val payload = buildJsonObject {
             put("model", model.name)
             put("stream", true)
             if (model.maxOutputTokens > 0) put("max_tokens", model.maxOutputTokens)
             put("messages", buildJsonArray {
-                messages.forEach { add(json.encodeToJsonElement(ChatMessage.serializer(), it)) }
+                safeMessages.forEach { add(json.encodeToJsonElement(ChatMessage.serializer(), it)) }
             })
             if (model.supportsReasoning && settings.thinkingEnabled) {
                 putJsonObject("thinking") { put("type", "enabled") }
