@@ -131,10 +131,20 @@ data class WorkspaceUiState(
     val webUrl: String = "",
     val webGeneration: Int = 0,
     val appUpdate: AppUpdate? = null,
+    val otherRuns: List<ProjectRunStatus> = emptyList(),
 ) {
     val projectName: String?
         get() = projectRoot?.let { File(it).name.ifBlank { it } }
 }
+
+/** A project whose agent is still running, or just finished, while another folder is open. */
+data class ProjectRunStatus(
+    val path: String,
+    val name: String,
+    val phase: String,
+    val focus: String,
+    val running: Boolean,
+)
 
 /** Live line shown while the agent is waiting, thinking, or running a tool. */
 data class AgentActivity(
@@ -142,6 +152,26 @@ data class AgentActivity(
     val context: String,
     val focus: String,
     val startedAt: Long,
+)
+
+private class LiveProject(
+    val workspace: Workspace,
+    val conversation: MutableList<ChatMessage>,
+    val buffers: MutableMap<String, String>,
+    val idGenerator: AtomicLong,
+    val epoch: AtomicLong = AtomicLong(0),
+    var agentJob: Job? = null,
+    val liveAnswer: StringBuilder = StringBuilder(),
+    var runContext: List<ChatMessage>? = null,
+    var runOutcome: String? = null,
+    var thoughtTail: String = "",
+    var lastThoughtUi: Long = 0L,
+    var lastNoticeAt: Long = 0L,
+    var lastNoticePhase: String = "",
+    var unseenResult: String? = null,
+    var treeGeneration: Long = 0L,
+    var persistJob: Job? = null,
+    var ui: WorkspaceUiState,
 )
 
 class WorkspaceViewModel(
@@ -156,6 +186,8 @@ class WorkspaceViewModel(
     val settings: StateFlow<AgentSettings> = settingsStore.settings
 
     private var workspace: Workspace? = null
+    private val projects = linkedMapOf<String, LiveProject>()
+    private var current: LiveProject? = null
     private val deviceShell = DeviceShell(appContext) { settingsStore.current.networkEnabled }
     private val shizukuShell = ShizukuShell(appContext)
     private val agentNet = AgentNet()
@@ -168,27 +200,9 @@ class WorkspaceViewModel(
     private val remoteClient = RemoteClient(::ensureHostTrusted)
     private val library = ProjectLibrary(appContext)
 
-    /** Live editor text per open file, including unsaved changes. */
-    private val buffers = mutableMapOf<String, String>()
-
-    /** Conversation handed back to the model on the next request. */
-    private val conversation = mutableListOf<ChatMessage>()
-
-    private var agentJob: Job? = null
-    private val liveAnswer = StringBuilder()
-    private var runContext: List<ChatMessage>? = null
-    private var runOutcome: String? = null
-    private var thoughtTail = ""
-    private var lastThoughtUi = 0L
-    private var lastNoticeAt = 0L
-    private var lastNoticePhase = ""
     private var updateChecked = false
     private var updateJob: Job? = null
     private val activityJson = Json { ignoreUnknownKeys = true }
-    private var persistJob: Job? = null
-    private val idGenerator = AtomicLong(0)
-    private val treeRefresh = AtomicLong(0)
-    private val sessionEpoch = AtomicLong(0)
 
     init {
         viewModelScope.launch {
@@ -230,77 +244,154 @@ class WorkspaceViewModel(
         }
         if (!canonical.isDirectory) {
             library.forget(canonical.path)
-            _state.update { it.copy(recentProjects = library.roots()) }
+            projects.remove(canonical.path)
+            _state.update { it.copy(recentProjects = library.roots(), otherRuns = runStatuses(current)) }
             showMessage("Folder is gone: ${canonical.path}")
             return
         }
-        if (workspace?.root?.canonicalPath == canonical.path) {
-            library.save(canonical.path, snapshotSession())
+        if (current?.workspace?.root?.canonicalPath == canonical.path) {
+            current?.let { project ->
+                project.ui = projectSlice(_state.value)
+                library.save(canonical.path, snapshotSession(project))
+            }
             _state.update { it.copy(projectRoot = canonical.path, recentProjects = library.roots()) }
             refreshProjectTree()
             return
         }
 
-        sessionEpoch.incrementAndGet()
-        abandonAgent(announce = false)
-        persistJob?.cancel()
-        persistNow()
-
-        val opened = runCatching { Workspace(canonical) }.getOrElse { error ->
-            showMessage("Cannot open project: ${error.message}")
-            return
+        current?.let { leaving ->
+            leaving.ui = projectSlice(_state.value)
+            persistNow(leaving)
         }
-        val session = library.load(canonical.path)
-        workspace = opened
-        buffers.clear()
-        conversation.clear()
-        conversation += ToolTranscript.seal(session.conversation)
-        idGenerator.set(session.nextId)
-        library.save(canonical.path, session)
 
-        _state.value = WorkspaceUiState(
-            projectRoot = canonical.path,
-            recentProjects = library.roots(),
-            rootEntries = opened.children(),
-            chat = session.chat.map { entry ->
-                ChatEntry(
-                    id = entry.id,
-                    role = runCatching { ChatRole.valueOf(entry.role) }.getOrDefault(ChatRole.Assistant),
-                    text = entry.text,
-                    toolName = entry.toolName,
-                )
-            },
-            shellLines = session.shell.map { line ->
-                ShellLine(id = line.id, command = line.command, output = line.output)
-            },
-            chatVisible = _state.value.chatVisible,
-            shellVisible = _state.value.shellVisible,
-        )
+        val project = projects[canonical.path] ?: run {
+            val created = runCatching { loadProject(canonical) }.getOrElse { error ->
+                showMessage("Cannot open project: ${error.message}")
+                return
+            }
+            projects[canonical.path] = created
+            created
+        }
+        showProject(project)
     }
 
     fun forgetProject(path: String) {
         val canonical = runCatching { File(path).canonicalPath }.getOrDefault(path)
-        val leavingCurrent = workspace?.root?.canonicalPath == canonical
+        val project = projects.remove(canonical)
+        val leavingCurrent = current === project || workspace?.root?.canonicalPath == canonical
+        if (project != null) {
+            project.persistJob?.cancel()
+            if (project.agentJob?.isActive == true) abandonAgent(project, announce = false)
+        }
         if (leavingCurrent) {
-            sessionEpoch.incrementAndGet()
-            abandonAgent(announce = false)
-            persistJob?.cancel()
+            current = null
             workspace = null
-            buffers.clear()
-            conversation.clear()
         }
         library.forget(canonical)
         val remaining = library.roots()
         if (!leavingCurrent) {
-            _state.update { it.copy(recentProjects = remaining) }
+            _state.update { it.copy(recentProjects = remaining, otherRuns = runStatuses(current)) }
             return
         }
+        val previous = _state.value
         _state.value = WorkspaceUiState(
             recentProjects = remaining,
-            chatVisible = _state.value.chatVisible,
-            shellVisible = _state.value.shellVisible,
+            chatVisible = previous.chatVisible,
+            shellVisible = previous.shellVisible,
+            webVisible = previous.webVisible,
+            webUrl = previous.webUrl,
+            webGeneration = previous.webGeneration,
+            appUpdate = previous.appUpdate,
+            otherRuns = runStatuses(null),
         )
         remaining.firstOrNull()?.let { openProject(File(it)) }
+    }
+
+    private fun loadProject(canonical: File): LiveProject {
+        val opened = Workspace(canonical)
+        val session = library.load(canonical.path)
+        library.save(canonical.path, session)
+        return LiveProject(
+            workspace = opened,
+            conversation = ToolTranscript.seal(session.conversation).toMutableList(),
+            buffers = mutableMapOf(),
+            idGenerator = AtomicLong(session.nextId),
+            ui = WorkspaceUiState(
+                projectRoot = canonical.path,
+                rootEntries = opened.children(),
+                chat = session.chat.map { entry ->
+                    ChatEntry(
+                        id = entry.id,
+                        role = runCatching { ChatRole.valueOf(entry.role) }.getOrDefault(ChatRole.Assistant),
+                        text = entry.text,
+                        toolName = entry.toolName,
+                    )
+                },
+                shellLines = session.shell.map { line ->
+                    ShellLine(id = line.id, command = line.command, output = line.output)
+                },
+            ),
+        )
+    }
+
+    private fun showProject(project: LiveProject) {
+        current = project
+        workspace = project.workspace
+        project.unseenResult = null
+        val previous = _state.value
+        _state.value = project.ui.copy(
+            projectRoot = project.workspace.root.canonicalPath,
+            recentProjects = library.roots(),
+            chatVisible = previous.chatVisible,
+            shellVisible = previous.shellVisible,
+            webVisible = previous.webVisible,
+            webUrl = previous.webUrl,
+            webGeneration = previous.webGeneration,
+            appUpdate = previous.appUpdate,
+            execPrompt = previous.execPrompt,
+            hostPrompt = previous.hostPrompt,
+            otherRuns = runStatuses(project),
+        )
+        project.ui = projectSlice(_state.value)
+    }
+
+    private fun projectSlice(state: WorkspaceUiState): WorkspaceUiState =
+        state.copy(
+            recentProjects = emptyList(),
+            message = null,
+            execPrompt = null,
+            hostPrompt = null,
+            appUpdate = null,
+            otherRuns = emptyList(),
+        )
+
+    private fun runStatuses(except: LiveProject?): List<ProjectRunStatus> =
+        projects.values.mapNotNull { project ->
+            if (project === except) return@mapNotNull null
+            val running = project.agentJob?.isActive == true
+            val result = project.unseenResult
+            if (!running && result.isNullOrBlank()) return@mapNotNull null
+            val activity = project.ui.agentActivity
+            ProjectRunStatus(
+                path = project.workspace.root.canonicalPath,
+                name = project.workspace.root.name.ifBlank { project.workspace.root.path },
+                phase = if (running) activity?.phase ?: "Working" else result.orEmpty(),
+                focus = if (running) activity?.focus.orEmpty() else "",
+                running = running,
+            )
+        }
+
+    private fun editProject(project: LiveProject, transform: (WorkspaceUiState) -> WorkspaceUiState) {
+        if (current === project) {
+            _state.update { global ->
+                val next = transform(global)
+                project.ui = projectSlice(next)
+                next.copy(otherRuns = runStatuses(project))
+            }
+        } else {
+            project.ui = projectSlice(transform(project.ui))
+            _state.update { it.copy(otherRuns = runStatuses(current)) }
+        }
     }
 
     fun toggleDirectory(path: String) {
@@ -327,14 +418,14 @@ class WorkspaceViewModel(
             showMessage("Cannot read $path: ${error.message}")
             return
         }
-        buffers[path] = content
+        current?.buffers?.set(path, content)
         _state.update {
             it.copy(openFiles = it.openFiles + OpenFile(path, content), activePath = path)
         }
     }
 
     fun closeFile(path: String) {
-        buffers.remove(path)
+        current?.buffers?.remove(path)
         _state.update { current ->
             val remaining = current.openFiles.filterNot { it.path == path }
             val nextActive = if (current.activePath == path) {
@@ -356,11 +447,12 @@ class WorkspaceViewModel(
 
     /** Current editor text for [path], preferring unsaved buffer content. */
     fun contentFor(path: String): String =
-        buffers[path]
+        current?.buffers?.get(path)
             ?: _state.value.openFiles.firstOrNull { it.path == path }?.onDisk
             ?: ""
 
     fun onEditorTextChanged(path: String, text: String) {
+        val buffers = current?.buffers ?: return
         if (buffers[path] == text) return
         buffers[path] = text
         if (path !in _state.value.dirtyPaths) {
@@ -374,7 +466,7 @@ class WorkspaceViewModel(
 
     private fun saveFile(path: String) {
         val ws = workspace ?: return
-        val text = buffers[path] ?: return
+        val text = current?.buffers?.get(path) ?: return
         runCatching { ws.write(path, text) }
             .onSuccess {
                 _state.update { current ->
@@ -408,7 +500,7 @@ class WorkspaceViewModel(
         }
         val url = current.webUrl.ifBlank { activeRemote()?.webUrl.orEmpty() }
         if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            showMessage("Set an http or https site URL on the selected server, or ask the agent to open a page.")
+            _state.update { it.copy(webVisible = true, webUrl = "", shellVisible = false) }
             return
         }
         val reload = current.webUrl != url
@@ -480,22 +572,21 @@ class WorkspaceViewModel(
     }
 
     fun runShellCommand(command: String) {
-        val root = workspace?.root ?: run {
+        val project = current ?: run {
             showMessage("Open a project folder first.")
             return
         }
         val trimmed = command.trim()
-        if (trimmed.isEmpty() || _state.value.shellRunning) return
-        val epoch = sessionEpoch.get()
-        val id = nextId()
-        _state.update {
+        if (trimmed.isEmpty() || project.ui.shellRunning) return
+        val id = nextId(project)
+        editProject(project) {
             it.copy(
                 shellVisible = true,
                 shellRunning = true,
                 shellLines = it.shellLines + ShellLine(id, trimmed, "", running = true),
             )
         }
-        schedulePersist()
+        schedulePersist(project)
         viewModelScope.launch {
             val rendered = runCatching {
                 if (ProgramRun.needsConsent(trimmed) && !ensureExecAllowed(
@@ -505,24 +596,20 @@ class WorkspaceViewModel(
                     "exit=1\nRunning installed programs is not allowed. Turn it on in Settings to run compilers."
                 } else {
                     withContext(Dispatchers.IO) {
-                        deviceShell.run(trimmed, root, timeoutSeconds = 120).render()
+                        deviceShell.run(trimmed, project.workspace.root, timeoutSeconds = 120).render()
                     }
                 }
             }.getOrElse { error -> "exit=1\n${error.message}" }
-            if (sessionEpoch.get() != epoch) {
-                rememberFinishedCommand(root.canonicalPath, trimmed, rendered, id)
-                return@launch
-            }
-            _state.update { current ->
-                current.copy(
+            editProject(project) { shown ->
+                shown.copy(
                     shellRunning = false,
-                    shellLines = current.shellLines.map { line ->
+                    shellLines = shown.shellLines.map { line ->
                         if (line.id == id) line.copy(output = rendered, running = false) else line
                     },
                 )
             }
-            refreshProjectTree()
-            persistNow()
+            refreshProjectTree(project)
+            persistNow(project)
         }
     }
 
@@ -634,26 +721,26 @@ class WorkspaceViewModel(
     }
 
     fun sendPrompt(prompt: String) {
-        val ws = workspace ?: run {
+        val project = current ?: run {
             showMessage("Open a project folder first.")
             return
         }
-        if (prompt.isBlank() || _state.value.agentRunning) return
+        if (prompt.isBlank() || project.agentJob?.isActive == true) return
 
-        appendChat(ChatRole.User, prompt)
-        val history = conversation.toList()
-        runContext = null
-        conversation += ChatMessage.user(prompt)
-        val epoch = sessionEpoch.get()
+        appendChat(project, ChatRole.User, prompt)
+        val history = project.conversation.toList()
+        project.runContext = null
+        project.conversation += ChatMessage.user(prompt)
+        val epoch = project.epoch.get()
         val openFile = _state.value.activePath?.substringAfterLast('/').orEmpty()
         val preparedChars = history.sumOf { it.content?.length ?: 0 } + prompt.length
 
-        val loop = buildAgentLoop(ws)
+        val loop = buildAgentLoop(project)
         val finalText = StringBuilder()
-        liveAnswer.clear()
-        runOutcome = null
-        thoughtTail = ""
-        _state.update {
+        project.liveAnswer.clear()
+        project.runOutcome = null
+        project.thoughtTail = ""
+        editProject(project) {
             it.copy(
                 agentRunning = true,
                 chatVisible = true,
@@ -661,43 +748,48 @@ class WorkspaceViewModel(
                 message = null,
                 agentActivity = AgentActivity(
                     phase = "Preparing the request",
-                    context = formatActivityContext(history.size + 1, preparedChars),
+                    context = formatActivityContext(project, history.size + 1, preparedChars),
                     focus = if (openFile.isBlank()) "" else "open $openFile",
                     startedAt = System.currentTimeMillis(),
                 ),
             )
         }
-        publishStatus(force = true)
+        publishStatus(project, force = true)
 
-        agentJob = agentScope.launch {
+        project.agentJob = agentScope.launch {
             runCatching {
                 loop.run(history, prompt).collect { event ->
-                    if (sessionEpoch.get() == epoch) handleEvent(event, finalText)
+                    if (project.epoch.get() == epoch) handleEvent(project, event, finalText)
                 }
             }.onFailure { error ->
                 if (error is kotlinx.coroutines.CancellationException) throw error
-                if (sessionEpoch.get() == epoch) {
+                if (project.epoch.get() == epoch) {
                     val message = error.message?.lineSequence()?.firstOrNull { it.isNotBlank() }?.take(180)
                         ?: "The agent stopped."
-                    appendChat(ChatRole.Error, message)
-                    runOutcome = message
+                    appendChat(project, ChatRole.Error, message)
+                    project.runOutcome = message
                 }
             }
 
-            if (sessionEpoch.get() != epoch) return@launch
+            if (project.epoch.get() != epoch) return@launch
             val text = finalText.toString()
-            liveAnswer.clear()
-            commitRunContext(text)
-            val outcome = runOutcome
-            val started = _state.value.agentActivity?.startedAt ?: System.currentTimeMillis()
-            _state.update { it.copy(agentRunning = false, agentActivity = null) }
+            project.liveAnswer.clear()
+            commitRunContext(project, text)
+            val outcome = project.runOutcome
+            val started = project.ui.agentActivity?.startedAt ?: System.currentTimeMillis()
+            if (current !== project) {
+                project.unseenResult = outcome
+                    ?: text.lineSequence().firstOrNull { it.isNotBlank() }?.take(80)
+                    ?: "Finished"
+            }
+            editProject(project) { it.copy(agentRunning = false, agentActivity = null) }
             if (outcome == null) {
-                AgentNotifications.dismiss(appContext)
+                if (current === project) AgentNotifications.dismiss(appContext)
             } else {
                 AgentNotifications.settle(
                     appContext,
                     AgentStatus(
-                        phase = outcome,
+                        phase = "${project.workspace.root.name}: $outcome",
                         detail = workLine(),
                         focus = "",
                         startedAt = started,
@@ -705,18 +797,19 @@ class WorkspaceViewModel(
                     ),
                 )
             }
-            persistNow()
+            persistNow(project)
         }
     }
 
     /** Sends a short follow-up so a stopped task can pick up from the chat history. */
     fun continueAgent() {
-        if (_state.value.agentRunning) return
-        if (workspace == null) {
+        val project = current
+        if (project == null) {
             showMessage("Open a project folder first.")
             return
         }
-        if (conversation.isEmpty() && _state.value.chat.isEmpty()) {
+        if (project.agentJob?.isActive == true) return
+        if (project.conversation.isEmpty() && project.ui.chat.isEmpty()) {
             showMessage("Nothing to continue yet.")
             return
         }
@@ -724,18 +817,26 @@ class WorkspaceViewModel(
     }
 
     fun cancelAgent() {
-        abandonAgent(announce = true)
+        val project = current ?: return
+        abandonAgent(project, announce = true)
     }
 
-    fun checkForUpdate() {
-        if (updateChecked || _state.value.appUpdate != null) return
-        updateChecked = true
+    fun checkForUpdate(manual: Boolean = false) {
+        if (!manual && (updateChecked || _state.value.appUpdate != null)) return
+        if (manual && _state.value.appUpdate?.downloading == true) return
+        if (!manual) updateChecked = true
         viewModelScope.launch {
+            val local = withContext(Dispatchers.IO) { AppUpdater.localVersion(appContext) }
             val offer = withContext(Dispatchers.IO) {
-                val local = AppUpdater.localVersion(appContext)
                 runCatching { AppUpdater.latestNewerThan(local) }.getOrNull()
-            } ?: return@launch
-            _state.update { it.copy(appUpdate = offer) }
+            }
+            if (offer == null) {
+                if (manual) showMessage("Version $local is up to date.")
+                return@launch
+            }
+            _state.update {
+                it.copy(appUpdate = offer.copy(error = null, downloading = false, installing = false))
+            }
         }
     }
 
@@ -850,90 +951,97 @@ class WorkspaceViewModel(
      * Keeps tool calls and tool results for the next Continue. The chat bubbles
      * are already on screen; this is the transcript the model actually sees.
      */
-    private fun commitRunContext(finalText: String) {
-        val saved = runContext
-        runContext = null
+    private fun commitRunContext(project: LiveProject, finalText: String) {
+        val saved = project.runContext
+        project.runContext = null
         if (saved != null) {
-            conversation.clear()
-            conversation.addAll(ToolTranscript.seal(saved))
-            val alreadyThere = conversation.lastOrNull()?.content == finalText
+            project.conversation.clear()
+            project.conversation.addAll(ToolTranscript.seal(saved))
+            val alreadyThere = project.conversation.lastOrNull()?.content == finalText
             if (finalText.isNotBlank() && !alreadyThere) {
-                conversation += ChatMessage.assistant(finalText)
+                project.conversation += ChatMessage.assistant(finalText)
             }
             return
         }
         if (finalText.isNotBlank()) {
-            conversation += ChatMessage.assistant(finalText)
+            project.conversation += ChatMessage.assistant(finalText)
         }
     }
 
-    private fun abandonAgent(announce: Boolean) {
-        val wasRunning = agentJob?.isActive == true || _state.value.agentRunning
-        val partial = liveAnswer.toString()
-        liveAnswer.clear()
-        commitRunContext(partial)
-        agentJob?.cancel()
-        agentJob = null
-        thoughtTail = ""
-        lastNoticePhase = ""
-        val started = _state.value.agentActivity?.startedAt ?: System.currentTimeMillis()
-        _state.update { it.copy(agentRunning = false, agentActivity = null) }
+    private fun abandonAgent(project: LiveProject, announce: Boolean) {
+        val wasRunning = project.agentJob?.isActive == true || project.ui.agentRunning
+        val partial = project.liveAnswer.toString()
+        project.liveAnswer.clear()
+        project.epoch.incrementAndGet()
+        commitRunContext(project, partial)
+        project.agentJob?.cancel()
+        project.agentJob = null
+        project.thoughtTail = ""
+        project.lastNoticePhase = ""
+        val started = project.ui.agentActivity?.startedAt ?: System.currentTimeMillis()
+        if (current !== project && wasRunning) {
+            project.unseenResult = if (announce) "Stopped" else "Left running task"
+        }
+        editProject(project) { it.copy(agentRunning = false, agentActivity = null) }
         if (announce && wasRunning) {
             val note = "Stopped by the user."
-            appendChat(ChatRole.Error, note)
-            runOutcome = note
+            appendChat(project, ChatRole.Error, note)
+            project.runOutcome = note
             AgentNotifications.settle(
                 appContext,
                 AgentStatus(
-                    phase = note,
+                    phase = "${project.workspace.root.name}: $note",
                     detail = "Continue resumes, or swipe this away.",
                     focus = "",
                     startedAt = started,
                     workLine = workLine(),
                 ),
             )
-        } else {
+        } else if (current === project) {
             AgentNotifications.dismiss(appContext)
         }
     }
 
-    private fun handleEvent(event: AgentEvent, finalText: StringBuilder) {
+    private fun handleEvent(project: LiveProject, event: AgentEvent, finalText: StringBuilder) {
         when (event) {
             is AgentEvent.AssistantText -> {
                 finalText.append(event.text)
-                liveAnswer.append(event.text)
-                appendStreaming(ChatRole.Assistant, event.text)
-                if (_state.value.agentActivity?.phase != "Writing the answer") {
-                    setActivity(phase = "Writing the answer", focus = "")
+                project.liveAnswer.append(event.text)
+                appendStreaming(project, ChatRole.Assistant, event.text)
+                if (project.ui.agentActivity?.phase != "Writing the answer") {
+                    setActivity(project, phase = "Writing the answer", focus = "")
                 }
             }
 
             is AgentEvent.Reasoning -> {
-                appendStreaming(ChatRole.Reasoning, event.text)
-                noteThought(event.text)
+                appendStreaming(project, ChatRole.Reasoning, event.text)
+                noteThought(project, event.text)
             }
 
             is AgentEvent.Activity -> {
-                thoughtTail = ""
-                val openFile = _state.value.activePath?.substringAfterLast('/').orEmpty()
+                project.thoughtTail = ""
+                val openFile = project.ui.activePath?.substringAfterLast('/').orEmpty()
                 setActivity(
+                    project,
                     phase = event.phase,
-                    context = formatActivityContext(event.messages, event.chars),
+                    context = formatActivityContext(project, event.messages, event.chars),
                     focus = if (openFile.isBlank()) "" else "open $openFile",
                 )
             }
 
             is AgentEvent.ToolStarted -> {
                 appendChat(
+                    project,
                     role = ChatRole.Tool,
                     text = visibleToolArguments(event.name, event.arguments),
                     toolName = "${event.name} →",
                 )
-                setActivity(phase = event.name, focus = toolFocus(event.name, event.arguments))
+                setActivity(project, phase = event.name, focus = toolFocus(event.name, event.arguments))
             }
 
             is AgentEvent.ToolFinished -> {
                 appendChat(
+                    project,
                     role = if (event.result.isError) ChatRole.Error else ChatRole.Tool,
                     text = event.result.content,
                     toolName = "${event.name} ←",
@@ -944,7 +1052,7 @@ class WorkspaceViewModel(
                     .orEmpty()
                     .take(140)
                 val phase = if (event.result.isError) "${event.name} failed" else "${event.name} done"
-                setActivity(phase = phase, focus = line)
+                setActivity(project, phase = phase, focus = line)
             }
 
             is AgentEvent.TurnFinished -> {
@@ -956,13 +1064,13 @@ class WorkspaceViewModel(
                     else -> null
                 }
                 if (note != null) {
-                    appendChat(ChatRole.Error, note)
-                    runOutcome = note
+                    appendChat(project, ChatRole.Error, note)
+                    project.runOutcome = note
                 }
             }
 
-            is AgentEvent.Context -> runContext = event.messages
-            is AgentEvent.Failed -> appendChat(ChatRole.Error, event.message)
+            is AgentEvent.Context -> project.runContext = event.messages
+            is AgentEvent.Failed -> appendChat(project, ChatRole.Error, event.message)
         }
     }
 
@@ -987,18 +1095,23 @@ class WorkspaceViewModel(
         }
     }
 
-    private fun formatActivityContext(messages: Int, chars: Int): String {
+    private fun formatActivityContext(project: LiveProject, messages: Int, chars: Int): String {
         val model = settingsStore.current.modelLabel()
         val size = if (chars >= 1024) "${chars / 1024} KB" else "$chars B"
-        val project = _state.value.projectName ?: "no project"
-        return "$model · $messages messages · $size · $project"
+        val name = project.workspace.root.name.ifBlank { "project" }
+        return "$model · $messages messages · $size · $name"
     }
 
-    private fun setActivity(phase: String, context: String? = null, focus: String? = null) {
-        _state.update { current ->
-            val previous = current.agentActivity
+    private fun setActivity(
+        project: LiveProject,
+        phase: String,
+        context: String? = null,
+        focus: String? = null,
+    ) {
+        editProject(project) { shown ->
+            val previous = shown.agentActivity
             val started = previous?.startedAt ?: System.currentTimeMillis()
-            current.copy(
+            shown.copy(
                 agentActivity = AgentActivity(
                     phase = phase,
                     context = context ?: previous?.context.orEmpty(),
@@ -1007,20 +1120,20 @@ class WorkspaceViewModel(
                 ),
             )
         }
-        publishStatus()
+        publishStatus(project)
     }
 
-    private fun publishStatus(force: Boolean = false) {
-        val activity = _state.value.agentActivity
-        if (!_state.value.agentRunning || activity == null) return
+    private fun publishStatus(project: LiveProject, force: Boolean = false) {
+        val activity = project.ui.agentActivity
+        if (!project.ui.agentRunning || activity == null) return
         val now = System.currentTimeMillis()
-        if (!force && activity.phase == lastNoticePhase && now - lastNoticeAt < 800) return
-        lastNoticeAt = now
-        lastNoticePhase = activity.phase
+        if (!force && activity.phase == project.lastNoticePhase && now - project.lastNoticeAt < 800) return
+        project.lastNoticeAt = now
+        project.lastNoticePhase = activity.phase
         AgentNotifications.publish(
             appContext,
             AgentStatus(
-                phase = activity.phase,
+                phase = "${project.workspace.root.name}: ${activity.phase}",
                 detail = activity.context,
                 focus = activity.focus,
                 startedAt = activity.startedAt,
@@ -1056,20 +1169,20 @@ class WorkspaceViewModel(
         return "$network, $programs"
     }
 
-    private fun noteThought(delta: String) {
-        thoughtTail = (thoughtTail + delta).takeLast(240)
+    private fun noteThought(project: LiveProject, delta: String) {
+        project.thoughtTail = (project.thoughtTail + delta).takeLast(240)
         val now = System.currentTimeMillis()
-        val alreadyThinking = _state.value.agentActivity?.phase == "Thinking"
-        if (alreadyThinking && now - lastThoughtUi < 400) return
-        lastThoughtUi = now
-        val line = thoughtTail
+        val alreadyThinking = project.ui.agentActivity?.phase == "Thinking"
+        if (alreadyThinking && now - project.lastThoughtUi < 400) return
+        project.lastThoughtUi = now
+        val line = project.thoughtTail
             .lineSequence()
             .lastOrNull { it.isNotBlank() }
             ?.trim()
             .orEmpty()
-            .ifBlank { thoughtTail.trim() }
+            .ifBlank { project.thoughtTail.trim() }
             .take(140)
-        setActivity(phase = "Thinking", focus = line)
+        setActivity(project, phase = "Thinking", focus = line)
     }
 
     private fun toolFocus(name: String, arguments: String): String {
@@ -1098,50 +1211,52 @@ class WorkspaceViewModel(
         return shown.ifBlank { "(no arguments)" }
     }
 
-    private fun appendChat(role: ChatRole, text: String, toolName: String? = null) {
-        _state.update { current ->
-            val sealed = current.chat.map { if (it.streaming) it.copy(streaming = false) else it }
-            current.copy(chat = sealed + ChatEntry(nextId(), role, text, toolName))
+    private fun appendChat(project: LiveProject, role: ChatRole, text: String, toolName: String? = null) {
+        editProject(project) { shown ->
+            val sealed = shown.chat.map { if (it.streaming) it.copy(streaming = false) else it }
+            shown.copy(chat = sealed + ChatEntry(nextId(project), role, text, toolName))
         }
-        schedulePersist()
+        schedulePersist(project)
     }
 
-    private fun appendStreaming(role: ChatRole, delta: String) {
-        _state.update { current ->
-            val last = current.chat.lastOrNull()
+    private fun appendStreaming(project: LiveProject, role: ChatRole, delta: String) {
+        editProject(project) { shown ->
+            val last = shown.chat.lastOrNull()
             if (last != null && last.role == role && last.streaming) {
-                current.copy(
-                    chat = current.chat.dropLast(1) + last.copy(text = last.text + delta),
+                shown.copy(
+                    chat = shown.chat.dropLast(1) + last.copy(text = last.text + delta),
                 )
             } else {
-                val sealed = current.chat.map { if (it.streaming) it.copy(streaming = false) else it }
-                current.copy(chat = sealed + ChatEntry(nextId(), role, delta, streaming = true))
+                val sealed = shown.chat.map { if (it.streaming) it.copy(streaming = false) else it }
+                shown.copy(chat = sealed + ChatEntry(nextId(project), role, delta, streaming = true))
             }
         }
-        schedulePersist()
+        schedulePersist(project)
     }
 
     /** Called from file tools after the agent creates or edits a file. */
-    private fun onAgentEditedFile(path: String) {
-        refreshOpenFile(path)
-        if (!path.startsWith("/")) refreshProjectTree(path)
+    private fun onAgentEditedFile(project: LiveProject, path: String) {
+        refreshOpenFile(project, path)
+        if (!path.startsWith("/")) refreshProjectTree(project, path)
     }
 
-    private fun refreshOpenFile(path: String) {
-        val ws = workspace ?: return
-        if (_state.value.openFiles.none { it.path == path }) return
-        if (path in _state.value.dirtyPaths) {
-            showMessage("The agent changed $path, but you have unsaved edits. Save or revert, then reopen it.")
+    private fun refreshOpenFile(project: LiveProject, path: String) {
+        val shown = if (current === project) _state.value else project.ui
+        if (shown.openFiles.none { it.path == path }) return
+        if (path in shown.dirtyPaths) {
+            if (current === project) {
+                showMessage("The agent changed $path, but you have unsaved edits. Save or revert, then reopen it.")
+            }
             return
         }
-        val fresh = runCatching { ws.read(path) }.getOrNull() ?: return
-        buffers[path] = fresh
-        _state.update { current ->
-            current.copy(
-                openFiles = current.openFiles.map {
+        val fresh = runCatching { project.workspace.read(path) }.getOrNull() ?: return
+        project.buffers[path] = fresh
+        editProject(project) { currentState ->
+            currentState.copy(
+                openFiles = currentState.openFiles.map {
                     if (it.path == path) it.copy(onDisk = fresh) else it
                 },
-                reloadCounter = current.reloadCounter + 1,
+                reloadCounter = currentState.reloadCounter + 1,
             )
         }
     }
@@ -1151,26 +1266,28 @@ class WorkspaceViewModel(
      * so a file the agent just created shows up without reopening the project.
      */
     private fun refreshProjectTree(revealPath: String? = null) {
-        val ws = workspace ?: return
-        val generation = treeRefresh.incrementAndGet()
+        val project = current ?: return
+        refreshProjectTree(project, revealPath)
+    }
+
+    private fun refreshProjectTree(project: LiveProject, revealPath: String? = null) {
+        val ws = project.workspace
+        val generation = ++project.treeGeneration
         val parents = ancestorDirs(revealPath)
         viewModelScope.launch(Dispatchers.IO) {
-            val expandedNow = _state.value.expandedDirs + parents
+            val expandedSource = if (current === project) _state.value.expandedDirs else project.ui.expandedDirs
+            val expandedNow = expandedSource + parents
             val rootEntries = runCatching { ws.children() }.getOrDefault(emptyList())
             val contents = expandedNow.associateWith { dir ->
                 runCatching { ws.children(dir) }.getOrDefault(emptyList())
             }
-            if (generation != treeRefresh.get()) return@launch
-            _state.update { current ->
-                if (generation != treeRefresh.get()) {
-                    current
-                } else {
-                    current.copy(
-                        rootEntries = rootEntries,
-                        expandedDirs = current.expandedDirs + parents,
-                        dirContents = current.dirContents + contents,
-                    )
-                }
+            if (generation != project.treeGeneration) return@launch
+            editProject(project) { shown ->
+                shown.copy(
+                    rootEntries = rootEntries,
+                    expandedDirs = shown.expandedDirs + parents,
+                    dirContents = shown.dirContents + contents,
+                )
             }
         }
     }
@@ -1186,10 +1303,11 @@ class WorkspaceViewModel(
         return parts.indices.map { index -> parts.take(index + 1).joinToString("/") }.toSet()
     }
 
-    private fun buildAgentLoop(ws: Workspace): AgentLoop {
-        val epochAtBuild = sessionEpoch.get()
+    private fun buildAgentLoop(project: LiveProject): AgentLoop {
+        val ws = project.workspace
+        val epochAtBuild = project.epoch.get()
         val changeListener: (String, String, String) -> Unit = { path, _, _ ->
-            if (sessionEpoch.get() == epochAtBuild) onAgentEditedFile(path)
+            if (project.epoch.get() == epochAtBuild) onAgentEditedFile(project, path)
         }
 
         val tools = mutableListOf<Tool>(
@@ -1206,18 +1324,18 @@ class WorkspaceViewModel(
             MovePathTool(ws),
             ZipPathsTool(ws),
             ShellTool(deviceShell, ws, this::ensureExecAllowed) { command, rendered ->
-                if (sessionEpoch.get() != epochAtBuild) {
+                if (project.epoch.get() != epochAtBuild) {
                     rememberFinishedCommand(ws.root.canonicalPath, command, rendered)
                     return@ShellTool
                 }
-                appendShellLine(command, rendered)
-                refreshProjectTree()
+                appendShellLine(project, command, rendered)
+                refreshProjectTree(project)
             },
             HttpRequestTool(ws, agentNet, { settingsStore.current.networkEnabled }) { path ->
-                if (sessionEpoch.get() == epochAtBuild) onAgentEditedFile(path)
+                if (project.epoch.get() == epochAtBuild) onAgentEditedFile(project, path)
             },
             InstallModuleTool(ws, agentNet, { settingsStore.current.networkEnabled }) { path ->
-                if (sessionEpoch.get() == epochAtBuild) onAgentEditedFile(path)
+                if (project.epoch.get() == epochAtBuild) onAgentEditedFile(project, path)
             },
             InstallRuntimeTool(
                 toolchain = deviceShell.toolchain,
@@ -1254,7 +1372,7 @@ class WorkspaceViewModel(
             RemoteWriteTool(::activeRemote, remoteClient),
             RemotePutTool(::activeRemote, remoteClient, ws),
             RemoteGetTool(::activeRemote, remoteClient, ws) { path ->
-                if (sessionEpoch.get() == epochAtBuild) onAgentEditedFile(path)
+                if (project.epoch.get() == epochAtBuild) onAgentEditedFile(project, path)
             },
             SshExecTool(::activeRemote, remoteClient),
         )
@@ -1282,13 +1400,13 @@ class WorkspaceViewModel(
         )
     }
 
-    private fun appendShellLine(command: String, rendered: String) {
-        _state.update {
+    private fun appendShellLine(project: LiveProject, command: String, rendered: String) {
+        editProject(project) {
             it.copy(
-                shellLines = it.shellLines + ShellLine(nextId(), command, rendered),
+                shellLines = it.shellLines + ShellLine(nextId(project), command, rendered),
             )
         }
-        schedulePersist()
+        schedulePersist(project)
     }
 
     private fun rememberFinishedCommand(
@@ -1308,10 +1426,10 @@ class WorkspaceViewModel(
         )
     }
 
-    private fun snapshotSession(): StoredSession {
-        val current = _state.value
+    private fun snapshotSession(project: LiveProject): StoredSession {
+        val shown = if (current === project) _state.value else project.ui
         return StoredSession(
-            chat = current.chat.takeLast(MAX_STORED_CHAT).map { entry ->
+            chat = shown.chat.takeLast(MAX_STORED_CHAT).map { entry ->
                 StoredChat(
                     id = entry.id,
                     role = entry.role.name,
@@ -1319,36 +1437,39 @@ class WorkspaceViewModel(
                     toolName = entry.toolName,
                 )
             },
-            conversation = ToolTranscript.trim(conversation.toList(), MAX_STORED_CONVERSATION),
-            shell = current.shellLines.filterNot { it.running }.takeLast(MAX_STORED_SHELL).map { line ->
+            conversation = ToolTranscript.trim(project.conversation.toList(), MAX_STORED_CONVERSATION),
+            shell = shown.shellLines.filterNot { it.running }.takeLast(MAX_STORED_SHELL).map { line ->
                 StoredShell(id = line.id, command = line.command, output = line.output)
             },
-            nextId = idGenerator.get(),
+            nextId = project.idGenerator.get(),
         )
     }
 
-    private fun schedulePersist() {
-        persistJob?.cancel()
-        persistJob = viewModelScope.launch {
+    private fun schedulePersist(project: LiveProject) {
+        project.persistJob?.cancel()
+        project.persistJob = viewModelScope.launch {
             delay(400)
-            persistNow()
+            persistNow(project)
         }
     }
 
-    private fun persistNow() {
-        val root = workspace?.root?.canonicalPath ?: return
-        library.save(root, snapshotSession())
+    private fun persistNow(project: LiveProject) {
+        val root = project.workspace.root.canonicalPath
+        library.save(root, snapshotSession(project))
     }
 
-    private fun nextId(): Long = idGenerator.incrementAndGet()
+    private fun nextId(project: LiveProject): Long = project.idGenerator.incrementAndGet()
 
     private fun showMessage(text: String) {
         _state.update { it.copy(message = text) }
     }
 
     override fun onCleared() {
-        persistJob?.cancel()
-        persistNow()
+        current?.let { project -> project.ui = projectSlice(_state.value) }
+        projects.values.forEach { project ->
+            project.persistJob?.cancel()
+            persistNow(project)
+        }
         super.onCleared()
     }
 
