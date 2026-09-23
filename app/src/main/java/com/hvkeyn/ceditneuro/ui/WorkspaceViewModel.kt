@@ -2,6 +2,11 @@ package com.hvkeyn.ceditneuro.ui
 
 import android.content.Context
 import android.content.pm.PackageManager
+import com.hvkeyn.ceditneuro.CEditNeuroApp
+import com.hvkeyn.ceditneuro.agent.AgentNotifications
+import com.hvkeyn.ceditneuro.agent.AgentStatus
+import com.hvkeyn.ceditneuro.update.AppUpdate
+import com.hvkeyn.ceditneuro.update.AppUpdater
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -26,6 +31,7 @@ import com.hvkeyn.ceditneuro.tools.BrowsePageTool
 import com.hvkeyn.ceditneuro.tools.EditFileTool
 import com.hvkeyn.ceditneuro.tools.HttpRequestTool
 import com.hvkeyn.ceditneuro.tools.InstallModuleTool
+import com.hvkeyn.ceditneuro.tools.InstallAndroidSdkTool
 import com.hvkeyn.ceditneuro.tools.InstallJdkTool
 import com.hvkeyn.ceditneuro.tools.InstallProgramTool
 import com.hvkeyn.ceditneuro.tools.InstallRuntimeTool
@@ -58,6 +64,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
@@ -121,6 +128,7 @@ data class WorkspaceUiState(
     val webVisible: Boolean = false,
     val webUrl: String = "",
     val webGeneration: Int = 0,
+    val appUpdate: AppUpdate? = null,
 ) {
     val projectName: String?
         get() = projectRoot?.let { File(it).name.ifBlank { it } }
@@ -137,6 +145,7 @@ data class AgentActivity(
 class WorkspaceViewModel(
     private val appContext: Context,
     private val settingsStore: SettingsStore,
+    private val agentScope: CoroutineScope,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(WorkspaceUiState())
@@ -164,8 +173,13 @@ class WorkspaceViewModel(
     private val conversation = mutableListOf<ChatMessage>()
 
     private var agentJob: Job? = null
+    private val liveAnswer = StringBuilder()
     private var thoughtTail = ""
     private var lastThoughtUi = 0L
+    private var lastNoticeAt = 0L
+    private var lastNoticePhase = ""
+    private var updateChecked = false
+    private var updateJob: Job? = null
     private val activityJson = Json { ignoreUnknownKeys = true }
     private var persistJob: Job? = null
     private val idGenerator = AtomicLong(0)
@@ -207,8 +221,7 @@ class WorkspaceViewModel(
         }
 
         sessionEpoch.incrementAndGet()
-        agentJob?.cancel()
-        agentJob = null
+        abandonAgent(announce = false)
         persistJob?.cancel()
         persistNow()
 
@@ -249,8 +262,7 @@ class WorkspaceViewModel(
         val leavingCurrent = workspace?.root?.canonicalPath == canonical
         if (leavingCurrent) {
             sessionEpoch.incrementAndGet()
-            agentJob?.cancel()
-            agentJob = null
+            abandonAgent(announce = false)
             persistJob?.cancel()
             workspace = null
             buffers.clear()
@@ -613,6 +625,7 @@ class WorkspaceViewModel(
 
         val loop = buildAgentLoop(ws)
         val finalText = StringBuilder()
+        liveAnswer.clear()
         thoughtTail = ""
         _state.update {
             it.copy(
@@ -628,8 +641,9 @@ class WorkspaceViewModel(
                 ),
             )
         }
+        publishStatus(force = true)
 
-        agentJob = viewModelScope.launch {
+        agentJob = agentScope.launch {
             runCatching {
                 loop.run(history, prompt).collect { event ->
                     if (sessionEpoch.get() == epoch) handleEvent(event, finalText)
@@ -642,26 +656,129 @@ class WorkspaceViewModel(
             }
 
             if (sessionEpoch.get() != epoch) return@launch
-            if (finalText.isNotBlank()) {
-                conversation += ChatMessage.assistant(finalText.toString())
+            val text = finalText.toString()
+            liveAnswer.clear()
+            if (text.isNotBlank()) {
+                conversation += ChatMessage.assistant(text)
             }
             _state.update { it.copy(agentRunning = false, agentActivity = null) }
+            AgentNotifications.dismiss(appContext)
             persistNow()
         }
     }
 
+    /** Sends a short follow-up so a stopped task can pick up from the chat history. */
+    fun continueAgent() {
+        if (_state.value.agentRunning) return
+        if (workspace == null) {
+            showMessage("Open a project folder first.")
+            return
+        }
+        if (conversation.isEmpty() && _state.value.chat.isEmpty()) {
+            showMessage("Nothing to continue yet.")
+            return
+        }
+        sendPrompt("Continue the previous task from where it stopped. Do not repeat steps that already finished.")
+    }
+
     fun cancelAgent() {
+        abandonAgent(announce = true)
+    }
+
+    fun checkForUpdate() {
+        if (updateChecked || _state.value.appUpdate != null) return
+        updateChecked = true
+        viewModelScope.launch {
+            val offer = withContext(Dispatchers.IO) {
+                val local = AppUpdater.localVersion(appContext)
+                runCatching { AppUpdater.latestNewerThan(local) }.getOrNull()
+            } ?: return@launch
+            _state.update { it.copy(appUpdate = offer) }
+        }
+    }
+
+    fun dismissUpdate() {
+        updateJob?.cancel()
+        updateJob = null
+        _state.update { it.copy(appUpdate = null) }
+    }
+
+    fun confirmUpdate() {
+        val offer = _state.value.appUpdate ?: return
+        if (offer.downloading) return
+        _state.update { it.copy(appUpdate = offer.copy(downloading = true, error = null)) }
+        updateJob = viewModelScope.launch {
+            val downloaded = runCatching {
+                withContext(Dispatchers.IO) {
+                    AppUpdater.download(appContext, offer.apkUrl) { received, total ->
+                        viewModelScope.launch {
+                            _state.update { current ->
+                                val shown = current.appUpdate ?: return@update current
+                                current.copy(
+                                    appUpdate = shown.copy(
+                                        received = received,
+                                        total = total,
+                                        downloading = true,
+                                    ),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            downloaded.onSuccess { apk ->
+                val installed = runCatching { AppUpdater.install(appContext, apk) }
+                if (installed.isSuccess) {
+                    _state.update { it.copy(appUpdate = null) }
+                } else {
+                    _state.update { current ->
+                        val shown = current.appUpdate ?: offer
+                        current.copy(
+                            appUpdate = shown.copy(
+                                downloading = false,
+                                error = installed.exceptionOrNull()?.message ?: "Could not open the installer.",
+                            ),
+                        )
+                    }
+                }
+            }.onFailure { error ->
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                _state.update { current ->
+                    val shown = current.appUpdate ?: offer
+                    current.copy(
+                        appUpdate = shown.copy(
+                            downloading = false,
+                            error = error.message ?: "Download failed.",
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    private fun abandonAgent(announce: Boolean) {
+        val wasRunning = agentJob?.isActive == true || _state.value.agentRunning
+        val partial = liveAnswer.toString()
+        liveAnswer.clear()
+        if (partial.isNotBlank()) {
+            conversation += ChatMessage.assistant(partial)
+        }
         agentJob?.cancel()
         agentJob = null
         thoughtTail = ""
+        lastNoticePhase = ""
         _state.update { it.copy(agentRunning = false, agentActivity = null) }
-        appendChat(ChatRole.Error, "Stopped by the user.")
+        AgentNotifications.dismiss(appContext)
+        if (announce && wasRunning) {
+            appendChat(ChatRole.Error, "Stopped by the user.")
+        }
     }
 
     private fun handleEvent(event: AgentEvent, finalText: StringBuilder) {
         when (event) {
             is AgentEvent.AssistantText -> {
                 finalText.append(event.text)
+                liveAnswer.append(event.text)
                 appendStreaming(ChatRole.Assistant, event.text)
                 if (_state.value.agentActivity?.phase != "Writing the answer") {
                     setActivity(phase = "Writing the answer", focus = "")
@@ -754,6 +871,53 @@ class WorkspaceViewModel(
                 ),
             )
         }
+        publishStatus()
+    }
+
+    private fun publishStatus(force: Boolean = false) {
+        val activity = _state.value.agentActivity
+        if (!_state.value.agentRunning || activity == null) return
+        val now = System.currentTimeMillis()
+        if (!force && activity.phase == lastNoticePhase && now - lastNoticeAt < 800) return
+        lastNoticeAt = now
+        lastNoticePhase = activity.phase
+        AgentNotifications.publish(
+            appContext,
+            AgentStatus(
+                phase = activity.phase,
+                detail = activity.context,
+                focus = activity.focus,
+                startedAt = activity.startedAt,
+                workLine = workLine(),
+            ),
+        )
+    }
+
+    private fun workLine(): String {
+        val settings = settingsStore.current
+        val work = when (settings.workFocus) {
+            AgentSettings.WORK_BUILD -> "Build"
+            AgentSettings.WORK_REMOTE -> "Remote"
+            else -> "Edit"
+        }
+        val network = if (settings.networkEnabled) "Network on" else "Network off"
+        val programs = when (settings.execAllowed) {
+            true -> "Programs on"
+            false -> "Programs off"
+            null -> "Programs ask"
+        }
+        return "$work · $network · $programs"
+    }
+
+    private fun accessLine(): String {
+        val settings = settingsStore.current
+        val network = if (settings.networkEnabled) "network on" else "network off"
+        val programs = when (settings.execAllowed) {
+            true -> "programs allowed"
+            false -> "programs blocked"
+            null -> "programs not chosen yet"
+        }
+        return "$network, $programs"
     }
 
     private fun noteThought(delta: String) {
@@ -926,6 +1090,13 @@ class WorkspaceViewModel(
                 ensureExec = this::ensureExecAllowed,
             ),
             ShizukuExecTool(ws, shizukuShell, this::prepareShizuku),
+            InstallAndroidSdkTool(
+                toolchain = deviceShell.toolchain,
+                net = agentNet,
+                networkAllowed = { settingsStore.current.networkEnabled },
+                ensureExec = this::ensureExecAllowed,
+                zipAlignSource = appContext.assets.open("ZipAlign.java").bufferedReader().use { it.readText() },
+            ),
             InstallJdkTool(
                 toolchain = deviceShell.toolchain,
                 net = agentNet,
@@ -969,6 +1140,8 @@ class WorkspaceViewModel(
                 ws.root.absolutePath,
                 deviceShell.toolchainBin.absolutePath,
                 remoteSummary,
+                settingsStore.current.workFocus,
+                accessLine(),
             ),
         )
     }
@@ -1040,7 +1213,6 @@ class WorkspaceViewModel(
     override fun onCleared() {
         persistJob?.cancel()
         persistNow()
-        agentJob?.cancel()
         super.onCleared()
     }
 
@@ -1058,10 +1230,11 @@ class WorkspaceViewModel(
 
         fun factory(context: Context, settingsStore: SettingsStore): ViewModelProvider.Factory {
             val appContext = context.applicationContext
+            val scope = (appContext as CEditNeuroApp).agentScope
             return object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                    WorkspaceViewModel(appContext, settingsStore) as T
+                    WorkspaceViewModel(appContext, settingsStore, scope) as T
             }
         }
     }

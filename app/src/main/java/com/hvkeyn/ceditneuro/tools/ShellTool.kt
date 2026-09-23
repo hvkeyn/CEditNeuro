@@ -24,6 +24,7 @@ class ShellTool(
             "run directly. java, javac, and kotlinc run after install_jdk. " +
             "cwd defaults to the project and may be an absolute directory the app can use. " +
             "There is no pkg, apt, or root. git and python run after install_runtime. " +
+            "gradle, aapt2, and d8 run after install_android_sdk. Use timeout_seconds of 600 for gradle. " +
             "stderr is included after a --- stderr --- line. " +
             "`fetch URL DEST` as the whole command downloads a file. " +
             "timeout_seconds defaults to 120; use 300 or more for kotlinc."

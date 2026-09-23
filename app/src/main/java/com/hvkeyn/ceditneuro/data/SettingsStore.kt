@@ -23,6 +23,8 @@ data class AgentSettings(
     val networkEnabled: Boolean = true,
     /** Null until the user answers the prompt. True lets installed compilers run. */
     val execAllowed: Boolean? = null,
+    /** edit, build, or remote. The chat selector writes this. */
+    val workFocus: String = WORK_EDIT,
     val remotes: List<RemoteServer> = emptyList(),
     val activeRemoteId: String = "",
 ) {
@@ -53,6 +55,10 @@ data class AgentSettings(
 
     companion object {
         val REASONING_EFFORTS = listOf("low", "medium", "high")
+        const val WORK_EDIT = "edit"
+        const val WORK_BUILD = "build"
+        const val WORK_REMOTE = "remote"
+        val WORK_FOCUSES = listOf(WORK_EDIT, WORK_BUILD, WORK_REMOTE)
     }
 }
 
@@ -92,6 +98,8 @@ class SettingsStore(context: Context) {
             autoApproveEdits = prefs.getBoolean(KEY_AUTO_APPROVE, false),
             networkEnabled = prefs.getBoolean(KEY_NETWORK, true),
             execAllowed = if (prefs.contains(KEY_EXEC)) prefs.getBoolean(KEY_EXEC, false) else null,
+            workFocus = prefs.getString(KEY_WORK, null)?.takeIf { it in AgentSettings.WORK_FOCUSES }
+                ?: AgentSettings.WORK_EDIT,
             remotes = prefs.getString(KEY_REMOTES, null)?.let { raw ->
                 runCatching { json.decodeFromString<List<RemoteServer>>(raw) }.getOrNull()
             }.orEmpty(),
@@ -151,7 +159,8 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_NETWORK, settings.networkEnabled)
         val execAllowed = settings.execAllowed
         if (execAllowed == null) editor.remove(KEY_EXEC) else editor.putBoolean(KEY_EXEC, execAllowed)
-        editor.putString(KEY_REMOTES, json.encodeToString(settings.remotes))
+        editor.putString(KEY_WORK, settings.workFocus)
+            .putString(KEY_REMOTES, json.encodeToString(settings.remotes))
             .putString(KEY_ACTIVE_REMOTE, settings.activeRemoteId)
             .apply()
     }
@@ -182,6 +191,7 @@ class SettingsStore(context: Context) {
         const val KEY_AUTO_APPROVE = "auto_approve_edits"
         const val KEY_NETWORK = "agent_network"
         const val KEY_EXEC = "exec_allowed"
+        const val KEY_WORK = "work_focus"
         const val KEY_REMOTES = "remote_servers"
         const val KEY_ACTIVE_REMOTE = "active_remote"
         const val LEGACY_BASE_URL = "base_url"
