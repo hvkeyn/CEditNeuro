@@ -60,7 +60,28 @@ class DeepSeekBackend(
             put("stream", true)
             if (model.maxOutputTokens > 0) put("max_tokens", model.maxOutputTokens)
             put("messages", buildJsonArray {
-                safeMessages.forEach { add(json.encodeToJsonElement(ChatMessage.serializer(), it)) }
+                safeMessages.forEach { message ->
+                    val images = message.imageDataUrls
+                    if (images.isNotEmpty() && model.seesImages()) {
+                        add(buildJsonObject {
+                            put("role", message.role)
+                            put("content", buildJsonArray {
+                                add(buildJsonObject {
+                                    put("type", "text")
+                                    put("text", message.content.orEmpty())
+                                })
+                                images.forEach { url ->
+                                    add(buildJsonObject {
+                                        put("type", "image_url")
+                                        putJsonObject("image_url") { put("url", url) }
+                                    })
+                                }
+                            })
+                        })
+                    } else {
+                        add(json.encodeToJsonElement(ChatMessage.serializer(), message))
+                    }
+                }
             })
             if (model.supportsReasoning && settings.thinkingEnabled) {
                 putJsonObject("thinking") { put("type", "enabled") }

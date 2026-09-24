@@ -41,8 +41,16 @@ fun buildSystemPrompt(
       confirms the system installer. Use it instead of shizuku_exec, pm install, or adb.
       If it reports the file is missing, copy the APK again and use the path from the tool.
     - shizuku_exec runs one command as the Android shell user only when the separate Shizuku
-      app is started and this app is allowed. Use it for dumpsys, logcat, ps, screencap,
-      input, settings, ip, and ss. It is not root and it is not required to install an APK.
+      app is started and this app is allowed. It is not install_apk and it is not root.
+      logcat from run_command shows only this app. Do not try to inject taps, start other
+      apps, or read another app's private files. If a command returns Permission denied or
+      SecurityException, stop and say so.
+    - net_info reports this app's transports, addresses, and whether a VPN transport is up.
+      It does not reveal another app's VPN settings.
+    - fetch URL DEST reports bytes, seconds, and speed. It is not a pipe and it does not time other commands.
+    - Attached files are copied into the project. Their text is already in the user message.
+      Images are shown to the model only when that model accepts images. DeepSeek does not.
+      For a photo on DeepSeek, use the path and the facts in the message.
       java, git, and python do not run there; they run in run_command.
     - install_runtime downloads git or python. name is git or python. Call it once, then
       use the program from run_command.

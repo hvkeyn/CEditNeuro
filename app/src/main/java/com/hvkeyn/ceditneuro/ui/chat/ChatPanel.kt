@@ -2,6 +2,7 @@ package com.hvkeyn.ceditneuro.ui.chat
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -29,6 +30,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -86,7 +88,7 @@ import kotlinx.coroutines.launch
 fun ChatPanel(
     state: WorkspaceUiState,
     settings: AgentSettings,
-    onSend: (String) -> Unit,
+    onSend: (String, List<Uri>) -> Unit,
     onContinue: () -> Unit,
     onCancel: () -> Unit,
     onWorkFocus: (String) -> Unit,
@@ -97,6 +99,10 @@ fun ChatPanel(
     modifier: Modifier = Modifier,
 ) {
     var input by rememberSaveable { mutableStateOf("") }
+    var attachments by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { picked ->
+        if (picked.isNotEmpty()) attachments = (attachments + picked).take(8)
+    }
     var listening by remember { mutableStateOf(false) }
     var voiceNote by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
@@ -115,7 +121,7 @@ fun ChatPanel(
                 listening = false
                 voiceNote = null
                 input = ""
-                if (!state.agentRunning && state.projectRoot != null) onSend(heard)
+                if (!state.agentRunning && state.projectRoot != null) onSend(heard, emptyList())
                 else input = heard
             },
             onNote = { note ->
@@ -250,6 +256,14 @@ fun ChatPanel(
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
+            if (attachments.isNotEmpty()) {
+                Text(
+                    text = attachments.joinToString { it.lastPathSegment?.substringAfterLast('/') ?: "file" },
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 2,
+                )
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -265,6 +279,14 @@ fun ChatPanel(
                     singleLine = compact,
                     maxLines = if (compact) 1 else 4,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
+                )
+                RoundAction(
+                    icon = Icons.Filled.AttachFile,
+                    description = "Attach a file",
+                    filled = attachments.isNotEmpty(),
+                    size = if (compact) 32.dp else 40.dp,
+                    enabled = state.projectRoot != null && !state.agentRunning,
+                    onClick = { picker.launch(arrayOf("*/*")) },
                 )
                 RoundAction(
                     icon = Icons.Filled.Mic,
@@ -308,16 +330,19 @@ fun ChatPanel(
                     description = "Send",
                     filled = true,
                     size = if (compact) 32.dp else 40.dp,
-                    enabled = !state.agentRunning && input.isNotBlank() && state.projectRoot != null,
+                    enabled = !state.agentRunning && state.projectRoot != null &&
+                        (input.isNotBlank() || attachments.isNotEmpty()),
                     onClick = {
                         if (listening) {
                             dictation.stop()
                             return@RoundAction
                         }
                         val prompt = input.trim()
-                        if (prompt.isNotEmpty()) {
+                        val files = attachments
+                        if (prompt.isNotEmpty() || files.isNotEmpty()) {
                             input = ""
-                            onSend(prompt)
+                            attachments = emptyList()
+                            onSend(prompt, files)
                         }
                     },
                 )

@@ -14,7 +14,17 @@ data class CatalogModel(
     val maxOutputTokens: Int = 8_192,
     val supportsTools: Boolean = true,
     val supportsReasoning: Boolean = false,
-)
+    val supportsVision: Boolean = false,
+) {
+    fun seesImages(): Boolean {
+        if (supportsVision) return true
+        val id = name.lowercase()
+        if (id.contains("deepseek")) return false
+        return id.contains("vision") || id.contains("gpt-4o") || id.contains("gpt-4.1") ||
+            id.contains("gemini") || id.contains("claude") || id.contains("-vl") ||
+            id.contains("pixtral") || id.contains("llava") || id.contains("grok")
+    }
+}
 
 /** A provider, in the same shape Zed stores under `language_models`. */
 @Serializable

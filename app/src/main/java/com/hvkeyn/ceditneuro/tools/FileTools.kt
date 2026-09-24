@@ -82,12 +82,14 @@ class ReadFileTool(private val workspace: Workspace) : Tool {
     override val name = "read_file"
     override val description =
         "Read a text file. A relative path is inside the project. An absolute path is a real " +
-            "filesystem path this app can read. Returns numbered lines. Use offset and limit for large files."
+            "filesystem path this app can read. Returns numbered lines. " +
+            "A file over about 200 KB should use offset, limit, or tail. tail returns the last N lines."
     override val parameters = objectSchema(
         properties = mapOf(
             "path" to stringProp("Project-relative file, or an absolute path."),
             "offset" to intProp("1-based first line to return. Defaults to 1."),
             "limit" to intProp("Maximum number of lines to return. Defaults to 400."),
+            "tail" to intProp("If set, return this many lines from the end and ignore offset."),
         ),
         required = listOf("path"),
     )
@@ -96,19 +98,26 @@ class ReadFileTool(private val workspace: Workspace) : Tool {
         val path = args.stringArg("path") ?: return@withContext ToolResult.error("Missing 'path'.")
         val offset = (args.intArg("offset") ?: 1).coerceAtLeast(1)
         val limit = (args.intArg("limit") ?: 400).coerceIn(1, 5_000)
+        val tail = args.intArg("tail")?.coerceIn(1, 5_000)
 
         val file = workspace.resolve(path)
         if (!file.isFile) return@withContext ToolResult.error("Not a file: $path")
+        if (file.length() > 200_000 && tail == null && args.intArg("offset") == null && args.intArg("limit") == null) {
+            return@withContext ToolResult.ok(
+                "File is ${file.length()} bytes. Pass tail, or offset and limit, instead of reading it all.",
+            )
+        }
 
         val lines = file.readLines()
-        val slice = lines.drop(offset - 1).take(limit)
+        val slice = if (tail != null) lines.takeLast(tail) else lines.drop(offset - 1).take(limit)
+        val start = if (tail != null) (lines.size - slice.size + 1).coerceAtLeast(1) else offset
         if (slice.isEmpty()) return@withContext ToolResult.ok("(no lines in the requested range)")
 
         val out = StringBuilder()
         slice.forEachIndexed { index, line ->
-            out.append(offset + index).append('\t').append(line).append('\n')
+            out.append(start + index).append('\t').append(line).append('\n')
         }
-        if (offset - 1 + slice.size < lines.size) {
+        if ((if (tail != null) 0 else offset - 1) + slice.size < lines.size && tail == null) {
             out.append("... (file has ${lines.size} lines in total)")
         }
         ToolResult.ok(out.toString())

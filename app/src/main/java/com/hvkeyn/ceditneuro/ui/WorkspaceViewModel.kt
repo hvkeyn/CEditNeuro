@@ -49,6 +49,7 @@ import com.hvkeyn.ceditneuro.tools.DeletePathTool
 import com.hvkeyn.ceditneuro.tools.GlobTool
 import com.hvkeyn.ceditneuro.tools.MkdirTool
 import com.hvkeyn.ceditneuro.tools.MovePathTool
+import com.hvkeyn.ceditneuro.tools.NetInfoTool
 import com.hvkeyn.ceditneuro.tools.GrepTool
 import com.hvkeyn.ceditneuro.tools.ListDirTool
 import com.hvkeyn.ceditneuro.tools.ReadFileTool
@@ -1090,21 +1091,25 @@ class WorkspaceViewModel(
         }
     }
 
-    fun sendPrompt(prompt: String) {
+    fun sendPrompt(prompt: String, attachments: List<android.net.Uri> = emptyList()) {
         val project = current ?: run {
             showMessage("Open a project folder first.")
             return
         }
-        startPrompt(project, prompt)
+        val prepared = com.hvkeyn.ceditneuro.agent.Attachments.prepare(
+            appContext, project.workspace.root, prompt, attachments,
+        )
+        val images = if (settingsStore.current.model.seesImages()) prepared.imageDataUrls else emptyList()
+        startPrompt(project, prepared.prompt, images)
     }
 
-    private fun startPrompt(project: LiveProject, prompt: String) {
+    private fun startPrompt(project: LiveProject, prompt: String, images: List<String> = emptyList()) {
         if (prompt.isBlank() || project.agentJob?.isActive == true) return
 
         appendChat(project, ChatRole.User, prompt)
         val history = project.conversation.toList()
         project.runContext = null
-        project.conversation += ChatMessage.user(prompt)
+        project.conversation += ChatMessage.user(prompt, images)
         val epoch = project.epoch.get()
         val openFile = _state.value.activePath?.substringAfterLast('/').orEmpty()
         val preparedChars = history.sumOf { it.content?.length ?: 0 } + prompt.length
@@ -1630,8 +1635,16 @@ class WorkspaceViewModel(
 
     private suspend fun prepareShizuku(): String? {
         if (!runCatching { Shizuku.pingBinder() }.getOrDefault(false)) {
-            return "Shizuku is not running. Install and open an APK with install_apk. " +
-                "Shizuku is only needed for shell-user commands such as dumpsys or logcat."
+            val launch = appContext.packageManager.getLaunchIntentForPackage("moe.shizuku.privileged.api")
+            if (launch != null) {
+                launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                runCatching { appContext.startActivity(launch) }
+            }
+            return "Shizuku is not running. " +
+                (if (launch != null) "The Shizuku app was opened. Start it and allow CEditNeuro, then retry. "
+                else "Install the Shizuku app, start it, and allow CEditNeuro. ") +
+                "This tool is not install_apk. run_command logcat only shows this app's own process. " +
+                "screencap and input into other apps are not available from here."
         }
         if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) return null
         return withContext(Dispatchers.Main) {
@@ -1909,6 +1922,7 @@ class WorkspaceViewModel(
                 ensureExec = this::ensureExecAllowed,
             ),
             ShizukuExecTool(ws, shizukuShell, this::prepareShizuku),
+            NetInfoTool(appContext),
             InstallApkTool(appContext, ws),
             InstallAndroidSdkTool(
                 toolchain = deviceShell.toolchain,
@@ -1963,7 +1977,16 @@ class WorkspaceViewModel(
                 settingsStore.current.workFocus,
                 accessLine(),
                 StoragePaths.describe(),
-                projectRules = readProjectRules(ws.root),
+                projectRules = buildString {
+                    val rules = readProjectRules(ws.root)
+                    if (rules.isNotBlank()) append(rules)
+                    val names = ws.root.list()?.filter { it != ".ceditneuro" }.orEmpty()
+                    if (names.isEmpty()) {
+                        if (isNotEmpty()) append("\n")
+                        append("This project folder is empty. Do not treat it as the user's notes. ")
+                        append("Ask which folder to open, or use an absolute path the user already gave.")
+                    }
+                },
             ),
         )
     }
