@@ -120,9 +120,12 @@ class DeviceShell(
             )
         }
         pumps.forEach { it.join(2_000) }
+        val adjusted = ShellExit.adjust(rewritten, process.exitValue())
+        val body = renderOutput(stdout, stderr, truncated.get()) + StoragePaths.noteVisibleFiles(rewritten)
+        val noted = if (adjusted.note.isBlank()) body else body + "\n" + adjusted.note
         return ShellOutput(
-            exitCode = process.exitValue(),
-            output = renderOutput(stdout, stderr, truncated.get()) + StoragePaths.noteVisibleFiles(rewritten),
+            exitCode = adjusted.exitCode,
+            output = noted,
             timedOut = false,
         )
     }

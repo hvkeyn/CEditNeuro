@@ -16,6 +16,7 @@ fun buildSystemPrompt(): String = """
     - HOME is this app's private directory. DOWNLOAD is the public Downloads folder. Do not describe a file under HOME as Downloads.
     - Shared storage cannot execute files. A program must be Android aarch64 or a shell script. Termux packages and ordinary Linux binaries will not start. TOOLCHAIN is the toolchain root.
     - run_command is the in-app shell (mksh and toybox). There is no pkg, apt, or root. java, git, and python run there after the matching installer. A long command output is saved to a file; read that file for the rest.
+    - grep with no matches is a result, not a failure. Do not repeat that search. Do not run logcat: this app cannot read it.
     - read_file numbers the first returned line and every 10th line.
     - If a host did not resolve, choose another URL. Do not repeat that host.
     - If shell access is not available, do not call shizuku_exec, fetch_system_layout, or execute_system_action again.

@@ -155,6 +155,7 @@ Each turn resends the conversation, so the harness keeps the repeated part small
 - The standing instructions do not include the project path, the clock, or which server is connected. That setup is a second system message. DeepSeek can cache the unchanged prefix. The activity line shows `cache hit` and `cache miss` when the API reports them.
 - Reading, editing, search, and the shell are on every request. Installers, the remote tools, and screen automation load through `load_tools`, or come with the build and remote focus. That focus, plus network and running installed programs, is in **Language models → Agent**. The chat bar keeps the model and Doctor.
 - `read_file` numbers the first line of a slice and every 10th line.
+- `grep` with no matches is a result. `logcat` is refused: this app cannot read the system log, so that command is not retried.
 - A long `run_command` result is written to a file under `.ceditneuro/tool-output`. The model sees the path and the tail.
 - Screen dumps stay the short tap list from `fetch_system_layout`.
 

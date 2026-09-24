@@ -28,6 +28,7 @@ class ShellTool(
             "gradle, aapt2, and d8 run after install_android_sdk. Use timeout_seconds of 600 for gradle. " +
             "stderr is included after a --- stderr --- line. " +
             "`fetch URL DEST` as the whole command downloads a file. " +
+            "grep with no matches is success. Do not run logcat. " +
             "timeout_seconds defaults to 120; use 300 or more for kotlinc."
     override val parameters = objectSchema(
         properties = mapOf(
