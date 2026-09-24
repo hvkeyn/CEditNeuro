@@ -82,7 +82,7 @@ class ReadFileTool(private val workspace: Workspace) : Tool {
     override val name = "read_file"
     override val description =
         "Read a text file. A relative path is inside the project. An absolute path is a real " +
-            "filesystem path this app can read. Returns numbered lines. " +
+            "filesystem path this app can read. Numbers the first returned line and every 10th line. " +
             "A file over about 200 KB should use offset, limit, or tail. tail returns the last N lines."
     override val parameters = objectSchema(
         properties = mapOf(
@@ -113,15 +113,23 @@ class ReadFileTool(private val workspace: Workspace) : Tool {
         val start = if (tail != null) (lines.size - slice.size + 1).coerceAtLeast(1) else offset
         if (slice.isEmpty()) return@withContext ToolResult.ok("(no lines in the requested range)")
 
-        val out = StringBuilder()
-        slice.forEachIndexed { index, line ->
-            out.append(start + index).append('\t').append(line).append('\n')
-        }
+        val out = StringBuilder(formatReadLines(slice, start))
         if ((if (tail != null) 0 else offset - 1) + slice.size < lines.size && tail == null) {
             out.append("... (file has ${lines.size} lines in total)")
         }
         ToolResult.ok(out.toString())
     }
+}
+
+/** First line of the slice, then every 10th file line. The other lines stay blank in the number column. */
+internal fun formatReadLines(lines: List<String>, startLine: Int): String {
+    val out = StringBuilder()
+    lines.forEachIndexed { index, line ->
+        val number = startLine + index
+        if (index == 0 || number % 10 == 0) out.append(number)
+        out.append('\t').append(line).append('\n')
+    }
+    return out.toString()
 }
 
 class WriteFileTool(

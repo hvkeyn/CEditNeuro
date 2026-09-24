@@ -16,6 +16,7 @@ import com.hvkeyn.ceditneuro.agent.AgentDoctor
 import com.hvkeyn.ceditneuro.agent.AgentLoop
 import com.hvkeyn.ceditneuro.agent.ChatMessage
 import com.hvkeyn.ceditneuro.agent.ToolTranscript
+import com.hvkeyn.ceditneuro.agent.buildSetupPrompt
 import com.hvkeyn.ceditneuro.agent.buildSystemPrompt
 import com.hvkeyn.ceditneuro.agent.deepseek.DeepSeekBackend
 import com.hvkeyn.ceditneuro.data.AgentSettings
@@ -43,6 +44,9 @@ import com.hvkeyn.ceditneuro.tools.InstallAndroidSdkTool
 import com.hvkeyn.ceditneuro.tools.InstallJdkTool
 import com.hvkeyn.ceditneuro.tools.InstallProgramTool
 import com.hvkeyn.ceditneuro.tools.InstallRuntimeTool
+import com.hvkeyn.ceditneuro.tools.LoadToolsTool
+import com.hvkeyn.ceditneuro.tools.ToolGroups
+import com.hvkeyn.ceditneuro.tools.ToolSession
 import com.hvkeyn.ceditneuro.tools.ExecuteSystemActionTool
 import com.hvkeyn.ceditneuro.tools.FetchSystemLayoutTool
 import com.hvkeyn.ceditneuro.tools.ShizukuExecTool
@@ -1949,6 +1953,8 @@ class WorkspaceViewModel(
         }
 
         val shizukuCommands = ShizukuCommandRunner(shizukuShell)
+        val loadedGroups = ToolGroups.forFocus(settingsStore.current.workFocus)
+        val toolSession = ToolSession(loadedGroups)
         val tools = mutableListOf<Tool>(
             ListDirTool(ws),
             ReadFileTool(ws),
@@ -1983,7 +1989,12 @@ class WorkspaceViewModel(
                 ensureExec = this::ensureExecAllowed,
             ),
             ShizukuExecTool(ws, shizukuShell, this::prepareShizuku),
-            FetchSystemLayoutTool(shizukuCommands, this::prepareShizuku),
+            LoadToolsTool(toolSession),
+            FetchSystemLayoutTool(
+                shizukuCommands,
+                this::prepareShizuku,
+                File(appContext.getExternalFilesDir(null) ?: appContext.cacheDir, "ui-state.xml"),
+            ),
             ExecuteSystemActionTool(shizukuCommands, this::prepareShizuku),
             NetInfoTool(appContext),
             InstallApkTool(appContext, ws),
@@ -2033,13 +2044,16 @@ class WorkspaceViewModel(
         return AgentLoop(
             backend = DeepSeekBackend { settingsStore.current },
             toolRegistry = ToolRegistry(tools),
-            systemPrompt = buildSystemPrompt(
-                ws.root.absolutePath,
-                deviceShell.toolchainBin.absolutePath,
-                remoteSummary,
-                settingsStore.current.workFocus,
-                accessLine(),
-                StoragePaths.describe(),
+            toolSession = toolSession,
+            systemPrompt = buildSystemPrompt(),
+            setupPrompt = buildSetupPrompt(
+                projectRoot = ws.root.absolutePath,
+                toolchainBin = deviceShell.toolchainBin.absolutePath,
+                remoteSummary = remoteSummary,
+                workFocus = settingsStore.current.workFocus,
+                accessLine = accessLine(),
+                storageLine = StoragePaths.describe(),
+                loadedGroups = loadedGroups,
                 projectRules = buildString {
                     val rules = readProjectRules(ws.root)
                     if (rules.isNotBlank()) append(rules)

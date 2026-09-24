@@ -87,6 +87,9 @@ class DeepSeekBackend(
                 putJsonObject("thinking") { put("type", "enabled") }
                 put("reasoning_effort", settings.reasoningEffort)
             }
+            if (settings.baseUrl.contains("deepseek.com", ignoreCase = true)) {
+                putJsonObject("stream_options") { put("include_usage", true) }
+            }
             if (tools.isNotEmpty() && model.supportsTools) {
                 put("tools", buildJsonArray {
                     tools.forEach { tool ->
@@ -122,6 +125,7 @@ class DeepSeekBackend(
 
             val accumulator = ToolCallAccumulator()
             var finishReason: String? = null
+            var cacheNote: String? = null
 
             while (!source.exhausted()) {
                 val line = source.readUtf8Line() ?: break
@@ -133,6 +137,7 @@ class DeepSeekBackend(
 
                 val frame = runCatching { json.parseToJsonElement(data) as? JsonObject }.getOrNull()
                     ?: continue
+                cacheNote = cacheNote(frame) ?: cacheNote
                 val choices = frame["choices"] as? JsonArray ?: continue
                 val choice = choices.firstOrNull() as? JsonObject ?: continue
 
@@ -156,7 +161,7 @@ class DeepSeekBackend(
             }
 
             if (accumulator.hasCalls()) emit(BackendChunk.ToolCalls(accumulator.build()))
-            emit(BackendChunk.Finished(finishReason))
+            emit(BackendChunk.Finished(finishReason, cacheNote))
         }
     }.flowOn(Dispatchers.IO)
 
@@ -165,6 +170,14 @@ class DeepSeekBackend(
         private const val SSE_DONE = "[DONE]"
 
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+
+        fun cacheNote(frame: JsonObject): String? {
+            val usage = frame["usage"] as? JsonObject ?: return null
+            val hit = (usage["prompt_cache_hit_tokens"] as? JsonPrimitive)?.intOrNull
+            val miss = (usage["prompt_cache_miss_tokens"] as? JsonPrimitive)?.intOrNull
+            if (hit == null && miss == null) return null
+            return "cache hit ${hit ?: 0}, miss ${miss ?: 0}"
+        }
 
         fun chatCompletionsUrl(apiUrl: String): String {
             val base = apiUrl.trim().trimEnd('/')

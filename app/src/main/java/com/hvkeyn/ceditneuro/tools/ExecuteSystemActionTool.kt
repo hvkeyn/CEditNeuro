@@ -13,8 +13,8 @@ class ExecuteSystemActionTool(
 ) : Tool {
     override val name = "execute_system_action"
     override val description =
-        "Tap one point on the screen. paramX and paramY are pixel coordinates from " +
-            "fetch_system_layout. Requires Shizuku or root, same as shizuku_exec. " +
+        "Tap one point on the screen. paramX and paramY are the tap=X,Y center from " +
+            "fetch_system_layout, not a corner of the bounds. Requires Shizuku or root, same as shizuku_exec. " +
             "Use it only for the UI automation the user asked for."
     override val parameters = objectSchema(
         properties = mapOf(

@@ -6,6 +6,7 @@ import com.hvkeyn.ceditneuro.workspace.Workspace
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
+import java.io.File
 
 /**
  * Runs a command in the project directory through [DeviceShell], the shell built
@@ -51,7 +52,7 @@ class ShellTool(
             return ToolResult.error(denied)
         }
         val rendered = withContext(Dispatchers.IO) {
-            shell.run(command, cwd, timeoutSeconds).render()
+            spill(shell.run(command, cwd, timeoutSeconds).render())
         }
         onFinished(command, rendered)
         return if (rendered.startsWith("timed out")) {
@@ -59,5 +60,21 @@ class ShellTool(
         } else {
             ToolResult.ok(rendered)
         }
+    }
+
+    /** Keeps the full output on disk and sends the model a short tail. */
+    private fun spill(rendered: String): String {
+        if (rendered.length <= INLINE_CHARS) return rendered
+        val dir = File(workspace.root, ".ceditneuro/tool-output").apply { mkdirs() }
+        val file = File(dir, "cmd-${System.currentTimeMillis()}.txt")
+        file.writeText(rendered)
+        val tail = rendered.takeLast(TAIL_CHARS)
+        return "Full output is ${rendered.length} chars at ${file.absolutePath}.\n" +
+            "Read that file for the rest.\n--- tail ---\n$tail"
+    }
+
+    private companion object {
+        const val INLINE_CHARS = 8_000
+        const val TAIL_CHARS = 2_500
     }
 }

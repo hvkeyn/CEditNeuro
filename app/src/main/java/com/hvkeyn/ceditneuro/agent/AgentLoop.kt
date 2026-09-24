@@ -2,6 +2,7 @@ package com.hvkeyn.ceditneuro.agent
 
 import com.hvkeyn.ceditneuro.tools.ToolRegistry
 import com.hvkeyn.ceditneuro.tools.ToolResult
+import com.hvkeyn.ceditneuro.tools.ToolSession
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -18,7 +19,9 @@ import java.io.IOException
 class AgentLoop(
     private val backend: AgentBackend,
     private val toolRegistry: ToolRegistry,
+    private val toolSession: ToolSession,
     private val systemPrompt: String,
+    private val setupPrompt: String,
     private val maxToolRounds: Int = 40,
 ) {
     private companion object {
@@ -36,6 +39,7 @@ class AgentLoop(
     fun run(history: List<ChatMessage>, userRequest: String): Flow<AgentEvent> = flow {
         val messages = mutableListOf<ChatMessage>()
         messages += ChatMessage.system(systemPrompt)
+        if (setupPrompt.isNotBlank()) messages += ChatMessage.system(setupPrompt)
         messages += history
         messages += ChatMessage.user(userRequest)
 
@@ -59,13 +63,14 @@ class AgentLoop(
             val reasoning = StringBuilder()
             var pendingCalls: List<ToolCall> = emptyList()
             var finishReason: String? = null
+            var cacheNote: String? = null
             emit(activity(messages, round))
 
             var attempt = 0
             var received = false
             while (true) {
                 try {
-                    backend.complete(messages, toolRegistry.all).collect { chunk ->
+                    backend.complete(messages, toolSession.visible(toolRegistry)).collect { chunk ->
                         when (chunk) {
                             is BackendChunk.Text -> {
                                 received = true
@@ -84,9 +89,14 @@ class AgentLoop(
                                 pendingCalls = chunk.calls
                             }
 
-                            is BackendChunk.Finished -> finishReason = chunk.finishReason
+                            is BackendChunk.Finished -> {
+                                finishReason = chunk.finishReason
+                                cacheNote = chunk.cacheNote ?: cacheNote
+                            }
                         }
                     }
+                    val noted = cacheNote
+                    if (!noted.isNullOrBlank()) emit(activity(messages, round, noted))
                     break
                 } catch (error: IOException) {
                     if (!retryable(error) || received || attempt >= MAX_NET_RETRIES) {
@@ -198,8 +208,10 @@ class AgentLoop(
         val tool = toolRegistry.find(call.function.name)
             ?: return ToolResult.error(
                 "Unknown tool '${call.function.name}'. Available tools: " +
-                    toolRegistry.all.joinToString { it.name },
+                    toolSession.visible(toolRegistry).joinToString { it.name },
             )
+        val held = toolSession.holdUntilLoaded(call.function.name)
+        if (held != null) return ToolResult.error(held)
 
         val rawArguments = call.function.arguments.ifBlank { "{}" }
         val args = runCatching { json.parseToJsonElement(rawArguments) }.getOrNull() as? JsonObject
