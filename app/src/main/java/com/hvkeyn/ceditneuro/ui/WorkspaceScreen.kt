@@ -119,6 +119,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
     var showSettings by rememberSaveable { mutableStateOf(false) }
     val versionName = remember { AppUpdater.localVersion(context) }
     var projectPanelOpen by rememberSaveable { mutableStateOf(true) }
+    var projectsMenu by remember { mutableStateOf(false) }
     var hasStorageAccess by remember { mutableStateOf(hasStorageAccess(context)) }
 
     val legacyStorageLauncher = rememberLauncherForActivityResult(
@@ -304,18 +305,35 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                     containerColor = MaterialTheme.colorScheme.surface,
                 ),
                 navigationIcon = {
-                    IconButton(
-                        onClick = { projectPanelOpen = !projectPanelOpen },
-                        modifier = if (shortLandscape) Modifier.size(40.dp) else Modifier,
-                    ) {
-                        Icon(Icons.Default.Menu, contentDescription = "Project files")
+                    Box {
+                        IconButton(
+                            onClick = { projectsMenu = true },
+                            modifier = if (shortLandscape) Modifier.size(40.dp) else Modifier,
+                        ) {
+                            Icon(Icons.Default.Menu, contentDescription = "Projects")
+                        }
+                        ProjectTitleMenu(
+                            expanded = projectsMenu,
+                            onDismiss = { projectsMenu = false },
+                            state = state,
+                            filesOpen = projectPanelOpen,
+                            onOpenProject = { path ->
+                                viewModel.openProject(File(path))
+                                projectPanelOpen = true
+                            },
+                            onChooseFolder = { folderPicker.launch(null) },
+                            onToggleFiles = { projectPanelOpen = !projectPanelOpen },
+                        )
                     }
                 },
                 title = {
-                    ProjectTitleMenu(
-                        state = state,
-                        onOpenProject = { path -> viewModel.openProject(File(path)) },
-                        onChooseFolder = { folderPicker.launch(null) },
+                    Text(
+                        text = state.projectName ?: "CEditNeuro",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { projectsMenu = true },
                     )
                 },
                 actions = {
@@ -663,66 +681,74 @@ private fun EditorSurface(
 
 @Composable
 private fun ProjectTitleMenu(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
     state: WorkspaceUiState,
+    filesOpen: Boolean,
     onOpenProject: (String) -> Unit,
     onChooseFolder: () -> Unit,
+    onToggleFiles: () -> Unit,
 ) {
-    var open by remember { mutableStateOf(false) }
-    Box {
-        Text(
-            text = state.projectName ?: "CEditNeuro",
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.clickable { open = true },
-        )
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            if (state.recentProjects.isEmpty()) {
-                DropdownMenuItem(
-                    text = { Text("No saved projects") },
-                    onClick = { open = false },
-                    enabled = false,
-                )
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        if (state.recentProjects.isEmpty()) {
+            DropdownMenuItem(
+                text = { Text("No saved projects") },
+                onClick = onDismiss,
+                enabled = false,
+            )
+        }
+        state.recentProjects.forEach { path ->
+            val run = state.otherRuns.firstOrNull { it.path == path }
+            val phase = when {
+                path == state.projectRoot && state.agentRunning -> state.agentActivity?.phase
+                run != null -> run.phase
+                else -> null
             }
-            state.recentProjects.forEach { path ->
-                val run = state.otherRuns.firstOrNull { it.path == path }
-                val phase = when {
-                    path == state.projectRoot && state.agentRunning -> state.agentActivity?.phase
-                    run != null -> run.phase
-                    else -> null
-                }
-                DropdownMenuItem(
-                    text = {
-                        Column {
+            val current = path == state.projectRoot
+            DropdownMenuItem(
+                text = {
+                    Column {
+                        Text(
+                            text = File(path).name.ifBlank { path },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = if (current) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                        )
+                        if (!phase.isNullOrBlank()) {
                             Text(
-                                text = File(path).name.ifBlank { path },
+                                text = phase,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
                             )
-                            if (!phase.isNullOrBlank()) {
-                                Text(
-                                    text = phase,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
-                            }
                         }
-                    },
-                    onClick = {
-                        open = false
-                        onOpenProject(path)
-                    },
-                )
-            }
-            DropdownMenuItem(
-                text = { Text("Choose folder") },
+                    }
+                },
                 onClick = {
-                    open = false
-                    onChooseFolder()
+                    onDismiss()
+                    onOpenProject(path)
                 },
             )
         }
+        DropdownMenuItem(
+            text = { Text("Choose folder") },
+            onClick = {
+                onDismiss()
+                onChooseFolder()
+            },
+        )
+        DropdownMenuItem(
+            text = { Text(if (filesOpen) "Hide files" else "Show files") },
+            onClick = {
+                onDismiss()
+                onToggleFiles()
+            },
+        )
     }
 }
 
