@@ -43,10 +43,16 @@ fun buildSystemPrompt(
     - shizuku_exec runs one command as the shell user. It uses Shizuku when that service is
       already running, and su when this phone is rooted. This app cannot become the shell
       user by itself. It is not install_apk. Do not read another app's private files.
+      If it says shell access is not available, do not call shizuku_exec, fetch_system_layout,
+      or execute_system_action again.
       If a command returns Permission denied or SecurityException, stop and say so.
+    - fetch_system_layout dumps the foreground UI and returns the hierarchy XML.
+      execute_system_action taps one point: paramX and paramY are pixel coordinates taken
+      from that XML. Use them only when the user asked to automate the screen.
     - net_info reports this app's transports, addresses, and whether a VPN transport is up.
       It does not reveal another app's VPN settings.
     - fetch URL DEST reports bytes, seconds, and speed. It is not a pipe and it does not time other commands.
+      If the host did not resolve, choose another URL. Do not repeat that host.
     - Attached files are copied into the project. Their text is already in the user message.
       Images are shown to the model only when that model accepts images. DeepSeek does not.
       For a photo on DeepSeek, use the path and the facts in the message.

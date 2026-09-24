@@ -31,6 +31,7 @@ import com.hvkeyn.ceditneuro.net.AgentNet
 import com.hvkeyn.ceditneuro.net.RemoteClient
 import com.hvkeyn.ceditneuro.shell.DeviceShell
 import com.hvkeyn.ceditneuro.workspace.StoragePaths
+import com.hvkeyn.ceditneuro.shizuku.ShizukuCommandRunner
 import com.hvkeyn.ceditneuro.shizuku.ShizukuShell
 import com.hvkeyn.ceditneuro.shell.ProgramRun
 import com.hvkeyn.ceditneuro.tools.BrowsePageTool
@@ -42,6 +43,8 @@ import com.hvkeyn.ceditneuro.tools.InstallAndroidSdkTool
 import com.hvkeyn.ceditneuro.tools.InstallJdkTool
 import com.hvkeyn.ceditneuro.tools.InstallProgramTool
 import com.hvkeyn.ceditneuro.tools.InstallRuntimeTool
+import com.hvkeyn.ceditneuro.tools.ExecuteSystemActionTool
+import com.hvkeyn.ceditneuro.tools.FetchSystemLayoutTool
 import com.hvkeyn.ceditneuro.tools.ShizukuExecTool
 import com.hvkeyn.ceditneuro.tools.ZipPathsTool
 import com.hvkeyn.ceditneuro.tools.GitDiffTool
@@ -167,6 +170,8 @@ data class WorkspaceUiState(
     val fileClipboard: FileClipboard? = null,
     val otherRuns: List<ProjectRunStatus> = emptyList(),
     val reader: ReaderView? = null,
+    /** When a book is open, true puts it above chat and shell. False leaves those panels in front. */
+    val readerInFront: Boolean = true,
 ) {
     val projectName: String?
         get() = projectRoot?.let { File(it).name.ifBlank { it } }
@@ -232,6 +237,7 @@ class WorkspaceViewModel(
     private var hostWaiter: CompletableDeferred<Boolean>? = null
     private var browseWaiter: CompletableDeferred<String>? = null
     private var browseGeneration = 0
+    private var shizukuPrompted = false
     private var browseReportJob: Job? = null
     private val remoteClient = RemoteClient(::ensureHostTrusted)
     private val library = ProjectLibrary(appContext)
@@ -523,8 +529,15 @@ class WorkspaceViewModel(
         project.ui = projectSlice(_state.value)
         openPages = emptyList()
         openBookKey = null
-        _state.value.reader?.path?.let { path ->
-            runCatching { loadReader(path, keepPlace = true) }
+        sourceText = ""
+        val restore = _state.value.reader?.path
+        if (restore != null) {
+            viewModelScope.launch {
+                val opened = withContext(Dispatchers.IO) {
+                    runCatching { loadReader(restore, keepPlace = true) }
+                }
+                opened.onFailure { showMessage(it.message ?: "Cannot open this book.") }
+            }
         }
     }
 
@@ -583,6 +596,26 @@ class WorkspaceViewModel(
 
     fun openFile(path: String) {
         val ws = workspace ?: return
+        val name = path.substringAfterLast('/')
+        if (com.hvkeyn.ceditneuro.reader.BookText.prefersReader(name)) {
+            openReader(path)
+            return
+        }
+        if (name.endsWith(".zip", ignoreCase = true)) {
+            viewModelScope.launch {
+                val books = withContext(Dispatchers.IO) {
+                    runCatching { com.hvkeyn.ceditneuro.reader.BookText.looksLikeBooks(ws.resolve(path)) }
+                        .getOrDefault(false)
+                }
+                if (books) openReader(path) else openFileAsText(path)
+            }
+            return
+        }
+        openFileAsText(path)
+    }
+
+    private fun openFileAsText(path: String) {
+        val ws = workspace ?: return
         if (_state.value.openFiles.any { it.path == path }) {
             _state.update { it.copy(activePath = path) }
             return
@@ -606,6 +639,7 @@ class WorkspaceViewModel(
             showMessage("Open a txt, Markdown, HTML, FB2, or EPUB file, then tap Read.")
             return
         }
+        _state.update { it.copy(activePath = path) }
         viewModelScope.launch {
             val opened = withContext(Dispatchers.IO) { runCatching { loadReader(path, keepPlace = false) } }
             opened.onFailure { showMessage(it.message ?: "Cannot open this book.") }
@@ -613,7 +647,13 @@ class WorkspaceViewModel(
     }
 
     fun closeReader() {
-        _state.update { it.copy(reader = null) }
+        _state.update { it.copy(reader = null, readerInFront = true) }
+    }
+
+    /** Brings an already open book back over chat or shell without reading the file again. */
+    fun showReader() {
+        if (_state.value.reader == null) return
+        _state.update { it.copy(readerInFront = true) }
     }
 
     fun readerPageText(): String = sourceText
@@ -708,7 +748,7 @@ class WorkspaceViewModel(
         val file = ws.resolve(path)
         val name = file.name
         if (!com.hvkeyn.ceditneuro.reader.BookText.supports(name)) {
-            error("Read supports txt, Markdown, HTML, FB2, and EPUB.")
+            error("Read supports txt, Markdown, HTML, FB2, EPUB, and a zip of those files.")
         }
         val book = com.hvkeyn.ceditneuro.reader.BookText.parse(name, file.readBytes())
         val saved = readerStore.read(file.absolutePath)
@@ -777,7 +817,7 @@ class WorkspaceViewModel(
                 spacing = spacing ?: record.spacing,
             ),
         )
-        _state.update { it.copy(reader = view) }
+        _state.update { it.copy(reader = view, readerInFront = true) }
     }
 
     private fun charsFor(fontSp: Int): Int = (1800 * 20 / fontSp).coerceIn(500, 3_200)
@@ -848,11 +888,29 @@ class WorkspaceViewModel(
     }
 
     fun toggleChat() {
-        _state.update { it.copy(chatVisible = !it.chatVisible, shellVisible = false) }
+        _state.update {
+            when {
+                it.chatVisible && it.reader != null && it.readerInFront ->
+                    it.copy(readerInFront = false, shellVisible = false)
+                it.chatVisible ->
+                    it.copy(chatVisible = false, shellVisible = false, readerInFront = it.reader != null)
+                else ->
+                    it.copy(chatVisible = true, shellVisible = false, readerInFront = false)
+            }
+        }
     }
 
     fun toggleShell() {
-        _state.update { it.copy(shellVisible = !it.shellVisible, chatVisible = false) }
+        _state.update {
+            when {
+                it.shellVisible && it.reader != null && it.readerInFront ->
+                    it.copy(readerInFront = false, chatVisible = false)
+                it.shellVisible ->
+                    it.copy(shellVisible = false, chatVisible = false, readerInFront = it.reader != null)
+                else ->
+                    it.copy(shellVisible = true, chatVisible = false, readerInFront = false)
+            }
+        }
     }
 
     fun toggleWeb() {
@@ -1125,6 +1183,7 @@ class WorkspaceViewModel(
                 agentRunning = true,
                 chatVisible = true,
                 shellVisible = false,
+                readerInFront = false,
                 message = null,
                 agentActivity = AgentActivity(
                     phase = "Preparing the request",
@@ -1638,14 +1697,14 @@ class WorkspaceViewModel(
         if (!runCatching { Shizuku.pingBinder() }.getOrDefault(false)) {
             if (com.hvkeyn.ceditneuro.shizuku.SuShell.available()) return null
             val launch = appContext.packageManager.getLaunchIntentForPackage("moe.shizuku.privileged.api")
-            if (launch != null) {
+            if (launch != null && !shizukuPrompted) {
+                shizukuPrompted = true
                 launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                 runCatching { appContext.startActivity(launch) }
             }
-            return "This app cannot grant itself the shell user. Root is not available, and Shizuku is not running. " +
-                (if (launch != null) "The Shizuku app was opened. Start it and allow CEditNeuro, then retry. "
-                else "Start Shizuku from adb, or root the phone, then retry. ") +
-                "install_apk does not need this. run_command logcat only shows this app."
+            return "Shell access is not available. Root is not present and Shizuku is not running. " +
+                "Do not call shizuku_exec, fetch_system_layout, or execute_system_action again until the user starts Shizuku or roots the phone. " +
+                "Use run_command for files, net_info for this app's network, and install_apk for an APK."
         }
         if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) return null
         return withContext(Dispatchers.Main) {
@@ -1889,6 +1948,7 @@ class WorkspaceViewModel(
             if (project.epoch.get() == epochAtBuild) onAgentEditedFile(project, path)
         }
 
+        val shizukuCommands = ShizukuCommandRunner(shizukuShell)
         val tools = mutableListOf<Tool>(
             ListDirTool(ws),
             ReadFileTool(ws),
@@ -1923,6 +1983,8 @@ class WorkspaceViewModel(
                 ensureExec = this::ensureExecAllowed,
             ),
             ShizukuExecTool(ws, shizukuShell, this::prepareShizuku),
+            FetchSystemLayoutTool(shizukuCommands, this::prepareShizuku),
+            ExecuteSystemActionTool(shizukuCommands, this::prepareShizuku),
             NetInfoTool(appContext),
             InstallApkTool(appContext, ws),
             InstallAndroidSdkTool(

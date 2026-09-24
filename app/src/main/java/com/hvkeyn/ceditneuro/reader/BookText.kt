@@ -12,16 +12,37 @@ data class BookPage(val chapter: String, val text: String)
 
 object BookText {
     private val extensions = setOf("txt", "md", "markdown", "note", "notes", "html", "htm", "fb2", "epub")
+    private val readable = extensions + setOf("zip", "fbz")
 
-    fun supports(name: String): Boolean = extension(name) in extensions
+    fun supports(name: String): Boolean {
+        val lower = name.lowercase()
+        return extension(lower) in readable || lower.endsWith(".fb2.zip")
+    }
+
+    /** FB2, EPUB, and a zipped FB2 open in the reader. Plain notes stay editable. */
+    fun prefersReader(name: String): Boolean {
+        val lower = name.lowercase()
+        val ext = extension(lower)
+        return ext == "fb2" || ext == "epub" || ext == "fbz" || lower.endsWith(".fb2.zip")
+    }
+
+    /** A zip of notes and books, as opposed to an arbitrary archive. */
+    fun looksLikeBooks(file: java.io.File): Boolean {
+        if (!file.isFile || file.length() > MAX_BYTES) return false
+        return runCatching {
+            java.util.zip.ZipFile(file).use { zip ->
+                zip.entries().asSequence().any { entry -> readableName(entry.name) }
+            }
+        }.getOrDefault(false)
+    }
 
     fun parse(name: String, bytes: ByteArray): ParsedBook {
         if (bytes.size > MAX_BYTES) error("This file is larger than 8 MB.")
-        val book = when (extension(name)) {
-            "epub" -> parseEpub(bytes, name)
-            "fb2" -> parseFb2(bytes, name)
-            "html", "htm" -> htmlBook(name, String(bytes, charset(bytes)))
-            "md", "markdown" -> markdownBook(name, String(bytes, charset(bytes)))
+        val book = when {
+            isZip(bytes) -> parseContainer(bytes, name, 0)
+            extension(name) == "html" || extension(name) == "htm" -> htmlBook(name, String(bytes, charset(bytes)))
+            extension(name) == "md" || extension(name) == "markdown" -> markdownBook(name, String(bytes, charset(bytes)))
+            extension(name) == "fb2" -> parseFb2(bytes, name)
             else -> plainBook(name, String(bytes, charset(bytes)))
         }
         return book.copy(
@@ -140,18 +161,95 @@ object BookText {
     }
 
     private fun parseFb2(bytes: ByteArray, name: String): ParsedBook {
+        if (isZip(bytes)) return parseContainer(bytes, name, 0)
         val xml = String(bytes, charset(bytes))
         val title = Regex("(?is)<book-title>(.*?)</book-title>").find(xml)?.groupValues?.get(1)?.let(::decode)
             ?: name.substringBeforeLast('.')
-        val sections = Regex("(?is)<section\\b[^>]*>(.*?)</section>").findAll(xml).toList()
-        if (sections.isEmpty()) return htmlBook(name, xml)
-        val chapters = sections.map { section ->
-            val heading = Regex("(?is)<title>(.*?)</title>").find(section.value)?.groupValues?.get(1)?.let(::stripTags)
-            val paragraphs = Regex("(?is)<p\\b[^>]*>(.*?)</p>").findAll(section.value)
-                .joinToString("\n\n") { stripTags(it.groupValues[1]) }
-            BookChapter(heading?.ifBlank { null } ?: title, paragraphs.ifBlank { stripTags(section.value) })
-        }.filter { it.text.isNotBlank() }
-        return ParsedBook(title, chapters.ifEmpty { listOf(BookChapter(title, stripTags(xml))) })
+        val body = Regex("(?is)<body\\b[^>]*>(.*)</body>").find(xml)?.groupValues?.get(1) ?: xml
+        val chapters = ArrayList<BookChapter>()
+        val paras = StringBuilder()
+        var current = title
+        fun flush() {
+            val text = paras.toString().trim()
+            paras.clear()
+            if (text.isNotEmpty()) chapters.add(BookChapter(current, text))
+        }
+        val tokens = Regex("(?is)<title\\b[^>]*>.*?</title>|<p\\b[^>]*>.*?</p>|<empty-line\\s*/?>")
+        for (match in tokens.findAll(body)) {
+            val token = match.value
+            when {
+                token.startsWith("<title", ignoreCase = true) -> {
+                    flush()
+                    current = stripTags(token).ifBlank { current }
+                }
+                token.startsWith("<empty", ignoreCase = true) -> paras.append("\n\n")
+                else -> paras.append(stripTags(token)).append("\n\n")
+            }
+        }
+        flush()
+        if (chapters.isEmpty()) chapters.add(BookChapter(title, stripTags(body).ifBlank { stripTags(xml) }))
+        return ParsedBook(title, chapters)
+    }
+
+    /**
+     * FB2 files from catalogs are zip archives. A zip can also hold several notes
+     * and books (txt, Markdown, HTML, FB2, EPUB).
+     */
+    private fun parseContainer(bytes: ByteArray, name: String, depth: Int): ParsedBook {
+        if (depth > 2) error("This archive is nested too deep.")
+        val files = LinkedHashMap<String, ByteArray>()
+        var total = 0
+        ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
+            var entry = zip.nextEntry
+            while (entry != null) {
+                if (!entry.isDirectory && !entry.name.contains("__MACOSX")) {
+                    val data = zip.readBytes()
+                    total += data.size
+                    if (total > MAX_UNCOMPRESSED) error("Unpacked text is larger than 16 MB.")
+                    files[entry.name.replace('\\', '/')] = data
+                }
+                entry = zip.nextEntry
+            }
+        }
+        val epub = "META-INF/container.xml" in files ||
+            files["mimetype"]?.toString(Charsets.US_ASCII)?.contains("epub") == true
+        if (epub) return parseEpub(bytes, name)
+        val parts = ArrayList<ParsedBook>()
+        for ((path, data) in files) {
+            val leaf = path.substringAfterLast('/')
+            if (leaf.isEmpty() || leaf.startsWith(".")) continue
+            val part = when {
+                isZip(data) -> parseContainer(data, leaf, depth + 1)
+                extension(leaf) == "epub" -> parseEpub(data, leaf)
+                extension(leaf) == "fb2" || extension(leaf) == "fbz" -> parseFb2(data, leaf)
+                extension(leaf) == "html" || extension(leaf) == "htm" ->
+                    htmlBook(leaf, String(data, charset(data)))
+                extension(leaf) == "md" || extension(leaf) == "markdown" ->
+                    markdownBook(leaf, String(data, charset(data)))
+                extension(leaf) in setOf("txt", "note", "notes") ->
+                    plainBook(leaf, String(data, charset(data)))
+                else -> null
+            } ?: continue
+            parts.add(part)
+        }
+        if (parts.isEmpty()) error("This archive has no readable book or note.")
+        if (parts.size == 1) return parts[0]
+        val chapters = parts.flatMap { part ->
+            val label = part.title.ifBlank { name }
+            part.chapters.map { chapter ->
+                chapter.copy(title = if (part.chapters.size == 1) label else "$label · ${chapter.title}")
+            }
+        }
+        return ParsedBook(name.substringBeforeLast('.'), chapters)
+    }
+
+    private fun isZip(bytes: ByteArray): Boolean =
+        bytes.size >= 4 && bytes[0] == 0x50.toByte() && bytes[1] == 0x4B.toByte()
+
+    private fun readableName(path: String): Boolean {
+        val leaf = path.substringAfterLast('/').substringAfterLast('\\').lowercase()
+        if (leaf.isEmpty() || leaf.startsWith(".")) return false
+        return extension(leaf) in readable || leaf.endsWith(".fb2.zip")
     }
 
     private fun parseEpub(bytes: ByteArray, name: String): ParsedBook {
@@ -216,4 +314,5 @@ object BookText {
     private fun extension(name: String) = name.substringAfterLast('.', "").lowercase()
 
     private const val MAX_BYTES = 8 * 1024 * 1024
+    private const val MAX_UNCOMPRESSED = 16 * 1024 * 1024
 }
