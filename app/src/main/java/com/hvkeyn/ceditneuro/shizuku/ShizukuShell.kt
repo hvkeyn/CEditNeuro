@@ -31,6 +31,12 @@ class ShizukuShell(private val context: Context) {
     }
 
     suspend fun exec(command: String, cwd: String, timeoutSeconds: Int): String {
+        if (!runCatching { Shizuku.pingBinder() }.getOrDefault(false)) {
+            if (SuShell.available()) {
+                return withContext(Dispatchers.IO) { SuShell.exec(command, cwd, timeoutSeconds) }
+            }
+            error("Shell access is not running.")
+        }
         val api = bind()
         return withContext(Dispatchers.IO) { api.exec(command, cwd, timeoutSeconds) }
     }
