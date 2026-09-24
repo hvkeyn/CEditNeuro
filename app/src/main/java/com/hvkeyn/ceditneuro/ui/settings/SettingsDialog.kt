@@ -25,9 +25,11 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -41,6 +43,10 @@ import com.hvkeyn.ceditneuro.data.AgentSettings
 import com.hvkeyn.ceditneuro.data.CatalogModel
 import com.hvkeyn.ceditneuro.data.ModelProvider
 import com.hvkeyn.ceditneuro.data.RemoteServer
+import com.hvkeyn.ceditneuro.net.ProviderBalance
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SettingsDialog(
@@ -362,6 +368,7 @@ private fun ProviderCard(
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
         )
+        BalanceLine(provider.apiUrl, provider.apiKey)
         provider.models.forEach { model ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -393,6 +400,36 @@ private fun ProviderCard(
             )
         }
         HorizontalDivider()
+    }
+}
+
+@Composable
+private fun BalanceLine(apiUrl: String, apiKey: String) {
+    var text by remember(apiUrl, apiKey) { mutableStateOf(if (apiKey.isBlank()) "No API key." else "Checking balance…") }
+    val scope = rememberCoroutineScope()
+    fun refresh() {
+        if (apiKey.isBlank()) {
+            text = "No API key."
+            return
+        }
+        text = "Checking balance…"
+        scope.launch {
+            text = withContext(Dispatchers.IO) { ProviderBalance.lookup(apiUrl, apiKey) }
+        }
+    }
+    LaunchedEffect(apiUrl, apiKey) { refresh() }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = { refresh() }, enabled = apiKey.isNotBlank()) { Text("Balance") }
     }
 }
 

@@ -35,6 +35,7 @@ layer is wired end to end.
 | Book and note reader (txt, Markdown, HTML, FB2, EPUB, or a zip of those) with pages, bookmarks, and notes | done |
 | Foreground layout and tap (`fetch_system_layout`, `execute_system_action`) when Shizuku or root is already allowed | done |
 | Longer agent runs send a stable prompt, load rare tools on demand, and keep file reads and command output short | done |
+| Prepaid balance for the API key in Language models (DeepSeek and other hosts that publish one) | done |
 | Update check at the bottom of Language models settings | done — install starts only after confirmation |
 | Phone profile in `CEditNeuro/profiles` survives uninstall and loads on the next install | done |
 | `install_jdk`, `install_android_sdk`, `install_runtime` from the Termux mirror | done |
@@ -70,7 +71,10 @@ Published builds are on the [GitHub releases](https://github.com/hvkeyn/CEditNeu
    storage. This is why CEditNeuro is a sideloaded tool and not a Play Store app.
 2. Tap **Choose folder** and point it at a project.
 3. Open **Settings** (**Language models**). **Models** is open; paste the DeepSeek API key
-   there. The built-in provider defaults to `https://api.deepseek.com/v1` and `deepseek-flash`.
+   there. The balance line under the key shows what is left on that account, so a stop
+   for price limits is visible before the agent runs out. Other providers use the same
+   line when their host publishes a balance. The built-in provider defaults to
+   `https://api.deepseek.com/v1` and `deepseek-flash`.
    **Check for updates** is a separate row at the bottom.
 4. Tap the chat icon to slide the agent panel in. The paperclip attaches photos and
    documents. They are saved in the project and their text is sent with the message.
