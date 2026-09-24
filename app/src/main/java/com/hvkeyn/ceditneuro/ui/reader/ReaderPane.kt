@@ -1,5 +1,7 @@
 package com.hvkeyn.ceditneuro.ui.reader
 
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -37,6 +39,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -64,6 +68,7 @@ private data class Spread(val ranges: List<IntRange>, val chapters: List<String>
 fun ReaderPane(
     reader: ReaderView,
     pageText: String,
+    images: Map<String, ByteArray> = emptyMap(),
     onClose: () -> Unit,
     onStyle: (fontSp: Int, fontName: String, spacing: Float, theme: String) -> Unit,
     onProgress: (page: Int, pageCount: Int, chapter: String) -> Unit,
@@ -120,12 +125,29 @@ fun ReaderPane(
         }
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = side, vertical = 8.dp)) {
             Row(modifier = Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                shown.forEach { column ->
-                    Text(
-                        text = column,
-                        style = style,
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                    )
+                for (column in shown) {
+                    val imageId = Regex("^\u0001(.+)\u0001$").find(column)?.groupValues?.get(1)
+                    val bitmap = imageId?.let { id ->
+                        androidx.compose.runtime.remember(id, images[id]) {
+                            images[id]?.let { bytes ->
+                                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                            }
+                        }
+                    }
+                    if (bitmap != null) {
+                        Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = imageId,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                        )
+                    } else {
+                        Text(
+                            text = column,
+                            style = style,
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                        )
+                    }
                 }
             }
             Text(
@@ -284,13 +306,24 @@ private fun paginate(
     var chapter = ""
     var start = 0
     while (start < text.length) {
+        if (text[start] == '\u0001') {
+            val close = text.indexOf('\u0001', start + 1)
+            if (close > start) {
+                ranges.add(start..close)
+                chapters.add(chapter)
+                start = close + 1
+                while (start < text.length && text[start].isWhitespace() && text[start] != '\u0000') start++
+                continue
+            }
+        }
         if (text[start] == '\u0000') {
             val endTitle = text.indexOf('\n', start + 1).let { if (it < 0) text.length else it }
             chapter = text.substring(start + 1, endTitle).trim()
             start = (endTitle + 1).coerceAtMost(text.length)
             continue
         }
-        val window = min(text.length, start + budget)
+        val imageAt = text.indexOf('\u0001', start).takeIf { it > start }
+        val window = minOf(text.length, start + budget, imageAt ?: text.length)
         val broken = if (window >= text.length) {
             window
         } else {

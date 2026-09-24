@@ -577,6 +577,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                 ReaderPane(
                     reader = reader,
                     pageText = viewModel.readerPageText(),
+                    images = viewModel.readerImages(),
                     onClose = viewModel::closeReader,
                     onStyle = viewModel::readerStyle,
                     onProgress = viewModel::readerProgress,

@@ -127,7 +127,7 @@ the foreground UI XML and `execute_system_action` taps one point taken from that
 
 ## Reading
 
-Long-press a file and choose **Read**, or open it and tap the book icon. txt, Markdown, HTML, FB2, and EPUB are shown as text, not raw markup. A catalog FB2 is often a zip, and a zip of those files opens as one book. Headings, lists, wiki links, and tables become readable lines. Pages are fitted to the screen and laid out again when you rotate or change the type. Tap the center, then the sliders icon, for size, serif or sans, spacing, and day, sepia, or night paper. Bookmarks and notes stay on this phone.
+Long-press a file and choose **Read**, or open it and tap the book icon. txt, Markdown, HTML, FB2, and EPUB are shown as text, not raw markup. Pictures inside FB2, EPUB, and HTML are shown on their own page. A catalog FB2 is often a zip, and a zip of those files opens as one book. Headings, lists, wiki links, and tables become readable lines. Pages are fitted to the screen and laid out again when you rotate or change the type. Tap the center, then the sliders icon, for size, serif or sans, spacing, and day, sepia, or night paper. Bookmarks and notes stay on this phone.
 
 ## Several projects
 
