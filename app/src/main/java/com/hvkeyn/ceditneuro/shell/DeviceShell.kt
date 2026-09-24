@@ -179,7 +179,7 @@ class DeviceShell(
 
     companion object {
         private const val SHELL = "/system/bin/sh"
-        private const val MAX_OUTPUT_CHARS = 20_000
+        private const val MAX_OUTPUT_CHARS = 120_000
 
         private fun isPlainFetch(command: String): Boolean {
             val trimmed = command.trim()

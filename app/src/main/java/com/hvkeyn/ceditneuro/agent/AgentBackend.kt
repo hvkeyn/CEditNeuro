@@ -8,7 +8,7 @@ sealed interface BackendChunk {
     data class Text(val value: String) : BackendChunk
     data class Reasoning(val value: String) : BackendChunk
     data class ToolCalls(val calls: List<ToolCall>) : BackendChunk
-    data class Finished(val finishReason: String?) : BackendChunk
+    data class Finished(val finishReason: String?, val cacheNote: String? = null) : BackendChunk
 }
 
 /**

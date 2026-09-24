@@ -32,7 +32,8 @@ class InstallJdkTool(
     override val description =
         "Download OpenJDK 17 and the Kotlin compiler into this app so java, javac, and kotlinc " +
             "can build programs. Call this once before compiling. The user is asked to allow it. " +
-            "For an Android APK, call install_android_sdk after this and run gradle assembleDebug."
+            "For an Android APK, call install_android_sdk after this and run gradle assembleDebug. " +
+            "kotlinc may say libjansi could not load libc.so.6. Exit code 0 still means it compiled."
     override val parameters = objectSchema(properties = emptyMap())
 
     override suspend fun execute(args: JsonObject): ToolResult = withContext(Dispatchers.IO) {

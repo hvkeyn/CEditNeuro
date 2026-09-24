@@ -34,6 +34,7 @@ layer is wired end to end.
 | Shared-storage paths follow this phone's real storage root and Downloads folder | done |
 | Book and note reader (txt, Markdown, HTML, FB2, EPUB, or a zip of those) with pages, bookmarks, and notes | done |
 | Foreground layout and tap (`fetch_system_layout`, `execute_system_action`) when Shizuku or root is already allowed | done |
+| Longer agent runs send a stable prompt, load rare tools on demand, and keep file reads and command output short | done |
 | Update check at the bottom of Language models settings | done — install starts only after confirmation |
 | Phone profile in `CEditNeuro/profiles` survives uninstall and loads on the next install | done |
 | `install_jdk`, `install_android_sdk`, `install_runtime` from the Termux mirror | done |
@@ -140,6 +141,18 @@ or failed run leaves a separate card you can continue or swipe away.
 
 On a short landscape screen the chat, shell, and page preview open across the editor instead
 of docking into a column that is not on screen.
+
+## Token use
+
+Each turn resends the conversation, so the harness keeps the repeated part small.
+
+- The standing instructions do not include the project path, the clock, or which server is connected. That setup is a second system message. DeepSeek can cache the unchanged prefix. The activity line shows `cache hit` and `cache miss` when the API reports them.
+- Reading, editing, search, and the shell are on every request. Installers, the remote tools, and screen automation load through `load_tools`, or come with the build and remote focus.
+- `read_file` numbers the first line of a slice and every 10th line.
+- A long `run_command` result is written to a file under `.ceditneuro/tool-output`. The model sees the path and the tail.
+- Screen dumps stay the short tap list from `fetch_system_layout`.
+
+CEditNeuro does not spawn subagents or switch models in the middle of a chat. Those cuts belong to a multi-agent harness, and here they would add a round trip instead of removing one.
 
 ## Updates
 

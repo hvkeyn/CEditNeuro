@@ -15,8 +15,8 @@ android {
         // API 29+ forbids executing a program this app just wrote. API 28 stays in the
         // compatibility domain that can run compilers installed into the app's private files.
         targetSdk = 28
-        versionCode = 27
-        versionName = "0.27.0"
+        versionCode = 28
+        versionName = "0.28.0"
     }
 
     buildTypes {
@@ -111,6 +111,8 @@ dependencies {
     implementation("com.itsaky.androidide.treesitter:tree-sitter-python:4.3.1")
     implementation("com.itsaky.androidide.treesitter:tree-sitter-json:4.3.1")
     implementation("com.itsaky.androidide.treesitter:tree-sitter-xml:4.3.1")
+
+    testImplementation("junit:junit:4.13.2")
 
     implementation(libs.jgit) {
         exclude(group = "com.googlecode.javaewah", module = "JavaEWAH")
