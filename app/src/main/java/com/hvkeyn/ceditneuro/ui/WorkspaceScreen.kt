@@ -206,7 +206,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
             },
             confirmButton = {
                 when {
-                    update.replaceInstalled -> TextButton(onClick = viewModel::uninstallForUpdate) {
+                    update.replaceInstalled -> TextButton(onClick = { viewModel.uninstallForUpdate(context) }) {
                         Text("Uninstall old app")
                     }
                     update.needsInstallPermission -> TextButton(onClick = viewModel::allowInstalls) {

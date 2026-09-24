@@ -1197,20 +1197,19 @@ class WorkspaceViewModel(
         AppUpdater.requestInstallPermission(appContext)
     }
 
-    /** Copies the update into Downloads, then asks Android to uninstall this signed copy. */
-    fun uninstallForUpdate() {
+    /** Copies the update into Downloads, closes this dialog, then opens Android's uninstall screen. */
+    fun uninstallForUpdate(context: Context) {
         val ready = _state.value.appUpdate?.exportedApk?.let { File(it) }?.takeIf { it.isFile }
             ?: AppUpdater.exportUpdateApk(appContext)
         if (ready == null) {
             showMessage("Could not copy the update into Downloads.")
             return
         }
-        _state.update { current ->
-            val shown = current.appUpdate ?: return@update current
-            current.copy(appUpdate = shown.copy(exportedApk = ready.absolutePath))
+        _state.update { it.copy(appUpdate = null) }
+        val opened = runCatching { AppUpdater.uninstallSelf(context) }
+        if (opened.isFailure) {
+            showMessage(opened.exceptionOrNull()?.message ?: "Could not open the uninstall screen.")
         }
-        runCatching { AppUpdater.uninstallSelf(appContext) }
-            .onFailure { showMessage(it.message ?: "Could not open the uninstall screen.") }
     }
 
     fun stageCopy(path: String) = stageFile(path, cut = false)
