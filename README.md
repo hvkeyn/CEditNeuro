@@ -66,9 +66,9 @@ Published builds are on the [GitHub releases](https://github.com/hvkeyn/CEditNeu
 1. The app asks for all-files access. It is required: the app edits project folders on shared
    storage. This is why CEditNeuro is a sideloaded tool and not a Play Store app.
 2. Tap **Choose folder** and point it at a project.
-3. Open **Settings** (**Language models**) and paste your DeepSeek API key. The built-in
-   provider defaults to `https://api.deepseek.com/v1` and `deepseek-flash`. The version name
-   and **Check for updates** are at the bottom of that screen.
+3. Open **Settings** (**Language models**). **Models** is open; paste the DeepSeek API key
+   there. The built-in provider defaults to `https://api.deepseek.com/v1` and `deepseek-flash`.
+   **Check for updates** is a separate row at the bottom.
 4. Tap the chat icon to slide the agent panel in. Opening another project does not stop the
    agent you left running.
 
@@ -79,8 +79,9 @@ shell) are copied to shared storage at `CEditNeuro/profiles`. The active profile
 file named in `active.txt`. Uninstalling the app deletes its private files. The next
 install, from any computer, loads that profile after all-files access is allowed.
 
-Open **Language models** to see the active profile, save the current state under another
-name, or switch. Switching loads that profile's settings and projects.
+Open **Language models** and expand **Profile** to save the current state under another
+name, or switch. Switching loads that profile's settings and projects. Models, reasoning,
+the agent, and servers are separate sections. **Check for updates** stays on its own row.
 
 That folder stays on the phone. It contains the API key and server passwords. Do not copy
 it into a repository or a public release.
