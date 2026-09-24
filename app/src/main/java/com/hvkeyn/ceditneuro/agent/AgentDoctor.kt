@@ -64,11 +64,18 @@ object AgentDoctor {
         val key = "$tool|$kind"
         val current = findings[key]
         if (current == null) {
-            findings[key] = Finding(kind, tool, 1, folder, sample.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty().take(160))
+            findings[key] = Finding(kind, tool, 1, folder, sampleLine(sample))
         } else {
             findings[key] = current.copy(count = current.count + 1)
         }
     }
+
+    private fun sampleLine(text: String): String =
+        text.lineSequence()
+            .map { it.trim() }
+            .firstOrNull { it.isNotBlank() && !it.matches(Regex("""exit=\d+""")) }
+            ?.take(160)
+            ?: text.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty().take(160)
 
     private fun kindOf(text: String): String? {
         val line = text.lowercase()
