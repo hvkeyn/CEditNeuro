@@ -138,6 +138,8 @@ data class WorkspaceUiState(
     val execPrompt: String? = null,
     val hostPrompt: HostTrustPrompt? = null,
     val webVisible: Boolean = false,
+    /** True while the running agent is waiting on the in-app browser. */
+    val agentBrowsing: Boolean = false,
     val webUrl: String = "",
     val webGeneration: Int = 0,
     val appUpdate: AppUpdate? = null,
@@ -207,6 +209,7 @@ class WorkspaceViewModel(
     private val hostMutex = Mutex()
     private var hostWaiter: CompletableDeferred<Boolean>? = null
     private var browseWaiter: CompletableDeferred<String>? = null
+    private var browseGeneration = 0
     private var browseReportJob: Job? = null
     private val remoteClient = RemoteClient(::ensureHostTrusted)
     private val library = ProjectLibrary(appContext)
@@ -438,6 +441,7 @@ class WorkspaceViewModel(
             webVisible = previous.webVisible,
             webUrl = previous.webUrl,
             webGeneration = previous.webGeneration,
+            agentBrowsing = previous.agentBrowsing,
             appUpdate = previous.appUpdate,
             otherRuns = runStatuses(null),
         )
@@ -484,6 +488,7 @@ class WorkspaceViewModel(
             webVisible = previous.webVisible,
             webUrl = previous.webUrl,
             webGeneration = previous.webGeneration,
+            agentBrowsing = previous.agentBrowsing,
             appUpdate = previous.appUpdate,
             execPrompt = previous.execPrompt,
             hostPrompt = previous.hostPrompt,
@@ -601,10 +606,17 @@ class WorkspaceViewModel(
         _state.value.activePath?.let(::saveFile)
     }
 
-    private fun saveFile(path: String) {
-        val ws = workspace ?: return
-        val text = current?.buffers?.get(path) ?: return
-        runCatching { ws.write(path, text) }
+    /** Saves every open file that has unsaved edits. Returns false if one of them failed. */
+    fun saveDirtyFiles(): Boolean {
+        val paths = _state.value.dirtyPaths.toList()
+        if (paths.isEmpty()) return false
+        return paths.all(::saveFile)
+    }
+
+    private fun saveFile(path: String): Boolean {
+        val ws = workspace ?: return false
+        val text = current?.buffers?.get(path) ?: return false
+        return runCatching { ws.write(path, text) }
             .onSuccess {
                 _state.update { current ->
                     current.copy(
@@ -616,6 +628,7 @@ class WorkspaceViewModel(
                 }
             }
             .onFailure { showMessage("Save failed: ${it.message}") }
+            .isSuccess
     }
 
     fun toggleChat() {
@@ -674,12 +687,14 @@ class WorkspaceViewModel(
         if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
             return "Only http and https pages can be opened in the browser."
         }
+        val generation = ++browseGeneration
         finishBrowse("Superseded by a newer page.")
         val waiter = CompletableDeferred<String>()
         browseWaiter = waiter
         _state.update {
             it.copy(
                 webVisible = true,
+                agentBrowsing = true,
                 webUrl = trimmed,
                 webGeneration = it.webGeneration + 1,
                 shellVisible = false,
@@ -690,6 +705,10 @@ class WorkspaceViewModel(
             withTimeout(waitMs) { waiter.await() }
         } catch (error: TimeoutCancellationException) {
             "The browser did not finish loading $trimmed within ${waitMs / 1000} seconds."
+        } finally {
+            if (browseGeneration == generation) {
+                _state.update { it.copy(agentBrowsing = false) }
+            }
         }
     }
 
