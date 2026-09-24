@@ -262,6 +262,10 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
             onSettingsChange = viewModel::updateSettings,
             onTestRemote = viewModel::testRemote,
             versionName = versionName,
+            profileName = viewModel.activeProfileName(),
+            profileNames = viewModel.profileNames(),
+            onSaveProfile = viewModel::saveProfileAs,
+            onUseProfile = viewModel::useProfile,
             onCheckUpdate = { viewModel.checkForUpdate(manual = true) },
             onDismiss = { showSettings = false },
         )

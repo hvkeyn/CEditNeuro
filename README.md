@@ -33,6 +33,7 @@ layer is wired end to end.
 | Install and open an APK with `install_apk` (no Shizuku) | done |
 | Shared-storage paths follow this phone's real storage root and Downloads folder | done |
 | Update check at the bottom of Language models settings | done — install starts only after confirmation |
+| Phone profile in `CEditNeuro/profiles` survives uninstall and loads on the next install | done |
 | `install_jdk`, `install_android_sdk`, `install_runtime` from the Termux mirror | done |
 | Zed-style per-edit Accept/Reject diffs | not yet — edits apply immediately |
 
@@ -70,6 +71,19 @@ Published builds are on the [GitHub releases](https://github.com/hvkeyn/CEditNeu
    and **Check for updates** are at the bottom of that screen.
 4. Tap the chat icon to slide the agent panel in. Opening another project does not stop the
    agent you left running.
+
+## Profiles
+
+Settings, the API key, saved servers, and the project list (with each project's chat and
+shell) are copied to shared storage at `CEditNeuro/profiles`. The active profile is the
+file named in `active.txt`. Uninstalling the app deletes its private files. The next
+install, from any computer, loads that profile after all-files access is allowed.
+
+Open **Language models** to see the active profile, save the current state under another
+name, or switch. Switching loads that profile's settings and projects.
+
+That folder stays on the phone. It contains the API key and server passwords. Do not copy
+it into a repository or a public release.
 
 ## Built-in shell
 

@@ -19,6 +19,8 @@ import com.hvkeyn.ceditneuro.agent.buildSystemPrompt
 import com.hvkeyn.ceditneuro.agent.deepseek.DeepSeekBackend
 import com.hvkeyn.ceditneuro.data.AgentSettings
 import com.hvkeyn.ceditneuro.data.RemoteServer
+import com.hvkeyn.ceditneuro.data.DeviceProfile
+import com.hvkeyn.ceditneuro.data.ProfileStore
 import com.hvkeyn.ceditneuro.data.ProjectLibrary
 import com.hvkeyn.ceditneuro.data.SettingsStore
 import com.hvkeyn.ceditneuro.data.StoredChat
@@ -208,12 +210,18 @@ class WorkspaceViewModel(
     private var browseReportJob: Job? = null
     private val remoteClient = RemoteClient(::ensureHostTrusted)
     private val library = ProjectLibrary(appContext)
+    private val profiles = ProfileStore(appContext)
+    private var profileJob: Job? = null
+    private var activeProfileName = "default"
+    private var allowEmptyProfile = false
 
     private var updateChecked = false
     private var updateJob: Job? = null
     private val activityJson = Json { ignoreUnknownKeys = true }
 
     init {
+        settingsStore.afterChange = { scheduleProfile() }
+        library.afterChange = { scheduleProfile() }
         viewModelScope.launch {
             UpdateBus.failures.collect { message ->
                 val replace = message.contains("UPDATE_INCOMPATIBLE", ignoreCase = true) ||
@@ -233,10 +241,10 @@ class WorkspaceViewModel(
                     replace && exported != null ->
                         "This phone already has CEditNeuro signed with a different key, so Android will not replace it. " +
                             "The new APK is in Downloads:\n$exported\n" +
-                            "Uninstall this app, then open that file. The API key saved in this app is removed with the uninstall."
+                            "Uninstall this app, then open that file. The phone profile is kept and the new install loads it."
                     replace ->
                         "This phone already has CEditNeuro signed with a different key, so Android will not replace it. " +
-                            "Uninstall this app, then install the new APK. The API key saved in this app is removed with the uninstall."
+                            "Uninstall this app, then install the new APK. The phone profile is kept and the new install loads it."
                     permission ->
                         "Android is not letting this app install updates. Allow installs for CEditNeuro, then come back."
                     else -> message
@@ -268,10 +276,100 @@ class WorkspaceViewModel(
             _state.update { it.copy(recentProjects = library.roots()) }
             return
         }
+        adoptDeviceProfile()
         val live = library.roots().filter { path -> File(path).isDirectory }
         library.replaceRoots(live)
         _state.update { it.copy(recentProjects = live) }
         live.firstOrNull()?.let { openProject(File(it)) }
+    }
+
+    fun profileNames(): List<String> = profiles.names().ifEmpty { listOf(activeProfileName) }
+
+    fun activeProfileName(): String = activeProfileName
+
+    fun saveProfileAs(name: String) {
+        val safe = profiles.safeName(name)
+        viewModelScope.launch(Dispatchers.IO) {
+            flushProfile()
+            activeProfileName = safe
+            allowEmptyProfile = library.roots().isEmpty()
+            flushProfile()
+            showMessage("Profile $safe saved.")
+        }
+    }
+
+    fun useProfile(name: String) {
+        val safe = profiles.safeName(name)
+        if (safe == activeProfileName) return
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { flushProfile() }
+            val profile = withContext(Dispatchers.IO) { profiles.read(safe) }
+            if (profile == null) {
+                showMessage("Profile $safe is missing.")
+                return@launch
+            }
+            applyProfile(profile)
+        }
+    }
+
+    private fun adoptDeviceProfile() {
+        activeProfileName = profiles.activeName()
+        if (library.roots().isNotEmpty()) return
+        val settings = settingsStore.current
+        val configured = settings.providers.any { it.apiKey.isNotBlank() } || settings.remotes.isNotEmpty()
+        if (configured) return
+        val profile = profiles.readActive() ?: return
+        val useful = profile.settings.providers.any { it.apiKey.isNotBlank() } ||
+            profile.settings.remotes.isNotEmpty() ||
+            profile.roots.isNotEmpty()
+        if (!useful) return
+        activeProfileName = profile.name.ifBlank { profiles.safeName(profile.name) }
+        settingsStore.replace(profile.settings.normalized())
+        val live = profile.roots.filter { path -> File(path).isDirectory }
+        if (live.isNotEmpty()) library.replaceAll(live, profile.sessions)
+        _state.update { it.copy(message = "Profile $activeProfileName loaded.") }
+    }
+
+    private fun applyProfile(profile: DeviceProfile) {
+        projects.values.toList().forEach { project ->
+            project.persistJob?.cancel()
+            if (project.agentJob?.isActive == true) abandonAgent(project, announce = false)
+        }
+        projects.clear()
+        current = null
+        workspace = null
+        activeProfileName = profile.name.ifBlank { profiles.safeName(profile.name) }
+        profiles.markActive(activeProfileName)
+        settingsStore.replace(profile.settings.normalized())
+        val live = profile.roots.filter { path -> File(path).isDirectory }
+        allowEmptyProfile = live.isEmpty()
+        library.replaceAll(live, profile.sessions)
+        _state.value = WorkspaceUiState(
+            recentProjects = live,
+            message = "Profile $activeProfileName loaded.",
+        )
+        live.firstOrNull()?.let { openProject(File(it)) }
+    }
+
+    private fun scheduleProfile() {
+        profileJob?.cancel()
+        profileJob = viewModelScope.launch {
+            delay(400)
+            withContext(Dispatchers.IO) { flushProfile() }
+        }
+    }
+
+    private fun flushProfile() {
+        val (roots, sessions) = library.snapshot()
+        val existing = profiles.read(activeProfileName)
+        val keepPrevious = roots.isEmpty() && !allowEmptyProfile &&
+            existing != null && existing.roots.isNotEmpty()
+        profiles.write(
+            name = activeProfileName,
+            settings = settingsStore.current,
+            roots = if (keepPrevious) existing.roots else roots,
+            sessions = if (keepPrevious) existing.sessions else sessions,
+        )
     }
 
     fun openProject(root: File) {
@@ -280,6 +378,7 @@ class WorkspaceViewModel(
             return
         }
         if (!canonical.isDirectory) {
+            if (library.roots().size <= 1) allowEmptyProfile = true
             library.forget(canonical.path)
             projects.remove(canonical.path)
             _state.update { it.copy(recentProjects = library.roots(), otherRuns = runStatuses(current)) }
@@ -324,6 +423,7 @@ class WorkspaceViewModel(
             current = null
             workspace = null
         }
+        if (library.roots().size <= 1) allowEmptyProfile = true
         library.forget(canonical)
         val remaining = library.roots()
         if (!leavingCurrent) {
@@ -1631,6 +1731,7 @@ class WorkspaceViewModel(
                 settingsStore.current.workFocus,
                 accessLine(),
                 StoragePaths.describe(),
+                projectRules = readProjectRules(ws.root),
             ),
         )
     }
@@ -1697,6 +1798,12 @@ class WorkspaceViewModel(
 
     private fun showMessage(text: String) {
         _state.update { it.copy(message = text) }
+    }
+
+    private fun readProjectRules(root: File): String {
+        val file = File(root, "AGENTS.md")
+        if (!file.isFile || file.length() > 64_000L) return ""
+        return runCatching { file.readText(Charsets.UTF_8).trim().take(6_000) }.getOrDefault("")
     }
 
     override fun onCleared() {

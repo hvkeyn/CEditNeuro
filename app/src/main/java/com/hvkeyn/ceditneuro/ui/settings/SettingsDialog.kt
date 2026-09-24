@@ -1,5 +1,6 @@
 package com.hvkeyn.ceditneuro.ui.settings
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,10 +42,15 @@ fun SettingsDialog(
     onSettingsChange: ((AgentSettings) -> AgentSettings) -> Unit,
     onTestRemote: (RemoteServer) -> Unit,
     versionName: String,
+    profileName: String,
+    profileNames: List<String>,
+    onSaveProfile: (String) -> Unit,
+    onUseProfile: (String) -> Unit,
     onCheckUpdate: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     var draft by remember(settings) { mutableStateOf(settings) }
+    var profileDraft by rememberSaveable(profileName) { mutableStateOf(profileName) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -200,6 +206,44 @@ fun SettingsDialog(
                 }
 
                 HorizontalDivider()
+                Column(
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text("Profile", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        text = "Saved in CEditNeuro/profiles on this phone. A new install loads the active profile after storage access.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = profileDraft,
+                            onValueChange = { profileDraft = it },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            label = { Text("Name") },
+                        )
+                        TextButton(
+                            onClick = { onSaveProfile(profileDraft) },
+                            enabled = profileDraft.isNotBlank(),
+                        ) { Text("Save") }
+                    }
+                    if (profileNames.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            profileNames.forEach { name ->
+                                FilterChip(
+                                    selected = name == profileName,
+                                    onClick = { onUseProfile(name) },
+                                    label = { Text(name) },
+                                )
+                            }
+                        }
+                    }
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

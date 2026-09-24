@@ -8,10 +8,12 @@ import androidx.security.crypto.MasterKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
 
+@Serializable
 data class AgentSettings(
     val providers: List<ModelProvider> = ModelCatalog.builtins(),
     val activeProviderId: String = ModelCatalog.DEEPSEEK_ID,
@@ -68,6 +70,8 @@ data class AgentSettings(
  */
 class SettingsStore(context: Context) {
 
+    var afterChange: () -> Unit = {}
+
     private val prefs: SharedPreferences = createPrefs(context)
     private val json = Json {
         ignoreUnknownKeys = true
@@ -81,9 +85,14 @@ class SettingsStore(context: Context) {
     val current: AgentSettings get() = _settings.value
 
     fun update(transform: (AgentSettings) -> AgentSettings) {
-        val next = transform(_settings.value).normalized()
+        replace(transform(_settings.value))
+    }
+
+    fun replace(settings: AgentSettings) {
+        val next = settings.normalized()
         persist(next)
         _settings.value = next
+        afterChange()
     }
 
     private fun read(context: Context): AgentSettings {
