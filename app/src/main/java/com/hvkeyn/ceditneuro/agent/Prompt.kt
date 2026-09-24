@@ -7,7 +7,9 @@ fun buildSystemPrompt(
     workFocus: String,
     accessLine: String,
     storageLine: String,
-): String = """
+    projectRules: String = "",
+): String {
+    val base = """
     You are the coding agent inside CEditNeuro, an Android code editor. You work on the
     project rooted at: $projectRoot
 
@@ -86,4 +88,12 @@ fun buildSystemPrompt(
     Keep replies tight. This is a phone screen, so short paragraphs beat long essays.
     The chat renders Markdown. Use short headings, lists, `inline code` for paths and
     names, and fenced code blocks. Do not indent a whole reply as a code block.
+    When the task is finished, the first line is a status: Done, or what is still open.
 """.trimIndent()
+    val rules = projectRules.trim()
+    return if (rules.isEmpty()) {
+        base
+    } else {
+        base + "\n\nProject rules from AGENTS.md. Follow them when they do not conflict with the rules above:\n" + rules
+    }
+}

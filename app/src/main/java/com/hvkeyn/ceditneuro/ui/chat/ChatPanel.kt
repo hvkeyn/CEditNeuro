@@ -1,5 +1,9 @@
 package com.hvkeyn.ceditneuro.ui.chat
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,6 +33,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.CircularProgressIndicator
@@ -43,6 +48,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,6 +64,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
@@ -65,6 +72,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.hvkeyn.ceditneuro.agent.agentBars
 import com.hvkeyn.ceditneuro.data.AgentSettings
 import com.hvkeyn.ceditneuro.ui.AgentActivity
@@ -89,6 +97,37 @@ fun ChatPanel(
     modifier: Modifier = Modifier,
 ) {
     var input by rememberSaveable { mutableStateOf("") }
+    var listening by remember { mutableStateOf(false) }
+    var voiceNote by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    val dictation = remember(context) {
+        VoiceDictation(context.applicationContext, ContextCompat.getMainExecutor(context))
+    }
+    DisposableEffect(dictation) {
+        onDispose { dictation.release() }
+    }
+    val startDictation = {
+        listening = true
+        voiceNote = "Listening…"
+        dictation.start(
+            onPartial = { heard -> input = heard },
+            onFinal = { heard ->
+                listening = false
+                voiceNote = null
+                input = ""
+                if (!state.agentRunning && state.projectRoot != null) onSend(heard)
+                else input = heard
+            },
+            onNote = { note ->
+                if (note == null || note != "Listening…") listening = false
+                voiceNote = note
+            },
+        )
+    }
+    val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) startDictation()
+        else voiceNote = "Microphone permission is needed to dictate."
+    }
     val lastEntry = state.chat.lastOrNull()
     val listState = remember(state.projectRoot) {
         LazyListState(state.chat.lastIndex.coerceAtLeast(0), 0)
@@ -222,10 +261,30 @@ fun ChatPanel(
                     value = input,
                     onValueChange = { input = it },
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text(if (compact) "Message" else "Ask the agent…") },
+                    placeholder = { Text(if (listening) "Listening…" else if (compact) "Message" else "Ask the agent…") },
                     singleLine = compact,
                     maxLines = if (compact) 1 else 4,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
+                )
+                RoundAction(
+                    icon = Icons.Filled.Mic,
+                    description = if (listening) "Stop dictation" else "Dictate",
+                    filled = listening,
+                    danger = listening,
+                    size = if (compact) 32.dp else 40.dp,
+                    enabled = state.projectRoot != null && (!state.agentRunning || listening),
+                    onClick = {
+                        if (listening) {
+                            dictation.stop()
+                        } else if (
+                            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                            PackageManager.PERMISSION_GRANTED
+                        ) {
+                            startDictation()
+                        } else {
+                            micPermission.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    },
                 )
                 RoundAction(
                     icon = Icons.Filled.PlayArrow,
@@ -251,12 +310,24 @@ fun ChatPanel(
                     size = if (compact) 32.dp else 40.dp,
                     enabled = !state.agentRunning && input.isNotBlank() && state.projectRoot != null,
                     onClick = {
+                        if (listening) {
+                            dictation.stop()
+                            return@RoundAction
+                        }
                         val prompt = input.trim()
                         if (prompt.isNotEmpty()) {
                             input = ""
                             onSend(prompt)
                         }
                     },
+                )
+            }
+            voiceNote?.let { note ->
+                Text(
+                    text = note,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 4.dp),
                 )
             }
         }
