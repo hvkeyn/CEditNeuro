@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -95,6 +96,7 @@ fun ChatPanel(
     onNetwork: (Boolean) -> Unit,
     onPrograms: (Boolean) -> Unit,
     onClose: () -> Unit,
+    onDoctor: () -> String,
     onSelectModel: (providerId: String, modelName: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -177,6 +179,8 @@ fun ChatPanel(
                 onPrograms = onPrograms,
                 onSelectModel = onSelectModel,
                 onClose = onClose,
+                onDoctor = onDoctor,
+                onSendReport = { text -> onSend(text, emptyList()) },
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
@@ -368,9 +372,13 @@ private fun AgentToolbar(
     onPrograms: (Boolean) -> Unit,
     onSelectModel: (providerId: String, modelName: String) -> Unit,
     onClose: () -> Unit,
+    onDoctor: () -> String,
+    onSendReport: (String) -> Unit,
 ) {
     var modelOpen by rememberSaveable { mutableStateOf(false) }
     var workOpen by remember { mutableStateOf(false) }
+    var doctorOpen by remember { mutableStateOf(false) }
+    var doctorText by remember { mutableStateOf("") }
     val workLabel = when (settings.workFocus) {
         AgentSettings.WORK_BUILD -> "Build"
         AgentSettings.WORK_REMOTE -> "Remote"
@@ -439,6 +447,7 @@ private fun AgentToolbar(
                 compact = compact,
                 onClick = { onPrograms(settings.execAllowed != true) },
             )
+            Pill(text = "Doctor", compact = compact, onClick = { doctorText = onDoctor(); doctorOpen = true })
             Box(modifier = Modifier.weight(1f))
             IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
                 Icon(Icons.Default.Close, contentDescription = "Hide chat", modifier = Modifier.size(18.dp))
@@ -450,6 +459,36 @@ private fun AgentToolbar(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 2.dp),
+            )
+        }
+        if (doctorOpen) {
+            val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { doctorOpen = false },
+                title = { Text("Agent doctor") },
+                text = {
+                    androidx.compose.foundation.rememberScrollState().let { scroll ->
+                        Text(
+                            text = doctorText,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.verticalScroll(scroll),
+                        )
+                    }
+                },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = {
+                        doctorOpen = false
+                        onSendReport(
+                            "Fix the repeated agent failures in this doctor report. Change the project only where the report points at a real mistake.\n\n$doctorText",
+                        )
+                    }) { Text("Send to agent") }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = {
+                        clipboard.setText(androidx.compose.ui.text.AnnotatedString(doctorText))
+                        doctorOpen = false
+                    }) { Text("Copy") }
+                },
             )
         }
     }

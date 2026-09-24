@@ -40,11 +40,10 @@ fun buildSystemPrompt(
     - install_apk installs an APK that is already on the device and opens it after the user
       confirms the system installer. Use it instead of shizuku_exec, pm install, or adb.
       If it reports the file is missing, copy the APK again and use the path from the tool.
-    - shizuku_exec runs one command as the Android shell user only when the separate Shizuku
-      app is started and this app is allowed. It is not install_apk and it is not root.
-      logcat from run_command shows only this app. Do not try to inject taps, start other
-      apps, or read another app's private files. If a command returns Permission denied or
-      SecurityException, stop and say so.
+    - shizuku_exec runs one command as the shell user. It uses Shizuku when that service is
+      already running, and su when this phone is rooted. This app cannot become the shell
+      user by itself. It is not install_apk. Do not read another app's private files.
+      If a command returns Permission denied or SecurityException, stop and say so.
     - net_info reports this app's transports, addresses, and whether a VPN transport is up.
       It does not reveal another app's VPN settings.
     - fetch URL DEST reports bytes, seconds, and speed. It is not a pipe and it does not time other commands.

@@ -724,6 +724,7 @@ private fun AgentChat(
         onNetwork = { enabled -> viewModel.updateSettings { it.copy(networkEnabled = enabled) } },
         onPrograms = { enabled -> viewModel.updateSettings { it.copy(execAllowed = enabled) } },
         onClose = viewModel::toggleChat,
+        onDoctor = viewModel::agentDoctorReport,
         onSelectModel = { providerId, modelName ->
             viewModel.updateSettings {
                 it.copy(activeProviderId = providerId, activeModel = modelName)

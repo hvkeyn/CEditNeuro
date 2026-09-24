@@ -12,6 +12,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.hvkeyn.ceditneuro.agent.AgentEvent
+import com.hvkeyn.ceditneuro.agent.AgentDoctor
 import com.hvkeyn.ceditneuro.agent.AgentLoop
 import com.hvkeyn.ceditneuro.agent.ChatMessage
 import com.hvkeyn.ceditneuro.agent.ToolTranscript
@@ -1635,16 +1636,16 @@ class WorkspaceViewModel(
 
     private suspend fun prepareShizuku(): String? {
         if (!runCatching { Shizuku.pingBinder() }.getOrDefault(false)) {
+            if (com.hvkeyn.ceditneuro.shizuku.SuShell.available()) return null
             val launch = appContext.packageManager.getLaunchIntentForPackage("moe.shizuku.privileged.api")
             if (launch != null) {
                 launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                 runCatching { appContext.startActivity(launch) }
             }
-            return "Shizuku is not running. " +
+            return "This app cannot grant itself the shell user. Root is not available, and Shizuku is not running. " +
                 (if (launch != null) "The Shizuku app was opened. Start it and allow CEditNeuro, then retry. "
-                else "Install the Shizuku app, start it, and allow CEditNeuro. ") +
-                "This tool is not install_apk. run_command logcat only shows this app's own process. " +
-                "screencap and input into other apps are not available from here."
+                else "Start Shizuku from adb, or root the phone, then retry. ") +
+                "install_apk does not need this. run_command logcat only shows this app."
         }
         if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) return null
         return withContext(Dispatchers.Main) {
@@ -2050,6 +2051,16 @@ class WorkspaceViewModel(
     }
 
     private fun nextId(project: LiveProject): Long = project.idGenerator.incrementAndGet()
+
+    fun agentDoctorReport(): String {
+        val (_, saved) = library.snapshot()
+        val merged = saved.toMutableMap()
+        projects.forEach { (root, project) ->
+            val session = merged[root] ?: com.hvkeyn.ceditneuro.data.StoredSession()
+            merged[root] = session.copy(conversation = project.conversation.toList())
+        }
+        return AgentDoctor.report(merged)
+    }
 
     private fun showMessage(text: String) {
         _state.update { it.copy(message = text) }

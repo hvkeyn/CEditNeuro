@@ -73,7 +73,9 @@ Published builds are on the [GitHub releases](https://github.com/hvkeyn/CEditNeu
 4. Tap the chat icon to slide the agent panel in. The paperclip attaches photos and
    documents. They are saved in the project and their text is sent with the message.
    A model that accepts images also receives the photo. DeepSeek receives the file text
-   and path. Opening another project does not stop the agent you left running.
+   and path. **Doctor** reads saved agent sessions, lists mistakes that repeat, and can
+   send that report back so the agent fixes them. Opening another project does not stop the
+   agent you left running.
 
 ## Profiles
 
