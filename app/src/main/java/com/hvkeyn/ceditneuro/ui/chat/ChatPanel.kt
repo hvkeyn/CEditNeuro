@@ -98,9 +98,6 @@ fun ChatPanel(
     onSend: (String, List<Uri>) -> Unit,
     onContinue: () -> Unit,
     onCancel: () -> Unit,
-    onWorkFocus: (String) -> Unit,
-    onNetwork: (Boolean) -> Unit,
-    onPrograms: (Boolean) -> Unit,
     onClose: () -> Unit,
     onDoctor: () -> String,
     onSelectModel: (providerId: String, modelName: String) -> Unit,
@@ -180,9 +177,6 @@ fun ChatPanel(
             AgentToolbar(
                 settings = settings,
                 compact = compact,
-                onWorkFocus = onWorkFocus,
-                onNetwork = onNetwork,
-                onPrograms = onPrograms,
                 onSelectModel = onSelectModel,
                 onClose = onClose,
                 onDoctor = onDoctor,
@@ -406,23 +400,14 @@ private fun ComposerActions(
 private fun AgentToolbar(
     settings: AgentSettings,
     compact: Boolean,
-    onWorkFocus: (String) -> Unit,
-    onNetwork: (Boolean) -> Unit,
-    onPrograms: (Boolean) -> Unit,
     onSelectModel: (providerId: String, modelName: String) -> Unit,
     onClose: () -> Unit,
     onDoctor: () -> String,
     onSendReport: (String) -> Unit,
 ) {
     var modelOpen by rememberSaveable { mutableStateOf(false) }
-    var workOpen by remember { mutableStateOf(false) }
     var doctorOpen by remember { mutableStateOf(false) }
     var doctorText by remember { mutableStateOf("") }
-    val workLabel = when (settings.workFocus) {
-        AgentSettings.WORK_BUILD -> "Build"
-        AgentSettings.WORK_REMOTE -> "Remote"
-        else -> "Edit"
-    }
     Column {
         Row(
             modifier = Modifier
@@ -432,7 +417,7 @@ private fun AgentToolbar(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Box {
-                Pill(text = settings.modelLabel(), onClick = { modelOpen = true }, maxWidth = if (compact) 108.dp else 132.dp, compact = compact)
+                Pill(text = settings.modelLabel(), onClick = { modelOpen = true }, maxWidth = if (compact) 200.dp else 280.dp, compact = compact)
                 DropdownMenu(expanded = modelOpen, onDismissRequest = { modelOpen = false }) {
                     settings.providers.forEach { provider ->
                         Text(
@@ -453,39 +438,6 @@ private fun AgentToolbar(
                     }
                 }
             }
-            Box {
-                Pill(text = workLabel, onClick = { workOpen = true }, compact = compact)
-                DropdownMenu(expanded = workOpen, onDismissRequest = { workOpen = false }) {
-                    DropdownMenuItem(
-                        text = { Text("Edit") },
-                        onClick = {
-                            workOpen = false
-                            onWorkFocus(AgentSettings.WORK_EDIT)
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Build") },
-                        onClick = {
-                            workOpen = false
-                            onWorkFocus(AgentSettings.WORK_BUILD)
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Remote") },
-                        onClick = {
-                            workOpen = false
-                            onWorkFocus(AgentSettings.WORK_REMOTE)
-                        },
-                    )
-                }
-            }
-            Pill(text = "Net", selected = settings.networkEnabled, compact = compact, onClick = { onNetwork(!settings.networkEnabled) })
-            Pill(
-                text = "Run",
-                selected = settings.execAllowed == true,
-                compact = compact,
-                onClick = { onPrograms(settings.execAllowed != true) },
-            )
             Pill(text = "Doctor", compact = compact, onClick = { doctorText = onDoctor(); doctorOpen = true })
             Box(modifier = Modifier.weight(1f))
             IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {

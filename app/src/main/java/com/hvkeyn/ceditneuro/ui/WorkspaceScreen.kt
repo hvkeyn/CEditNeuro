@@ -724,9 +724,6 @@ private fun AgentChat(
         onSend = viewModel::sendPrompt,
         onContinue = viewModel::continueAgent,
         onCancel = viewModel::cancelAgent,
-        onWorkFocus = { focus -> viewModel.updateSettings { it.copy(workFocus = focus) } },
-        onNetwork = { enabled -> viewModel.updateSettings { it.copy(networkEnabled = enabled) } },
-        onPrograms = { enabled -> viewModel.updateSettings { it.copy(execAllowed = enabled) } },
         onClose = viewModel::toggleChat,
         onDoctor = viewModel::agentDoctorReport,
         onSelectModel = { providerId, modelName ->

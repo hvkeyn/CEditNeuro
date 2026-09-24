@@ -156,10 +156,29 @@ fun SettingsDialog(
                     }
                     SettingsSection(
                         title = "Agent",
-                        summary = "Net ${if (draft.networkEnabled) "on" else "off"} · Run ${if (draft.execAllowed == true) "on" else "off"}",
+                        summary = "${workLabel(draft.workFocus)} · Net ${if (draft.networkEnabled) "on" else "off"} · Run ${if (draft.execAllowed == true) "on" else "off"}",
                         expanded = openSection == "agent",
                         onToggle = { openSection = if (openSection == "agent") "" else "agent" },
                     ) {
+                        Text("Work", style = MaterialTheme.typography.labelLarge)
+                        Text(
+                            text = "Edit keeps file tools. Build also loads installers. Remote also loads the server tools.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(
+                                AgentSettings.WORK_EDIT to "Edit",
+                                AgentSettings.WORK_BUILD to "Build",
+                                AgentSettings.WORK_REMOTE to "Remote",
+                            ).forEach { (id, label) ->
+                                FilterChip(
+                                    selected = draft.workFocus == id,
+                                    onClick = { draft = draft.copy(workFocus = id) },
+                                    label = { Text(label) },
+                                )
+                            }
+                        }
                         ToggleRow(
                             title = "Agent network",
                             detail = "Let the agent download files and install modules.",
@@ -307,6 +326,12 @@ private fun SettingsSection(
         }
         HorizontalDivider()
     }
+}
+
+private fun workLabel(focus: String): String = when (focus) {
+    AgentSettings.WORK_BUILD -> "Build"
+    AgentSettings.WORK_REMOTE -> "Remote"
+    else -> "Edit"
 }
 
 @Composable
