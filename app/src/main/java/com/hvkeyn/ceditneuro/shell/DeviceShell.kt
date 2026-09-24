@@ -143,6 +143,7 @@ class DeviceShell(
         dest.parentFile?.mkdirs()
         val part = File(dest.parentFile, dest.name + ".part")
         return runCatching {
+            val started = System.currentTimeMillis()
             net.download(url, part, AgentNet.MAX_FILE_BYTES, 180)
             if (dest.exists() && !dest.delete()) {
                 part.delete()
@@ -153,7 +154,14 @@ class DeviceShell(
                 part.delete()
             }
             StoragePaths.scan(dest)
-            ShellOutput(0, "saved ${dest.length()} bytes to ${dest.absolutePath}", timedOut = false)
+            val seconds = ((System.currentTimeMillis() - started).coerceAtLeast(1)) / 1000.0
+            val bytes = dest.length()
+            val mbit = bytes * 8.0 / seconds / 1_000_000.0
+            ShellOutput(
+                0,
+                "saved $bytes bytes in ${"%.1f".format(seconds)} s (${"%.2f".format(mbit)} Mbit/s) to ${dest.absolutePath}",
+                timedOut = false,
+            )
         }.getOrElse { error ->
             part.delete()
             ShellOutput(1, error.message ?: "Download failed.", timedOut = false)

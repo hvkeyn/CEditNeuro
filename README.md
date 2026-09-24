@@ -70,8 +70,10 @@ Published builds are on the [GitHub releases](https://github.com/hvkeyn/CEditNeu
 3. Open **Settings** (**Language models**). **Models** is open; paste the DeepSeek API key
    there. The built-in provider defaults to `https://api.deepseek.com/v1` and `deepseek-flash`.
    **Check for updates** is a separate row at the bottom.
-4. Tap the chat icon to slide the agent panel in. Opening another project does not stop the
-   agent you left running.
+4. Tap the chat icon to slide the agent panel in. The paperclip attaches photos and
+   documents. They are saved in the project and their text is sent with the message.
+   A model that accepts images also receives the photo. DeepSeek receives the file text
+   and path. Opening another project does not stop the agent you left running.
 
 ## Profiles
 

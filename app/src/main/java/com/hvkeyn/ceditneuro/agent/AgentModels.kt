@@ -29,11 +29,17 @@ data class ChatMessage(
     @SerialName("tool_calls") val toolCalls: List<ToolCall>? = null,
     @SerialName("tool_call_id") val toolCallId: String? = null,
     val name: String? = null,
+    /** Not sent as a string field. The backend inlines these only for vision models. */
+    @kotlinx.serialization.Transient val imageDataUrls: List<String> = emptyList(),
 ) {
     companion object {
         fun system(text: String) = ChatMessage(role = "system", content = text)
 
-        fun user(text: String) = ChatMessage(role = "user", content = text)
+        fun user(text: String, imageDataUrls: List<String> = emptyList()) = ChatMessage(
+            role = "user",
+            content = text,
+            imageDataUrls = imageDataUrls,
+        )
 
         fun assistant(
             text: String? = null,
