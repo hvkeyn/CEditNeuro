@@ -117,6 +117,23 @@ data class FileClipboard(
 
 data class HostTrustPrompt(val serverId: String, val host: String, val fingerprint: String)
 
+data class ReaderToc(val title: String, val page: Int)
+
+data class ReaderView(
+    val path: String,
+    val title: String,
+    val page: Int,
+    val pageCount: Int,
+    val chapter: String,
+    val theme: String,
+    val fontSp: Int,
+    val bookmarked: Boolean,
+    val percent: Int,
+    val toc: List<ReaderToc>,
+    val bookmarks: List<Int>,
+    val notes: List<com.hvkeyn.ceditneuro.data.ReaderNote>,
+)
+
 data class WorkspaceUiState(
     val projectRoot: String? = null,
     val recentProjects: List<String> = emptyList(),
@@ -145,6 +162,7 @@ data class WorkspaceUiState(
     val appUpdate: AppUpdate? = null,
     val fileClipboard: FileClipboard? = null,
     val otherRuns: List<ProjectRunStatus> = emptyList(),
+    val reader: ReaderView? = null,
 ) {
     val projectName: String?
         get() = projectRoot?.let { File(it).name.ifBlank { it } }
@@ -213,6 +231,9 @@ class WorkspaceViewModel(
     private var browseReportJob: Job? = null
     private val remoteClient = RemoteClient(::ensureHostTrusted)
     private val library = ProjectLibrary(appContext)
+    private val readerStore = com.hvkeyn.ceditneuro.data.ReaderStore(appContext)
+    private var openPages: List<com.hvkeyn.ceditneuro.reader.BookPage> = emptyList()
+    private var openBookKey: String? = null
     private val profiles = ProfileStore(appContext)
     private var profileJob: Job? = null
     private var activeProfileName = "default"
@@ -495,6 +516,11 @@ class WorkspaceViewModel(
             otherRuns = runStatuses(project),
         )
         project.ui = projectSlice(_state.value)
+        openPages = emptyList()
+        openBookKey = null
+        _state.value.reader?.path?.let { path ->
+            runCatching { loadReader(path, keepPlace = true) }
+        }
     }
 
     private fun projectSlice(state: WorkspaceUiState): WorkspaceUiState =
@@ -565,6 +591,145 @@ class WorkspaceViewModel(
             it.copy(openFiles = it.openFiles + OpenFile(path, content), activePath = path)
         }
     }
+
+    fun openReader(path: String) {
+        if (workspace == null) {
+            showMessage("Open a project folder first.")
+            return
+        }
+        if (path.isBlank()) {
+            showMessage("Open a txt, Markdown, HTML, FB2, or EPUB file, then tap Read.")
+            return
+        }
+        viewModelScope.launch {
+            val opened = withContext(Dispatchers.IO) { runCatching { loadReader(path, keepPlace = false) } }
+            opened.onFailure { showMessage(it.message ?: "Cannot open this book.") }
+        }
+    }
+
+    fun closeReader() {
+        _state.update { it.copy(reader = null) }
+    }
+
+    fun readerPageText(): String = openPages.getOrNull(_state.value.reader?.page ?: -1)?.text.orEmpty()
+
+    fun readerTurn(delta: Int) {
+        val reader = _state.value.reader ?: return
+        readerGoTo((reader.page + delta).coerceIn(0, (reader.pageCount - 1).coerceAtLeast(0)))
+    }
+
+    fun readerGoTo(page: Int) {
+        val reader = _state.value.reader ?: return
+        val next = page.coerceIn(0, (openPages.size - 1).coerceAtLeast(0))
+        publishReader(reader.path, next, reader.theme, reader.fontSp)
+    }
+
+    fun readerFont(delta: Int) {
+        val reader = _state.value.reader ?: return
+        val size = (reader.fontSp + delta).coerceIn(14, 32)
+        if (size == reader.fontSp) return
+        reflow(reader.path, size, reader.theme, reader.page.toFloat() / reader.pageCount.coerceAtLeast(1))
+    }
+
+    fun readerCycleTheme() {
+        val reader = _state.value.reader ?: return
+        val theme = when (reader.theme) {
+            "day" -> "sepia"
+            "sepia" -> "night"
+            else -> "day"
+        }
+        publishReader(reader.path, reader.page, theme, reader.fontSp)
+    }
+
+    fun readerToggleBookmark() {
+        val reader = _state.value.reader ?: return
+        val record = readerStore.read(reader.path)
+        val marks = if (reader.page in record.bookmarks) record.bookmarks - reader.page else record.bookmarks + reader.page
+        readerStore.write(record.copy(bookmarks = marks.sorted()))
+        publishReader(reader.path, reader.page, reader.theme, reader.fontSp)
+    }
+
+    fun readerAddNote(text: String) {
+        val reader = _state.value.reader ?: return
+        if (text.isBlank()) return
+        val record = readerStore.read(reader.path)
+        val note = com.hvkeyn.ceditneuro.data.ReaderNote(reader.page, text.trim(), System.currentTimeMillis())
+        readerStore.write(record.copy(notes = record.notes + note))
+        publishReader(reader.path, reader.page, reader.theme, reader.fontSp)
+    }
+
+    fun readerDeleteNote(note: com.hvkeyn.ceditneuro.data.ReaderNote) {
+        val reader = _state.value.reader ?: return
+        val record = readerStore.read(reader.path)
+        readerStore.write(record.copy(notes = record.notes.filterNot { it == note }))
+        publishReader(reader.path, reader.page, reader.theme, reader.fontSp)
+    }
+
+    private fun loadReader(path: String, keepPlace: Boolean) {
+        val ws = workspace ?: return
+        val file = ws.resolve(path)
+        val name = file.name
+        if (!com.hvkeyn.ceditneuro.reader.BookText.supports(name)) {
+            error("Read supports txt, Markdown, HTML, FB2, and EPUB.")
+        }
+        val book = com.hvkeyn.ceditneuro.reader.BookText.parse(name, file.readBytes())
+        val saved = readerStore.read(file.absolutePath)
+        val font = saved.fontSp.coerceIn(14, 32)
+        openPages = com.hvkeyn.ceditneuro.reader.BookText.pages(book, charsFor(font))
+        openBookKey = file.absolutePath
+        val page = if (keepPlace) {
+            _state.value.reader?.page ?: saved.page
+        } else {
+            saved.page
+        }.coerceIn(0, openPages.lastIndex.coerceAtLeast(0))
+        publishReader(file.absolutePath, page, saved.theme, font, book.title)
+    }
+
+    private fun reflow(path: String, font: Int, theme: String, fraction: Float) {
+        val ws = workspace ?: return
+        val file = ws.resolve(path)
+        val book = com.hvkeyn.ceditneuro.reader.BookText.parse(file.name, file.readBytes())
+        openPages = com.hvkeyn.ceditneuro.reader.BookText.pages(book, charsFor(font))
+        openBookKey = file.absolutePath
+        val page = (fraction * openPages.size).toInt().coerceIn(0, openPages.lastIndex.coerceAtLeast(0))
+        publishReader(file.absolutePath, page, theme, font)
+    }
+
+    private fun publishReader(path: String, page: Int, theme: String, font: Int, title: String? = null) {
+        val record = readerStore.read(path)
+        val shown = openPages.getOrNull(page)
+        val count = openPages.size.coerceAtLeast(1)
+        val toc = ArrayList<ReaderToc>()
+        openPages.forEachIndexed { index, item ->
+            if (toc.none { it.title == item.chapter }) toc.add(ReaderToc(item.chapter, index))
+        }
+        val view = ReaderView(
+            path = path,
+            title = title ?: _state.value.reader?.title ?: File(path).name,
+            page = page,
+            pageCount = count,
+            chapter = shown?.chapter.orEmpty(),
+            theme = theme,
+            fontSp = font,
+            bookmarked = page in record.bookmarks,
+            percent = ((page + 1) * 100 / count),
+            toc = toc,
+            bookmarks = record.bookmarks.filter { it in openPages.indices },
+            notes = record.notes,
+        )
+        readerStore.write(
+            record.copy(
+                path = path,
+                page = page,
+                fraction = page.toFloat() / count,
+                theme = theme,
+                fontSp = font,
+            ),
+        )
+        _state.update { it.copy(reader = view) }
+    }
+
+    private fun charsFor(fontSp: Int): Int = (1800 * 20 / fontSp).coerceIn(500, 3_200)
 
     fun closeFile(path: String) {
         current?.buffers?.remove(path)
