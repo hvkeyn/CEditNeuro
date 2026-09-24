@@ -157,10 +157,23 @@ object AppUpdater {
     }
 
     fun uninstallSelf(context: Context) {
-        val intent = Intent(Intent.ACTION_DELETE)
-            .setData(Uri.parse("package:${context.packageName}"))
+        val name = context.packageName
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+            (if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0)
+        val callback = PendingIntent.getBroadcast(
+            context,
+            0,
+            Intent(context, UpdateResultReceiver::class.java),
+            flags,
+        )
+        val installer = runCatching {
+            context.packageManager.packageInstaller.uninstall(name, callback.intentSender)
+        }
+        if (installer.isSuccess) return
+        val screen = Intent(Intent.ACTION_UNINSTALL_PACKAGE)
+            .setData(Uri.parse("package:$name"))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(intent)
+        context.startActivity(screen)
     }
 
     fun install(context: Context, apk: File) {
