@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Settings
@@ -102,6 +103,7 @@ import androidx.compose.runtime.collectAsState
 import com.hvkeyn.ceditneuro.data.AgentSettings
 import com.hvkeyn.ceditneuro.update.AppUpdater
 import com.hvkeyn.ceditneuro.ui.chat.ChatPanel
+import com.hvkeyn.ceditneuro.ui.reader.ReaderPane
 import com.hvkeyn.ceditneuro.ui.editor.EditorPane
 import com.hvkeyn.ceditneuro.ui.settings.SettingsDialog
 import com.hvkeyn.ceditneuro.ui.shell.ShellPanel
@@ -353,6 +355,22 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                 actions = {
                     Row {
                         BarIcon(
+                            icon = Icons.Default.MenuBook,
+                            description = "Read book or note",
+                            active = state.reader != null,
+                            onClick = {
+                                val path = state.activePath
+                                if (path == null) {
+                                    viewModel.openReader("")
+                                } else if (state.reader?.path?.endsWith(path) == true) {
+                                    viewModel.closeReader()
+                                } else {
+                                    viewModel.openReader(path)
+                                }
+                            },
+                            size = barButton,
+                        )
+                        BarIcon(
                             icon = Icons.Default.Terminal,
                             description = "Toggle shell",
                             active = state.shellVisible,
@@ -485,6 +503,10 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                         onPaste = viewModel::pasteEntry,
                         onRename = viewModel::renameEntry,
                         onDelete = viewModel::deleteEntry,
+                        onRead = { path ->
+                            viewModel.openReader(path)
+                            if (!panes.splitTree) projectPanelOpen = false
+                        },
                         onClearClipboard = viewModel::clearFileClipboard,
                         modifier = if (panes.splitTree) {
                             Modifier.width(panes.treeWidth).fillMaxHeight()
@@ -548,6 +570,21 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                     }
                 }
             }
+            }
+            state.reader?.let { reader ->
+                ReaderPane(
+                    reader = reader,
+                    pageText = viewModel.readerPageText(),
+                    onClose = viewModel::closeReader,
+                    onTurn = viewModel::readerTurn,
+                    onFont = viewModel::readerFont,
+                    onTheme = viewModel::readerCycleTheme,
+                    onBookmark = viewModel::readerToggleBookmark,
+                    onGoTo = viewModel::readerGoTo,
+                    onAddNote = viewModel::readerAddNote,
+                    onDeleteNote = viewModel::readerDeleteNote,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
             AnimatedVisibility(
                 visible = state.chatVisible && !dockChat,
@@ -829,6 +866,7 @@ private fun FileTreePane(
     onPaste: (String) -> Unit,
     onRename: (String, String) -> Unit,
     onDelete: (String) -> Unit,
+    onRead: (String) -> Unit,
     onClearClipboard: () -> Unit,
     projectsMaxHeight: Dp,
     compactHeight: Boolean,
@@ -956,6 +994,7 @@ private fun FileTreePane(
                 onPaste = onPaste,
                 onRename = onRename,
                 onDelete = onDelete,
+                onRead = onRead,
             )
         }
     }
@@ -1020,6 +1059,7 @@ private fun LazyListScope.fileTree(
     onPaste: (String) -> Unit,
     onRename: (String, String) -> Unit,
     onDelete: (String) -> Unit,
+    onRead: (String) -> Unit,
 ) {
     entries.forEach { entry ->
         item(key = entry.relativePath) {
@@ -1046,6 +1086,7 @@ private fun LazyListScope.fileTree(
                 },
                 onRename = { name -> onRename(entry.relativePath, name) },
                 onDelete = { onDelete(entry.relativePath) },
+                onRead = { onRead(entry.relativePath) },
             )
         }
         if (entry.isDirectory && entry.relativePath in state.expandedDirs) {
@@ -1062,6 +1103,7 @@ private fun LazyListScope.fileTree(
                 onPaste = onPaste,
                 onRename = onRename,
                 onDelete = onDelete,
+                onRead = onRead,
             )
         }
     }
@@ -1083,6 +1125,7 @@ private fun FileRow(
     onPaste: () -> Unit,
     onRename: (String) -> Unit,
     onDelete: () -> Unit,
+    onRead: () -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
     var renameOpen by remember { mutableStateOf(false) }
@@ -1157,6 +1200,9 @@ private fun FileRow(
                 )
             }
             DropdownMenuItem(text = { Text("Delete") }, onClick = { menu = false; deleteOpen = true })
+            if (!entry.isDirectory) {
+                DropdownMenuItem(text = { Text("Read") }, onClick = { menu = false; onRead() })
+            }
         }
     }
     if (renameOpen) {

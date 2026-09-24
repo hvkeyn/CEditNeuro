@@ -32,6 +32,7 @@ layer is wired end to end.
 | One agent per open project, with its own shade card | done |
 | Install and open an APK with `install_apk` (no Shizuku) | done |
 | Shared-storage paths follow this phone's real storage root and Downloads folder | done |
+| Book and note reader (txt, Markdown, HTML, FB2, EPUB) with pages, bookmarks, and notes | done |
 | Update check at the bottom of Language models settings | done — install starts only after confirmation |
 | Phone profile in `CEditNeuro/profiles` survives uninstall and loads on the next install | done |
 | `install_jdk`, `install_android_sdk`, `install_runtime` from the Termux mirror | done |
@@ -111,6 +112,10 @@ the file manager would not show the file.
 The shell variable `HOME` is this app's private directory. `DOWNLOAD` is the public
 Downloads folder. `install_apk` installs an APK that is already on the device through the
 system installer and opens it after you confirm. Shizuku is not required for that.
+
+## Reading
+
+Long-press a file and choose **Read**, or open it and tap the book icon. txt, Markdown, HTML, FB2, and EPUB open as pages: tap the left side for the previous page and the right side for the next. The center shows the title bar. Day, sepia, and night paper, type size, a table of contents, bookmarks, and notes stay on this phone. They are not written into the project.
 
 ## Several projects
 
