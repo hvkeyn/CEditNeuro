@@ -40,7 +40,6 @@ fun RemoteSettingsSection(
     var formError by rememberSaveable { mutableStateOf("") }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Remote servers", style = MaterialTheme.typography.titleSmall)
         Text(
             text = "FTP, FTPS, or SFTP. The agent can list, edit, and upload files, then check the site URL. " +
                 "FTP sends the password without encryption. SSH asks before trusting a new host.",

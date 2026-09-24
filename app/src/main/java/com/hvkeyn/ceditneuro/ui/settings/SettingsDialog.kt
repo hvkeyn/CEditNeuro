@@ -1,5 +1,6 @@
 package com.hvkeyn.ceditneuro.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,8 +11,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -28,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -51,6 +57,7 @@ fun SettingsDialog(
 ) {
     var draft by remember(settings) { mutableStateOf(settings) }
     var profileDraft by rememberSaveable(profileName) { mutableStateOf(profileName) }
+    var openSection by rememberSaveable { mutableStateOf("models") }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -67,192 +74,168 @@ fun SettingsDialog(
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp),
                 )
-                Text(
-                    text = "Same idea as Zed: each provider has an API URL and a list of models. " +
-                        "API keys stay on this device.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                )
-
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                        .verticalScroll(rememberScrollState()),
                 ) {
-                    draft.providers.forEach { provider ->
-                        ProviderCard(
-                            provider = provider,
-                            selectedProviderId = draft.activeProviderId,
-                            selectedModel = draft.activeModel,
-                            onSelectModel = { modelName ->
-                                draft = draft.copy(
-                                    activeProviderId = provider.id,
-                                    activeModel = modelName,
-                                )
-                            },
-                            onChange = { updated ->
-                                draft = draft.copy(
-                                    providers = draft.providers.map { item ->
-                                        if (item.id == provider.id) updated else item
-                                    },
-                                )
-                            },
-                            onRemove = if (provider.builtin || draft.providers.size == 1) {
-                                null
-                            } else {
-                                {
-                                    val remaining = draft.providers.filterNot { it.id == provider.id }
-                                    draft = draft.copy(providers = remaining).normalized()
-                                }
+                    SettingsSection(
+                        title = "Models",
+                        summary = draft.modelLabel(),
+                        expanded = openSection == "models",
+                        onToggle = { openSection = if (openSection == "models") "" else "models" },
+                    ) {
+                        draft.providers.forEach { provider ->
+                            ProviderCard(
+                                provider = provider,
+                                selectedProviderId = draft.activeProviderId,
+                                selectedModel = draft.activeModel,
+                                onSelectModel = { modelName ->
+                                    draft = draft.copy(
+                                        activeProviderId = provider.id,
+                                        activeModel = modelName,
+                                    )
+                                },
+                                onChange = { updated ->
+                                    draft = draft.copy(
+                                        providers = draft.providers.map { item ->
+                                            if (item.id == provider.id) updated else item
+                                        },
+                                    )
+                                },
+                                onRemove = if (provider.builtin || draft.providers.size == 1) {
+                                    null
+                                } else {
+                                    {
+                                        val remaining = draft.providers.filterNot { it.id == provider.id }
+                                        draft = draft.copy(providers = remaining).normalized()
+                                    }
+                                },
+                            )
+                        }
+                        AddProviderForm(
+                            onAdd = { provider ->
+                                draft = draft.copy(providers = draft.providers + provider)
                             },
                         )
                     }
-
-                    AddProviderForm(
-                        onAdd = { provider ->
-                            draft = draft.copy(providers = draft.providers + provider)
-                        },
-                    )
-
                     if (draft.model.supportsReasoning) {
-                        Text("Reasoning", style = MaterialTheme.typography.titleSmall)
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier.fillMaxWidth(),
+                        SettingsSection(
+                            title = "Reasoning",
+                            summary = if (draft.thinkingEnabled) draft.reasoningEffort else "Off",
+                            expanded = openSection == "reasoning",
+                            onToggle = { openSection = if (openSection == "reasoning") "" else "reasoning" },
                         ) {
-                            Text("Thinking", style = MaterialTheme.typography.bodyMedium)
-                            Switch(
-                                checked = draft.thinkingEnabled,
-                                onCheckedChange = { draft = draft.copy(thinkingEnabled = it) },
-                            )
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            AgentSettings.REASONING_EFFORTS.forEach { effort ->
-                                FilterChip(
-                                    selected = draft.reasoningEffort == effort,
-                                    onClick = { draft = draft.copy(reasoningEffort = effort) },
-                                    label = { Text(effort) },
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("Thinking", style = MaterialTheme.typography.bodyMedium)
+                                Switch(
+                                    checked = draft.thinkingEnabled,
+                                    onCheckedChange = { draft = draft.copy(thinkingEnabled = it) },
                                 )
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                AgentSettings.REASONING_EFFORTS.forEach { effort ->
+                                    FilterChip(
+                                        selected = draft.reasoningEffort == effort,
+                                        onClick = { draft = draft.copy(reasoningEffort = effort) },
+                                        label = { Text(effort) },
+                                    )
+                                }
                             }
                         }
                     }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                    SettingsSection(
+                        title = "Agent",
+                        summary = "Net ${if (draft.networkEnabled) "on" else "off"} · Run ${if (draft.execAllowed == true) "on" else "off"}",
+                        expanded = openSection == "agent",
+                        onToggle = { openSection = if (openSection == "agent") "" else "agent" },
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Agent network", style = MaterialTheme.typography.labelLarge)
-                            Text(
-                                text = "Let the agent download files and install modules.",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Switch(
+                        ToggleRow(
+                            title = "Agent network",
+                            detail = "Let the agent download files and install modules.",
                             checked = draft.networkEnabled,
                             onCheckedChange = { draft = draft.copy(networkEnabled = it) },
                         )
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Run installed programs", style = MaterialTheme.typography.labelLarge)
-                            Text(
-                                text = "Lets the agent install and start compilers inside this app. Asked once if left unset.",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Switch(
+                        ToggleRow(
+                            title = "Run installed programs",
+                            detail = "Lets the agent install and start compilers inside this app. Asked once if left unset.",
                             checked = draft.execAllowed == true,
                             onCheckedChange = { draft = draft.copy(execAllowed = it) },
                         )
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Auto-approve edits", style = MaterialTheme.typography.labelLarge)
-                            Text(
-                                text = "Reserved for the diff review flow; edits already apply immediately.",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Switch(
+                        ToggleRow(
+                            title = "Auto-approve edits",
+                            detail = "Reserved for the diff review flow; edits already apply immediately.",
                             checked = draft.autoApproveEdits,
                             onCheckedChange = { draft = draft.copy(autoApproveEdits = it) },
                         )
                     }
-
-                    RemoteSettingsSection(
-                        draft = draft,
-                        onDraft = { draft = it },
-                        onTest = onTestRemote,
-                    )
-                }
-
-                HorizontalDivider()
-                Column(
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text("Profile", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        text = "Saved in CEditNeuro/profiles on this phone. A new install loads the active profile after storage access.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(
-                            value = profileDraft,
-                            onValueChange = { profileDraft = it },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true,
-                            label = { Text("Name") },
+                    SettingsSection(
+                        title = "Servers",
+                        summary = draft.remotes.find { it.id == draft.activeRemoteId }?.label() ?: "None",
+                        expanded = openSection == "servers",
+                        onToggle = { openSection = if (openSection == "servers") "" else "servers" },
+                    ) {
+                        RemoteSettingsSection(
+                            draft = draft,
+                            onDraft = { draft = it },
+                            onTest = onTestRemote,
                         )
-                        TextButton(
-                            onClick = { onSaveProfile(profileDraft) },
-                            enabled = profileDraft.isNotBlank(),
-                        ) { Text("Save") }
                     }
-                    if (profileNames.isNotEmpty()) {
-                        Row(
-                            modifier = Modifier.horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            profileNames.forEach { name ->
-                                FilterChip(
-                                    selected = name == profileName,
-                                    onClick = { onUseProfile(name) },
-                                    label = { Text(name) },
-                                )
+                    SettingsSection(
+                        title = "Profile",
+                        summary = profileName,
+                        expanded = openSection == "profile",
+                        onToggle = { openSection = if (openSection == "profile") "" else "profile" },
+                    ) {
+                        Text(
+                            text = "Saved in CEditNeuro/profiles on this phone. A new install loads the active profile after storage access.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            OutlinedTextField(
+                                value = profileDraft,
+                                onValueChange = { profileDraft = it },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true,
+                                label = { Text("Name") },
+                            )
+                            TextButton(
+                                onClick = { onSaveProfile(profileDraft) },
+                                enabled = profileDraft.isNotBlank(),
+                            ) { Text("Save") }
+                        }
+                        if (profileNames.isNotEmpty()) {
+                            Row(
+                                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                profileNames.forEach { name ->
+                                    FilterChip(
+                                        selected = name == profileName,
+                                        onClick = { onUseProfile(name) },
+                                        label = { Text(name) },
+                                    )
+                                }
                             }
                         }
                     }
                 }
+
+                HorizontalDivider()
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 4.dp),
+                        .padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         text = "Version $versionName",
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.weight(1f),
                     )
                     TextButton(onClick = onCheckUpdate) { Text("Check for updates") }
@@ -271,6 +254,76 @@ fun SettingsDialog(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SettingsSection(
+    title: String,
+    summary: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggle)
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleSmall)
+                if (!expanded) {
+                    Text(
+                        text = summary,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Icon(
+                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = if (expanded) "Collapse $title" else "Expand $title",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (expanded) {
+            Column(
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                content()
+            }
+        }
+        HorizontalDivider()
+    }
+}
+
+@Composable
+private fun ToggleRow(
+    title: String,
+    detail: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.labelLarge)
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
