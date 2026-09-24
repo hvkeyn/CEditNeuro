@@ -247,6 +247,7 @@ class WorkspaceViewModel(
     private val library = ProjectLibrary(appContext)
     private val readerStore = com.hvkeyn.ceditneuro.data.ReaderStore(appContext)
     private var openPages: List<com.hvkeyn.ceditneuro.reader.BookPage> = emptyList()
+    private var readerImages: Map<String, ByteArray> = emptyMap()
     private var openBookKey: String? = null
     private var sourceText: String = ""
     private val profiles = ProfileStore(appContext)
@@ -532,6 +533,7 @@ class WorkspaceViewModel(
         )
         project.ui = projectSlice(_state.value)
         openPages = emptyList()
+        readerImages = emptyMap()
         openBookKey = null
         sourceText = ""
         val restore = _state.value.reader?.path
@@ -662,6 +664,8 @@ class WorkspaceViewModel(
 
     fun readerPageText(): String = sourceText
 
+    fun readerImages(): Map<String, ByteArray> = readerImages
+
     fun readerTurn(delta: Int) {
         val reader = _state.value.reader ?: return
         readerGoTo((reader.page + delta).coerceIn(0, (reader.pageCount - 1).coerceAtLeast(0)))
@@ -758,6 +762,7 @@ class WorkspaceViewModel(
         val saved = readerStore.read(file.absolutePath)
         val font = saved.fontSp.coerceIn(15, 28)
         sourceText = book.chapters.joinToString("\n") { "\u0000${it.title}\n${it.text}" }
+        readerImages = book.images
         openPages = com.hvkeyn.ceditneuro.reader.BookText.pages(book, charsFor(font))
         openBookKey = file.absolutePath
         val page = if (keepPlace) {

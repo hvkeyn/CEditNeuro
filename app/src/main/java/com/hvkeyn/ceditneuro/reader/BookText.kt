@@ -6,7 +6,11 @@ import java.util.zip.ZipInputStream
 
 data class BookChapter(val title: String, val text: String)
 
-data class ParsedBook(val title: String, val chapters: List<BookChapter>)
+data class ParsedBook(
+    val title: String,
+    val chapters: List<BookChapter>,
+    val images: Map<String, ByteArray> = emptyMap(),
+)
 
 data class BookPage(val chapter: String, val text: String)
 
@@ -48,6 +52,7 @@ object BookText {
         return book.copy(
             title = polish(book.title),
             chapters = book.chapters.map { it.copy(title = polish(it.title), text = polish(it.text)) },
+            images = book.images,
         )
     }
 
@@ -128,7 +133,14 @@ object BookText {
         return ParsedBook(title, chapters)
     }
 
-    private fun htmlBook(name: String, html: String): ParsedBook {
+    private fun htmlBook(
+        name: String,
+        html: String,
+        files: Map<String, ByteArray> = emptyMap(),
+        base: String = "",
+        images: MutableMap<String, ByteArray> = LinkedHashMap(),
+    ): ParsedBook {
+        val withPictures = embedHtmlImages(html, files, base, images)
         val title = Regex("(?is)<title>(.*?)</title>").find(html)?.groupValues?.get(1)?.let(::decode)
             ?: name.substringBeforeLast('.')
         val chapters = ArrayList<BookChapter>()
@@ -136,9 +148,9 @@ object BookText {
         var current = title
         val tokens = Regex("(?is)<h[1-3][^>]*>.*?</h[1-3]>|<p[^>]*>.*?</p>|<br\\s*/?>")
         var cursor = 0
-        for (match in tokens.findAll(html)) {
+        for (match in tokens.findAll(withPictures)) {
             if (match.range.first > cursor) {
-                val gap = stripTags(html.substring(cursor, match.range.first))
+                val gap = stripTags(withPictures.substring(cursor, match.range.first))
                 if (gap.isNotBlank()) body.append(gap).append("\n\n")
             }
             val token = match.value
@@ -152,17 +164,18 @@ object BookText {
             }
             cursor = match.range.last + 1
         }
-        val tail = stripTags(html.substring(cursor))
+        val tail = stripTags(withPictures.substring(cursor))
         if (tail.isNotBlank()) body.append(tail)
         val last = body.toString().trim()
         if (last.isNotEmpty()) chapters.add(BookChapter(current, last))
-        if (chapters.isEmpty()) chapters.add(BookChapter(title, stripTags(html)))
-        return ParsedBook(title, chapters)
+        if (chapters.isEmpty()) chapters.add(BookChapter(title, stripTags(withPictures)))
+        return ParsedBook(title, chapters, images)
     }
 
     private fun parseFb2(bytes: ByteArray, name: String): ParsedBook {
         if (isZip(bytes)) return parseContainer(bytes, name, 0)
         val xml = String(bytes, charset(bytes))
+        val images = fb2Images(xml)
         val title = Regex("(?is)<book-title>(.*?)</book-title>").find(xml)?.groupValues?.get(1)?.let(::decode)
             ?: name.substringBeforeLast('.')
         val body = Regex("(?is)<body\\b[^>]*>(.*)</body>").find(xml)?.groupValues?.get(1) ?: xml
@@ -174,7 +187,9 @@ object BookText {
             paras.clear()
             if (text.isNotEmpty()) chapters.add(BookChapter(current, text))
         }
-        val tokens = Regex("(?is)<title\\b[^>]*>.*?</title>|<p\\b[^>]*>.*?</p>|<empty-line\\s*/?>")
+        val cover = Regex("(?is)<coverpage\\b[^>]*>(.*?)</coverpage>").find(xml)?.groupValues?.get(1).orEmpty()
+        imageMarker(cover, images)?.let { paras.append(it).append("\n\n") }
+        val tokens = Regex("(?is)<title\\b[^>]*>.*?</title>|<image\\b[^>]*?/?>|<p\\b[^>]*>.*?</p>|<empty-line\\s*/?>")
         for (match in tokens.findAll(body)) {
             val token = match.value
             when {
@@ -182,13 +197,15 @@ object BookText {
                     flush()
                     current = stripTags(token).ifBlank { current }
                 }
+                token.startsWith("<image", ignoreCase = true) ->
+                    imageMarker(token, images)?.let { paras.append(it).append("\n\n") }
                 token.startsWith("<empty", ignoreCase = true) -> paras.append("\n\n")
-                else -> paras.append(stripTags(token)).append("\n\n")
+                else -> paras.append(textWithImages(token, images)).append("\n\n")
             }
         }
         flush()
         if (chapters.isEmpty()) chapters.add(BookChapter(title, stripTags(body).ifBlank { stripTags(xml) }))
-        return ParsedBook(title, chapters)
+        return ParsedBook(title, chapters, images)
     }
 
     /**
@@ -215,6 +232,7 @@ object BookText {
             files["mimetype"]?.toString(Charsets.US_ASCII)?.contains("epub") == true
         if (epub) return parseEpub(bytes, name)
         val parts = ArrayList<ParsedBook>()
+        val images = LinkedHashMap<String, ByteArray>()
         for ((path, data) in files) {
             val leaf = path.substringAfterLast('/')
             if (leaf.isEmpty() || leaf.startsWith(".")) continue
@@ -231,6 +249,7 @@ object BookText {
                 else -> null
             } ?: continue
             parts.add(part)
+            part.images.forEach { (id, bytes) -> images.putIfAbsent(id, bytes) }
         }
         if (parts.isEmpty()) error("This archive has no readable book or note.")
         if (parts.size == 1) return parts[0]
@@ -240,7 +259,7 @@ object BookText {
                 chapter.copy(title = if (part.chapters.size == 1) label else "$label · ${chapter.title}")
             }
         }
-        return ParsedBook(name.substringBeforeLast('.'), chapters)
+        return ParsedBook(name.substringBeforeLast('.'), chapters, images)
     }
 
     private fun isZip(bytes: ByteArray): Boolean =
@@ -276,15 +295,66 @@ object BookText {
             id to href
         }
         val chapters = ArrayList<BookChapter>()
+        val images = LinkedHashMap<String, ByteArray>()
         for (id in hrefs) {
             val href = manifest[id] ?: continue
             val key = listOf(href, "$base/$href").firstOrNull { it in files } ?: continue
             val html = files.getValue(key).toString(Charsets.UTF_8)
-            val parsed = htmlBook(href.substringAfterLast('/'), html)
+            val dir = key.substringBeforeLast('/', "")
+            val parsed = htmlBook(href.substringAfterLast('/'), html, files, dir, images)
             chapters.addAll(parsed.chapters)
         }
-        return ParsedBook(title, chapters.ifEmpty { listOf(BookChapter(title, "(empty book)")) })
+        return ParsedBook(title, chapters.ifEmpty { listOf(BookChapter(title, "(empty book)")) }, images)
     }
+
+    private fun fb2Images(xml: String): Map<String, ByteArray> {
+        val images = LinkedHashMap<String, ByteArray>()
+        Regex("(?is)<binary\\b([^>]*)>(.*?)</binary>").findAll(xml).forEach { match ->
+            val id = attr(match.groupValues[1], "id") ?: return@forEach
+            val type = attr(match.groupValues[1], "content-type").orEmpty()
+            if (type.isNotEmpty() && !type.startsWith("image/")) return@forEach
+            val raw = match.groupValues[2].replace(Regex("\\s+"), "")
+            val bytes = runCatching { java.util.Base64.getMimeDecoder().decode(raw) }.getOrNull() ?: return@forEach
+            if (bytes.size in 32..MAX_IMAGE) images[id] = bytes
+        }
+        return images
+    }
+
+    private fun imageMarker(fragment: String, images: Map<String, ByteArray>): String? {
+        val href = Regex("(?is)(?:l:href|xlink:href|href)\\s*=\\s*[\"']#?([^\"']+)[\"']")
+            .find(fragment)?.groupValues?.get(1) ?: return null
+        val id = href.removePrefix("#").substringAfterLast('/')
+        if (id !in images && href !in images) return null
+        val key = if (id in images) id else href
+        return "\u0001$key\u0001"
+    }
+
+    private fun textWithImages(fragment: String, images: Map<String, ByteArray>): String {
+        val marked = Regex("(?is)<image\\b[^>]*?/?>").replace(fragment) { tag ->
+            imageMarker(tag.value, images)?.let { "\n$it\n" } ?: ""
+        }
+        return stripTags(marked)
+    }
+
+    private fun embedHtmlImages(
+        html: String,
+        files: Map<String, ByteArray>,
+        base: String,
+        images: MutableMap<String, ByteArray>,
+    ): String = Regex("(?is)<img\\b[^>]*>|<image\\b[^>]*?/?>").replace(html) { tag ->
+        val src = attr(tag.value, "src") ?: attr(tag.value, "xlink:href") ?: attr(tag.value, "href")
+            ?: return@replace tag.value
+        val clean = java.net.URLDecoder.decode(src.substringBefore('?'), Charsets.UTF_8).removePrefix("#")
+        val key = listOf(clean, "$base/$clean", clean.removePrefix("./")).firstOrNull { it in files } ?: return@replace ""
+        val bytes = files.getValue(key)
+        if (bytes.size !in 32..MAX_IMAGE) return@replace ""
+        val id = "img-${images.size}-${clean.substringAfterLast('/')}"
+        images[id] = bytes
+        "\n\u0001$id\u0001\n"
+    }
+
+    private fun attr(tag: String, name: String): String? =
+        Regex("(?is)(?:^|\\s)${Regex.escape(name)}\\s*=\\s*[\"']([^\"']+)[\"']").find(tag)?.groupValues?.get(1)
 
     private fun stripTags(value: String): String = decode(
         value.replace(Regex("(?is)<(script|style)\\b[^>]*>.*?</\\1>"), " ")
@@ -315,4 +385,5 @@ object BookText {
 
     private const val MAX_BYTES = 8 * 1024 * 1024
     private const val MAX_UNCOMPRESSED = 16 * 1024 * 1024
+    private const val MAX_IMAGE = 2 * 1024 * 1024
 }
