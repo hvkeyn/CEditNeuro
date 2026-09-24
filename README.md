@@ -116,8 +116,10 @@ system installer and opens it after you confirm. Shizuku is not required for tha
 
 Each open folder keeps its own chat and its own agent. Switching folders leaves the other
 run going. The menu button at the top left opens the project list: switch to one already
-open, choose a new folder, or show and hide that folder's files. A strip under the editor
-shows what the other projects are doing.
+open, choose a new folder, or show and hide that folder's files. Save appears only when
+an open file has unsaved edits; several files save together and the button shows how many.
+The globe appears only while the running agent is using the in-app browser. A strip under
+the editor shows what the other projects are doing.
 
 The Android status shade shows one ongoing card per running project: the folder name, the
 elapsed time, and that project's phase. **Stop** and **Continue** on a card apply only to

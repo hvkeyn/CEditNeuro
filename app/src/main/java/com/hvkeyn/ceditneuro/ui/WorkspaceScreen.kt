@@ -20,8 +20,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -48,6 +46,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -66,6 +65,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -76,9 +76,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -88,6 +91,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -120,6 +124,14 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
     val versionName = remember { AppUpdater.localVersion(context) }
     var projectPanelOpen by rememberSaveable { mutableStateOf(true) }
     var projectsMenu by remember { mutableStateOf(false) }
+    var savedFlash by remember { mutableIntStateOf(0) }
+    var showSaved by remember { mutableStateOf(false) }
+    LaunchedEffect(savedFlash) {
+        if (savedFlash == 0) return@LaunchedEffect
+        showSaved = true
+        kotlinx.coroutines.delay(900)
+        showSaved = false
+    }
     var hasStorageAccess by remember { mutableStateOf(hasStorageAccess(context)) }
 
     val legacyStorageLauncher = rememberLauncherForActivityResult(
@@ -297,6 +309,8 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
         snackbarHost = { SnackbarHost(snackbarHostState) },
         contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
+            val barButton = if (shortLandscape) 32.dp else 36.dp
+            CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides barButton) {
             TopAppBar(
                 windowInsets = WindowInsets.safeDrawing.only(
                     WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
@@ -308,7 +322,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                     Box {
                         IconButton(
                             onClick = { projectsMenu = true },
-                            modifier = if (shortLandscape) Modifier.size(40.dp) else Modifier,
+                            modifier = Modifier.size(barButton),
                         ) {
                             Icon(Icons.Default.Menu, contentDescription = "Projects")
                         }
@@ -337,34 +351,55 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                     )
                 },
                 actions = {
-                    Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                        val actionSize = if (shortLandscape) Modifier.size(40.dp) else Modifier
-                        IconButton(onClick = viewModel::saveActiveFile, modifier = actionSize) {
-                            Icon(Icons.Default.Save, contentDescription = "Save file")
-                        }
-                        IconButton(onClick = { showSettings = true }, modifier = actionSize) {
-                            Icon(Icons.Default.Settings, contentDescription = "Settings")
-                        }
-                        IconButton(onClick = viewModel::toggleShell, modifier = actionSize) {
-                            Icon(Icons.Default.Terminal, contentDescription = "Toggle shell")
-                        }
-                        IconButton(onClick = viewModel::toggleChat, modifier = actionSize) {
-                            Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Toggle agent chat")
-                        }
-                        IconButton(onClick = viewModel::toggleWeb, modifier = actionSize) {
-                            Icon(
-                                Icons.Default.Public,
-                                contentDescription = "Toggle browser",
-                                tint = if (state.webVisible) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface
-                                },
-                            )
-                        }
+                    Row {
+                        BarIcon(
+                            icon = Icons.Default.Terminal,
+                            description = "Toggle shell",
+                            active = state.shellVisible,
+                            onClick = viewModel::toggleShell,
+                            size = barButton,
+                        )
+                        BarIcon(
+                            icon = Icons.AutoMirrored.Filled.Chat,
+                            description = "Toggle agent chat",
+                            active = state.chatVisible,
+                            onClick = viewModel::toggleChat,
+                            size = barButton,
+                        )
+                            if (state.agentRunning && state.agentBrowsing) {
+                                BarIcon(
+                                    icon = Icons.Default.Public,
+                                    description = "Agent browser",
+                                    active = state.webVisible,
+                                    onClick = viewModel::toggleWeb,
+                                    size = barButton,
+                                )
+                            }
+                            run {
+                                val unsaved = state.dirtyPaths.size
+                                if (unsaved > 0 || showSaved) {
+                                    BarIcon(
+                                        icon = if (showSaved && unsaved == 0) Icons.Default.Check else Icons.Default.Save,
+                                        description = if (unsaved > 1) "Save $unsaved files" else "Save file",
+                                        active = unsaved > 0,
+                                        badge = unsaved,
+                                        onClick = {
+                                            if (viewModel.saveDirtyFiles()) savedFlash++
+                                        },
+                                        size = barButton,
+                                    )
+                                }
+                            }
+                        BarIcon(
+                            icon = Icons.Default.Settings,
+                            description = "Settings",
+                            onClick = { showSettings = true },
+                            size = barButton,
+                        )
                     }
                 },
             )
+            }
         },
     ) { innerPadding ->
         BoxWithConstraints(
@@ -677,6 +712,35 @@ private fun EditorSurface(
         onContentChanged = viewModel::onEditorTextChanged,
         modifier = modifier,
     )
+}
+
+@Composable
+private fun BarIcon(
+    icon: ImageVector,
+    description: String,
+    onClick: () -> Unit,
+    size: androidx.compose.ui.unit.Dp,
+    active: Boolean = false,
+    badge: Int = 0,
+) {
+    IconButton(onClick = onClick, modifier = Modifier.size(size)) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = description,
+                modifier = Modifier.size(if (size < 36.dp) 18.dp else 20.dp),
+                tint = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            )
+            if (badge > 1) {
+                Text(
+                    text = if (badge > 9) "9+" else badge.toString(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.align(Alignment.TopEnd),
+                )
+            }
+        }
+    }
 }
 
 @Composable
