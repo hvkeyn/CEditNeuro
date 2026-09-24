@@ -16,6 +16,8 @@ data class ReaderRecord(
     val fraction: Float = 0f,
     val theme: String = "sepia",
     val fontSp: Int = 20,
+    val fontName: String = "serif",
+    val spacing: Float = 1.45f,
     val bookmarks: List<Int> = emptyList(),
     val notes: List<ReaderNote> = emptyList(),
 )
