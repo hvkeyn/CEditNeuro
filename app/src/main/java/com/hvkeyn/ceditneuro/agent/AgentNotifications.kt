@@ -21,6 +21,7 @@ data class AgentStatus(
     val focus: String,
     val startedAt: Long,
     val workLine: String,
+    val done: Boolean = false,
 )
 
 /**
@@ -128,9 +129,9 @@ object AgentNotifications {
         val clock = clock(status.startedAt)
         val bars = agentBars(phase)
         val detail = listOfNotNull(
-            status.workLine.takeIf { it.isNotBlank() },
-            status.detail.takeIf { it.isNotBlank() },
             status.focus.takeIf { it.isNotBlank() },
+            status.detail.takeIf { it.isNotBlank() },
+            status.workLine.takeIf { it.isNotBlank() },
         ).joinToString("\n")
 
         val title = "${status.name} · $clock"
@@ -172,14 +173,14 @@ object AgentNotifications {
     private fun buildOutcome(context: Context, status: AgentStatus): Notification {
         ensureChannel(context)
         val clock = clock(status.startedAt)
-        val reason = status.phase.ifBlank { "Stopped" }
+        val reason = status.phase.ifBlank { if (status.done) "+ Done" else "Stopped" }
         val detail = listOfNotNull(
-            status.workLine.takeIf { it.isNotBlank() },
             status.detail.takeIf { it.isNotBlank() },
             status.focus.takeIf { it.isNotBlank() },
+            status.workLine.takeIf { it.isNotBlank() },
         ).joinToString("\n")
 
-        val title = "${status.name} stopped · $clock"
+        val title = if (status.done) "+ ${status.name} · $clock" else "${status.name} stopped · $clock"
         val compact = RemoteViews(context.packageName, R.layout.notification_agent_compact)
         compact.setTextViewText(R.id.agent_title, title)
         compact.setTextViewText(R.id.agent_phase, reason)

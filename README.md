@@ -139,9 +139,11 @@ The globe appears only while the running agent is using the in-app browser. A st
 the editor shows what the other projects are doing.
 
 The Android status shade shows one ongoing card per running project: the folder name, the
-elapsed time, and that project's phase. **Stop** and **Continue** on a card apply only to
-that project. When the last agent finishes, the foreground notification goes away. A stopped
-or failed run leaves a separate card you can continue or swipe away.
+elapsed time, and what the agent is doing in plain words (reading a file, running a command,
+reading the screen). The file or command sits on the next line. A finished step is marked
+`+`. When the run succeeds, the card stays as `+ Done` with the first line of the answer,
+until you swipe it away. **Stop** and **Continue** apply only to that project. A stopped
+or failed run leaves its own card, without the plus.
 
 On a short landscape screen the chat, shell, and page preview open across the editor instead
 of docking into a column that is not on screen.
@@ -151,7 +153,7 @@ of docking into a column that is not on screen.
 Each turn resends the conversation, so the harness keeps the repeated part small.
 
 - The standing instructions do not include the project path, the clock, or which server is connected. That setup is a second system message. DeepSeek can cache the unchanged prefix. The activity line shows `cache hit` and `cache miss` when the API reports them.
-- Reading, editing, search, and the shell are on every request. Installers, the remote tools, and screen automation load through `load_tools`, or come with the build and remote focus.
+- Reading, editing, search, and the shell are on every request. Installers, the remote tools, and screen automation load through `load_tools`, or come with the build and remote focus. That focus, plus network and running installed programs, is in **Language models → Agent**. The chat bar keeps the model and Doctor.
 - `read_file` numbers the first line of a slice and every 10th line.
 - A long `run_command` result is written to a file under `.ceditneuro/tool-output`. The model sees the path and the tail.
 - Screen dumps stay the short tap list from `fetch_system_layout`.

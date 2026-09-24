@@ -17,7 +17,7 @@ fun agentBars(phase: String): AgentBars {
         "preparing" in text -> 8
         "waiting" in text -> (18 + round * 8).coerceAtMost(60)
         "thinking" in text -> (32 + round * 8).coerceAtMost(74)
-        "done" in text -> (70 + round * 4).coerceAtMost(96)
+        "done" in text || text.startsWith("+") -> (70 + round * 4).coerceAtMost(96)
         else -> (48 + round * 6).coerceAtMost(88)
     }
     val step = when {

@@ -1219,22 +1219,26 @@ class WorkspaceViewModel(
             project.liveAnswer.clear()
             commitRunContext(project, text)
             val outcome = project.runOutcome
-            val started = project.ui.agentActivity?.startedAt ?: System.currentTimeMillis()
+            val activity = project.ui.agentActivity
+            val started = activity?.startedAt ?: System.currentTimeMillis()
+            val summary = text.lineSequence().firstOrNull { it.isNotBlank() }?.trim()?.take(160)
             if (current !== project) {
-                project.unseenResult = outcome
-                    ?: text.lineSequence().firstOrNull { it.isNotBlank() }?.take(80)
-                    ?: "Finished"
+                project.unseenResult = outcome ?: summary?.take(80) ?: "+ Done"
             }
             editProject(project) { it.copy(agentRunning = false, agentActivity = null) }
-            val key = project.workspace.root.canonicalPath
-            if (outcome == null) {
-                AgentNotifications.dismiss(appContext, key)
-            } else {
-                AgentNotifications.settle(
-                    appContext,
-                    agentStatus(project, outcome, workLine(), "", started),
+            val status = if (outcome == null) {
+                agentStatus(
+                    project,
+                    phase = "+ Done",
+                    detail = summary?.ifBlank { null } ?: "Finished",
+                    focus = activity?.focus.orEmpty(),
+                    startedAt = started,
+                    done = true,
                 )
+            } else {
+                agentStatus(project, outcome, workLine(), activity?.focus.orEmpty(), started)
             }
+            AgentNotifications.settle(appContext, status)
             persistNow(project)
         }
     }
@@ -1659,7 +1663,11 @@ class WorkspaceViewModel(
                     text = visibleToolArguments(event.name, event.arguments),
                     toolName = "${event.name} →",
                 )
-                setActivity(project, phase = event.name, focus = toolFocus(event.name, event.arguments))
+                setActivity(
+                    project,
+                    phase = toolPhase(event.name, finished = false, error = false),
+                    focus = toolFocus(event.name, event.arguments),
+                )
             }
 
             is AgentEvent.ToolFinished -> {
@@ -1674,7 +1682,7 @@ class WorkspaceViewModel(
                     .firstOrNull { it.isNotBlank() }
                     .orEmpty()
                     .take(140)
-                val phase = if (event.result.isError) "${event.name} failed" else "${event.name} done"
+                val phase = toolPhase(event.name, finished = true, error = event.result.isError)
                 setActivity(project, phase = phase, focus = line)
             }
 
@@ -1768,12 +1776,57 @@ class WorkspaceViewModel(
         )
     }
 
+    private fun toolPhase(name: String, finished: Boolean, error: Boolean): String {
+        val action = when (name) {
+            "read_file" -> "Reading a file"
+            "write_file" -> "Writing a file"
+            "edit_file" -> "Editing a file"
+            "list_dir" -> "Listing a folder"
+            "grep" -> "Searching the project"
+            "glob" -> "Finding files"
+            "mkdir" -> "Creating a folder"
+            "delete_path" -> "Deleting"
+            "move_path" -> "Moving a file"
+            "git_status" -> "Checking git"
+            "git_diff" -> "Reading the diff"
+            "run_command" -> "Running a command"
+            "zip_paths" -> "Packing a zip"
+            "http_request" -> "Requesting a page"
+            "load_tools" -> "Loading tools"
+            "fetch_system_layout" -> "Reading the screen"
+            "execute_system_action" -> "Tapping the screen"
+            "shizuku_exec" -> "Running a shell command"
+            "install_apk" -> "Installing an APK"
+            "install_jdk" -> "Installing the JDK"
+            "install_android_sdk" -> "Installing the Android SDK"
+            "install_runtime" -> "Installing a runtime"
+            "install_program" -> "Installing a program"
+            "install_module" -> "Installing a module"
+            "net_info" -> "Checking the network"
+            "remote_connect" -> "Connecting to a server"
+            "remote_list" -> "Listing a remote folder"
+            "remote_read" -> "Reading a remote file"
+            "remote_write" -> "Writing a remote file"
+            "remote_put" -> "Uploading"
+            "remote_get" -> "Downloading"
+            "ssh_exec" -> "Running a remote command"
+            "browse_page" -> "Opening a page"
+            else -> name.replace('_', ' ').replaceFirstChar { it.uppercase() }
+        }
+        return when {
+            error -> "$action failed"
+            finished -> "+ $action"
+            else -> action
+        }
+    }
+
     private fun agentStatus(
         project: LiveProject,
         phase: String,
         detail: String,
         focus: String,
         startedAt: Long,
+        done: Boolean = false,
     ): AgentStatus = AgentStatus(
         key = project.workspace.root.canonicalPath,
         name = project.workspace.root.name.ifBlank { "Agent" },
@@ -1782,6 +1835,7 @@ class WorkspaceViewModel(
         focus = focus,
         startedAt = startedAt,
         workLine = workLine(),
+        done = done,
     )
 
     private fun workLine(): String {
