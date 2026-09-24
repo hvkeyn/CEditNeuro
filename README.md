@@ -115,7 +115,7 @@ system installer and opens it after you confirm. Shizuku is not required for tha
 
 ## Reading
 
-Long-press a file and choose **Read**, or open it and tap the book icon. txt, Markdown, HTML, FB2, and EPUB open as pages: tap the left side for the previous page and the right side for the next. The center shows the title bar. Day, sepia, and night paper, type size, a table of contents, bookmarks, and notes stay on this phone. They are not written into the project.
+Long-press a file and choose **Read**, or open it and tap the book icon. txt, Markdown, HTML, FB2, and EPUB are shown as text, not raw markup: headings, lists, wiki links, and tables become readable lines. Pages are fitted to the screen and laid out again when you rotate or change the type. Tap the center, then the sliders icon, for size, serif or sans, spacing, and day, sepia, or night paper. Bookmarks and notes stay on this phone.
 
 ## Several projects
 

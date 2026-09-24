@@ -127,6 +127,8 @@ data class ReaderView(
     val chapter: String,
     val theme: String,
     val fontSp: Int,
+    val fontName: String,
+    val spacing: Float,
     val bookmarked: Boolean,
     val percent: Int,
     val toc: List<ReaderToc>,
@@ -234,6 +236,7 @@ class WorkspaceViewModel(
     private val readerStore = com.hvkeyn.ceditneuro.data.ReaderStore(appContext)
     private var openPages: List<com.hvkeyn.ceditneuro.reader.BookPage> = emptyList()
     private var openBookKey: String? = null
+    private var sourceText: String = ""
     private val profiles = ProfileStore(appContext)
     private var profileJob: Job? = null
     private var activeProfileName = "default"
@@ -611,7 +614,7 @@ class WorkspaceViewModel(
         _state.update { it.copy(reader = null) }
     }
 
-    fun readerPageText(): String = openPages.getOrNull(_state.value.reader?.page ?: -1)?.text.orEmpty()
+    fun readerPageText(): String = sourceText
 
     fun readerTurn(delta: Int) {
         val reader = _state.value.reader ?: return
@@ -626,9 +629,42 @@ class WorkspaceViewModel(
 
     fun readerFont(delta: Int) {
         val reader = _state.value.reader ?: return
-        val size = (reader.fontSp + delta).coerceIn(14, 32)
+        val size = (reader.fontSp + delta).coerceIn(15, 28)
         if (size == reader.fontSp) return
-        reflow(reader.path, size, reader.theme, reader.page.toFloat() / reader.pageCount.coerceAtLeast(1))
+        readerStyle(size, reader.fontName, reader.spacing, reader.theme)
+    }
+
+    fun readerStyle(fontSp: Int, fontName: String, spacing: Float, theme: String) {
+        val reader = _state.value.reader ?: return
+        val record = readerStore.read(reader.path)
+        readerStore.write(
+            record.copy(
+                fontSp = fontSp.coerceIn(15, 28),
+                fontName = fontName,
+                spacing = spacing,
+                theme = theme,
+            ),
+        )
+        publishReader(reader.path, reader.page, theme, fontSp, reader.title, fontName, spacing)
+    }
+
+    fun readerProgress(page: Int, pageCount: Int, chapter: String) {
+        val reader = _state.value.reader ?: return
+        if (page == reader.page && pageCount == reader.pageCount && chapter == reader.chapter) return
+        val record = readerStore.read(reader.path)
+        val count = pageCount.coerceAtLeast(1)
+        readerStore.write(record.copy(page = page, fraction = page.toFloat() / count))
+        _state.update {
+            it.copy(
+                reader = reader.copy(
+                    page = page,
+                    pageCount = count,
+                    chapter = chapter,
+                    percent = ((page + 1) * 100 / count),
+                    bookmarked = page in record.bookmarks,
+                ),
+            )
+        }
     }
 
     fun readerCycleTheme() {
@@ -674,7 +710,8 @@ class WorkspaceViewModel(
         }
         val book = com.hvkeyn.ceditneuro.reader.BookText.parse(name, file.readBytes())
         val saved = readerStore.read(file.absolutePath)
-        val font = saved.fontSp.coerceIn(14, 32)
+        val font = saved.fontSp.coerceIn(15, 28)
+        sourceText = book.chapters.joinToString("\n") { "\u0000${it.title}\n${it.text}" }
         openPages = com.hvkeyn.ceditneuro.reader.BookText.pages(book, charsFor(font))
         openBookKey = file.absolutePath
         val page = if (keepPlace) {
@@ -682,7 +719,7 @@ class WorkspaceViewModel(
         } else {
             saved.page
         }.coerceIn(0, openPages.lastIndex.coerceAtLeast(0))
-        publishReader(file.absolutePath, page, saved.theme, font, book.title)
+        publishReader(file.absolutePath, page, saved.theme, font, book.title, saved.fontName, saved.spacing)
     }
 
     private fun reflow(path: String, font: Int, theme: String, fraction: Float) {
@@ -695,7 +732,15 @@ class WorkspaceViewModel(
         publishReader(file.absolutePath, page, theme, font)
     }
 
-    private fun publishReader(path: String, page: Int, theme: String, font: Int, title: String? = null) {
+    private fun publishReader(
+        path: String,
+        page: Int,
+        theme: String,
+        font: Int,
+        title: String? = null,
+        fontName: String? = null,
+        spacing: Float? = null,
+    ) {
         val record = readerStore.read(path)
         val shown = openPages.getOrNull(page)
         val count = openPages.size.coerceAtLeast(1)
@@ -711,6 +756,8 @@ class WorkspaceViewModel(
             chapter = shown?.chapter.orEmpty(),
             theme = theme,
             fontSp = font,
+            fontName = fontName ?: record.fontName,
+            spacing = spacing ?: record.spacing,
             bookmarked = page in record.bookmarks,
             percent = ((page + 1) * 100 / count),
             toc = toc,
@@ -724,6 +771,8 @@ class WorkspaceViewModel(
                 fraction = page.toFloat() / count,
                 theme = theme,
                 fontSp = font,
+                fontName = fontName ?: record.fontName,
+                spacing = spacing ?: record.spacing,
             ),
         )
         _state.update { it.copy(reader = view) }

@@ -17,13 +17,41 @@ object BookText {
 
     fun parse(name: String, bytes: ByteArray): ParsedBook {
         if (bytes.size > MAX_BYTES) error("This file is larger than 8 MB.")
-        return when (extension(name)) {
+        val book = when (extension(name)) {
             "epub" -> parseEpub(bytes, name)
             "fb2" -> parseFb2(bytes, name)
             "html", "htm" -> htmlBook(name, String(bytes, charset(bytes)))
             "md", "markdown" -> markdownBook(name, String(bytes, charset(bytes)))
             else -> plainBook(name, String(bytes, charset(bytes)))
         }
+        return book.copy(
+            title = polish(book.title),
+            chapters = book.chapters.map { it.copy(title = polish(it.title), text = polish(it.text)) },
+        )
+    }
+
+    /** Turns Markdown, wiki links, and pipe tables into lines meant to be read. */
+    fun polish(text: String): String {
+        var value = text.replace("\r\n", "\n")
+        value = Regex("\\[\\[([^\\]|]+)\\|([^\\]]+)]]").replace(value) { it.groupValues[2].trim() }
+        value = Regex("\\[\\[([^\\]]+)]]").replace(value) {
+            it.groupValues[1].substringAfterLast('/').substringAfterLast('|').trim()
+        }
+        value = Regex("!\\[[^\\]]*]\\([^)]*\\)").replace(value, "")
+        value = Regex("\\[([^\\]]+)]\\([^)]*\\)").replace(value) { it.groupValues[1] }
+        value = Regex("`{1,3}([^`]*)`{1,3}").replace(value) { it.groupValues[1] }
+        value = value.replace("**", "").replace("__", "").replace("~~", "")
+        return value.lineSequence().joinToString("\n") { line ->
+            val trimmed = line.trim()
+            when {
+                trimmed.startsWith("|") && trimmed.contains("---") -> ""
+                trimmed.startsWith("|") && trimmed.endsWith("|") ->
+                    trimmed.trim('|').split('|').joinToString("  ·  ") { it.trim() }
+                trimmed.startsWith(">") -> trimmed.trimStart('>', ' ')
+                trimmed.startsWith("- ") || trimmed.startsWith("* ") -> "• ${trimmed.drop(2)}"
+                else -> line
+            }
+        }.replace(Regex("\n{3,}"), "\n\n").trim()
     }
 
     fun pages(book: ParsedBook, charsPerPage: Int): List<BookPage> {
