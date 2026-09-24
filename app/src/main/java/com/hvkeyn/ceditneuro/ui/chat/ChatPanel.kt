@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.size
@@ -43,6 +45,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -50,7 +53,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -85,6 +90,7 @@ import com.hvkeyn.ceditneuro.ui.WorkspaceUiState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatPanel(
     state: WorkspaceUiState,
@@ -268,6 +274,8 @@ fun ChatPanel(
                     maxLines = 2,
                 )
             }
+            val buttonSize = if (compact) 32.dp else 40.dp
+            CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides buttonSize) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -278,28 +286,23 @@ fun ChatPanel(
                 OutlinedTextField(
                     value = input,
                     onValueChange = { input = it },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .defaultMinSize(minWidth = 0.dp)
+                        .heightIn(max = if (compact) 48.dp else 96.dp),
                     placeholder = { Text(if (listening) "Listening…" else if (compact) "Message" else "Ask the agent…") },
                     singleLine = compact,
-                    maxLines = if (compact) 1 else 4,
+                    maxLines = if (compact) 1 else 3,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
                 )
-                RoundAction(
-                    icon = Icons.Filled.AttachFile,
-                    description = "Attach a file",
-                    filled = attachments.isNotEmpty(),
-                    size = if (compact) 32.dp else 40.dp,
-                    enabled = state.projectRoot != null && !state.agentRunning,
-                    onClick = { picker.launch(arrayOf("*/*")) },
-                )
-                RoundAction(
-                    icon = Icons.Filled.Mic,
-                    description = if (listening) "Stop dictation" else "Dictate",
-                    filled = listening,
-                    danger = listening,
-                    size = if (compact) 32.dp else 40.dp,
-                    enabled = state.projectRoot != null && (!state.agentRunning || listening),
-                    onClick = {
+                ComposerActions(
+                    state = state,
+                    listening = listening,
+                    input = input,
+                    attachments = attachments,
+                    buttonSize = buttonSize,
+                    onAttach = { picker.launch(arrayOf("*/*")) },
+                    onMic = {
                         if (listening) {
                             dictation.stop()
                         } else if (
@@ -311,35 +314,12 @@ fun ChatPanel(
                             micPermission.launch(Manifest.permission.RECORD_AUDIO)
                         }
                     },
-                )
-                RoundAction(
-                    icon = Icons.Filled.PlayArrow,
-                    description = "Continue",
-                    filled = false,
-                    size = if (compact) 32.dp else 40.dp,
-                    enabled = !state.agentRunning && state.projectRoot != null && state.chat.isNotEmpty(),
-                    onClick = onContinue,
-                )
-                RoundAction(
-                    icon = Icons.Filled.Stop,
-                    description = "Stop",
-                    filled = state.agentRunning,
-                    danger = true,
-                    size = if (compact) 32.dp else 40.dp,
-                    enabled = state.agentRunning,
-                    onClick = onCancel,
-                )
-                RoundAction(
-                    icon = Icons.AutoMirrored.Filled.Send,
-                    description = "Send",
-                    filled = true,
-                    size = if (compact) 32.dp else 40.dp,
-                    enabled = !state.agentRunning && state.projectRoot != null &&
-                        (input.isNotBlank() || attachments.isNotEmpty()),
-                    onClick = {
+                    onContinue = onContinue,
+                    onCancel = onCancel,
+                    onSend = {
                         if (listening) {
                             dictation.stop()
-                            return@RoundAction
+                            return@ComposerActions
                         }
                         val prompt = input.trim()
                         val files = attachments
@@ -351,6 +331,7 @@ fun ChatPanel(
                     },
                 )
             }
+            }
             voiceNote?.let { note ->
                 Text(
                     text = note,
@@ -361,6 +342,64 @@ fun ChatPanel(
             }
         }
     }
+}
+
+@Composable
+private fun ComposerActions(
+    state: WorkspaceUiState,
+    listening: Boolean,
+    input: String,
+    attachments: List<Uri>,
+    buttonSize: androidx.compose.ui.unit.Dp,
+    onAttach: () -> Unit,
+    onMic: () -> Unit,
+    onContinue: () -> Unit,
+    onCancel: () -> Unit,
+    onSend: () -> Unit,
+) {
+    RoundAction(
+        icon = Icons.Filled.AttachFile,
+        description = "Attach a file",
+        filled = attachments.isNotEmpty(),
+        size = buttonSize,
+        enabled = state.projectRoot != null && !state.agentRunning,
+        onClick = onAttach,
+    )
+    RoundAction(
+        icon = Icons.Filled.Mic,
+        description = if (listening) "Stop dictation" else "Dictate",
+        filled = listening,
+        danger = listening,
+        size = buttonSize,
+        enabled = state.projectRoot != null && (!state.agentRunning || listening),
+        onClick = onMic,
+    )
+    RoundAction(
+        icon = Icons.Filled.PlayArrow,
+        description = "Continue",
+        filled = false,
+        size = buttonSize,
+        enabled = !state.agentRunning && state.projectRoot != null && state.chat.isNotEmpty(),
+        onClick = onContinue,
+    )
+    RoundAction(
+        icon = Icons.Filled.Stop,
+        description = "Stop",
+        filled = state.agentRunning,
+        danger = true,
+        size = buttonSize,
+        enabled = state.agentRunning,
+        onClick = onCancel,
+    )
+    RoundAction(
+        icon = Icons.AutoMirrored.Filled.Send,
+        description = "Send",
+        filled = true,
+        size = buttonSize,
+        enabled = !state.agentRunning && state.projectRoot != null &&
+            (input.isNotBlank() || attachments.isNotEmpty()),
+        onClick = onSend,
+    )
 }
 
 @Composable

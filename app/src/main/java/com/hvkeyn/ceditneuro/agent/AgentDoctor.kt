@@ -47,7 +47,7 @@ object AgentDoctor {
                     once.take(8).forEach { append(it.render()) }
                 }
                 append("\nWhat to change\n")
-                advice(findings.keys).forEach { append("- ").append(it).append('\n') }
+                advice(findings.values.map { it.kind }.toSet()).forEach { append("- ").append(it).append('\n') }
             }
             append("\nSend this report back and fix only the repeated failures. ")
             append("Do not read other apps' private files and do not invent permissions Android will not grant.\n")
@@ -76,7 +76,9 @@ object AgentDoctor {
         return when {
             "securityexception" in line -> "SecurityException"
             "permission denied" in line -> "Permission denied"
-            "shizuku is not running" in line || "cannot grant itself" in line -> "shell access missing"
+            "unable to resolve host" in line || "no address associated" in line -> "host did not resolve"
+            "shizuku is not running" in line || "cannot grant itself" in line || "shell access is not available" in line ->
+                "shell access missing"
             "cannot link" in line -> "binary will not start"
             "timed out" in line -> "timed out"
             "http 400" in line || "tool_calls" in line && "400" in line -> "tool call rejected"
@@ -90,7 +92,10 @@ object AgentDoctor {
     private fun advice(kinds: Set<String>): List<String> {
         val lines = mutableListOf<String>()
         if ("shell access missing" in kinds || "SecurityException" in kinds) {
-            lines += "dumpsys, input, and screencap need Shizuku or root. Use net_info for this app's network and install_apk for APKs."
+            lines += "Do not call shizuku_exec, fetch_system_layout, or execute_system_action again. They cannot run until the user starts Shizuku or roots the phone. Use run_command, net_info, and install_apk."
+        }
+        if ("host did not resolve" in kinds) {
+            lines += "That hostname did not resolve. Do not fetch it again. Choose a different URL."
         }
         if ("Permission denied" in kinds) {
             lines += "Do not read /proc/net or another app's data. Stay on paths the tool already returned."

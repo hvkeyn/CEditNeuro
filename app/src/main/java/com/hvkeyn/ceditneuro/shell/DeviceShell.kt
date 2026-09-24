@@ -164,7 +164,16 @@ class DeviceShell(
             )
         }.getOrElse { error ->
             part.delete()
-            ShellOutput(1, error.message ?: "Download failed.", timedOut = false)
+            val detail = error.message ?: "Download failed."
+            val text = if (
+                detail.contains("Unable to resolve host", ignoreCase = true) ||
+                detail.contains("No address associated", ignoreCase = true)
+            ) {
+                "$detail Do not retry this URL."
+            } else {
+                detail
+            }
+            ShellOutput(1, text, timedOut = false)
         }
     }
 

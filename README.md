@@ -32,7 +32,8 @@ layer is wired end to end.
 | One agent per open project, with its own shade card | done |
 | Install and open an APK with `install_apk` (no Shizuku) | done |
 | Shared-storage paths follow this phone's real storage root and Downloads folder | done |
-| Book and note reader (txt, Markdown, HTML, FB2, EPUB) with pages, bookmarks, and notes | done |
+| Book and note reader (txt, Markdown, HTML, FB2, EPUB, or a zip of those) with pages, bookmarks, and notes | done |
+| Foreground layout and tap (`fetch_system_layout`, `execute_system_action`) when Shizuku or root is already allowed | done |
 | Update check at the bottom of Language models settings | done — install starts only after confirmation |
 | Phone profile in `CEditNeuro/profiles` survives uninstall and loads on the next install | done |
 | `install_jdk`, `install_android_sdk`, `install_runtime` from the Termux mirror | done |
@@ -116,10 +117,12 @@ the file manager would not show the file.
 The shell variable `HOME` is this app's private directory. `DOWNLOAD` is the public
 Downloads folder. `install_apk` installs an APK that is already on the device through the
 system installer and opens it after you confirm. Shizuku is not required for that.
+When Shizuku is already running, or the phone is rooted, `fetch_system_layout` returns
+the foreground UI XML and `execute_system_action` taps one point taken from that layout.
 
 ## Reading
 
-Long-press a file and choose **Read**, or open it and tap the book icon. txt, Markdown, HTML, FB2, and EPUB are shown as text, not raw markup: headings, lists, wiki links, and tables become readable lines. Pages are fitted to the screen and laid out again when you rotate or change the type. Tap the center, then the sliders icon, for size, serif or sans, spacing, and day, sepia, or night paper. Bookmarks and notes stay on this phone.
+Long-press a file and choose **Read**, or open it and tap the book icon. txt, Markdown, HTML, FB2, and EPUB are shown as text, not raw markup. A catalog FB2 is often a zip, and a zip of those files opens as one book. Headings, lists, wiki links, and tables become readable lines. Pages are fitted to the screen and laid out again when you rotate or change the type. Tap the center, then the sliders icon, for size, serif or sans, spacing, and day, sepia, or night paper. Bookmarks and notes stay on this phone.
 
 ## Several projects
 

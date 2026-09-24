@@ -95,6 +95,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -347,9 +348,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                         text = state.projectName ?: "CEditNeuro",
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { projectsMenu = true },
+                        modifier = Modifier.clickable { projectsMenu = true },
                     )
                 },
                 actions = {
@@ -357,15 +356,17 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                         BarIcon(
                             icon = Icons.Default.MenuBook,
                             description = "Read book or note",
-                            active = state.reader != null,
+                            active = state.reader != null && state.readerInFront,
                             onClick = {
                                 val path = state.activePath
-                                if (path == null) {
-                                    viewModel.openReader("")
-                                } else if (state.reader?.path?.endsWith(path) == true) {
-                                    viewModel.closeReader()
-                                } else {
-                                    viewModel.openReader(path)
+                                val reader = state.reader
+                                when {
+                                    reader != null && !state.readerInFront -> viewModel.showReader()
+                                    reader != null && path != null && !reader.path.endsWith(path) ->
+                                        viewModel.openReader(path)
+                                    reader != null -> viewModel.closeReader()
+                                    path.isNullOrBlank() -> viewModel.openReader("")
+                                    else -> viewModel.openReader(path)
                                 }
                             },
                             size = barButton,
@@ -373,14 +374,14 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                         BarIcon(
                             icon = Icons.Default.Terminal,
                             description = "Toggle shell",
-                            active = state.shellVisible,
+                            active = state.shellVisible && (state.reader == null || !state.readerInFront),
                             onClick = viewModel::toggleShell,
                             size = barButton,
                         )
                         BarIcon(
                             icon = Icons.AutoMirrored.Filled.Chat,
                             description = "Toggle agent chat",
-                            active = state.chatVisible,
+                            active = state.chatVisible && (state.reader == null || !state.readerInFront),
                             onClick = viewModel::toggleChat,
                             size = barButton,
                         )
@@ -433,10 +434,11 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                 shellVisible = state.shellVisible,
                 treeOpen = projectPanelOpen,
             )
+            val editorOpen = state.openFiles.isNotEmpty()
             val showTree = if (panes.splitTree) {
                 projectPanelOpen
             } else {
-                projectPanelOpen || state.activePath == null
+                projectPanelOpen || !editorOpen
             }
             val editorColumn = panes.splitTree || !showTree
             val dockChat = editorColumn && panes.chatWidth != null
@@ -581,14 +583,16 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                     onBookmark = viewModel::readerToggleBookmark,
                     onAddNote = viewModel::readerAddNote,
                     onDeleteNote = viewModel::readerDeleteNote,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .zIndex(if (state.readerInFront) 2f else -1f),
                 )
             }
             AnimatedVisibility(
                 visible = state.chatVisible && !dockChat,
                 enter = slideInHorizontally { width -> width },
                 exit = slideOutHorizontally { width -> width },
-                modifier = Modifier.align(Alignment.CenterEnd),
+                modifier = Modifier.align(Alignment.CenterEnd).zIndex(1f),
             ) {
                 AgentChat(
                     viewModel = viewModel,
@@ -607,7 +611,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                 visible = state.shellVisible && !dockShell,
                 enter = slideInHorizontally { width -> width },
                 exit = slideOutHorizontally { width -> width },
-                modifier = Modifier.align(Alignment.CenterEnd),
+                modifier = Modifier.align(Alignment.CenterEnd).zIndex(1f),
             ) {
                 ShellPanel(
                     state = state,

@@ -273,36 +273,31 @@ private fun paginate(
     height: Int,
 ): Spread {
     if (text.isBlank()) return Spread(listOf(0..0), listOf(""))
+    val sample = "Строка для замера ширины страницы читалки. ".repeat(6)
+    val layout = measurer.measure(sample, style = style, constraints = Constraints(maxWidth = width))
+    val lines = layout.lineCount.coerceAtLeast(1)
+    val lineHeight = (layout.size.height / lines).coerceAtLeast(1)
+    val charsPerLine = (sample.length / lines).coerceAtLeast(12)
+    val budget = (charsPerLine * (height / lineHeight).coerceAtLeast(1)).coerceIn(240, 3_200)
     val ranges = ArrayList<IntRange>()
     val chapters = ArrayList<String>()
     var chapter = ""
     var start = 0
     while (start < text.length) {
-        val marker = text.indexOf('\u0000', start)
-        if (marker == start) {
+        if (text[start] == '\u0000') {
             val endTitle = text.indexOf('\n', start + 1).let { if (it < 0) text.length else it }
             chapter = text.substring(start + 1, endTitle).trim()
             start = (endTitle + 1).coerceAtMost(text.length)
             continue
         }
-        val window = min(text.length, start + 2_400)
-        var low = start + 1
-        var high = window
-        var best = low
-        while (low <= high) {
-            val mid = (low + high) ushr 1
-            val slice = text.substring(start, mid).trimStart('\u0000')
-            val measured = measurer.measure(slice, style = style, constraints = Constraints(maxWidth = width))
-            if (measured.size.height <= height) {
-                best = mid
-                low = mid + 1
-            } else {
-                high = mid - 1
-            }
+        val window = min(text.length, start + budget)
+        val broken = if (window >= text.length) {
+            window
+        } else {
+            text.lastIndexOf('\n', window - 1).takeIf { it > start + budget / 5 }
+                ?: text.lastIndexOf(' ', window - 1).takeIf { it > start + budget / 5 }
+                ?: window
         }
-        val broken = text.lastIndexOf('\n', best - 1).takeIf { it > start + 40 }
-            ?: text.lastIndexOf(' ', best - 1).takeIf { it > start + 40 }
-            ?: best
         val end = broken.coerceIn(start + 1, text.length)
         ranges.add(start until end)
         chapters.add(chapter)
