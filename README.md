@@ -32,7 +32,7 @@ layer is wired end to end.
 | One agent per open project, with its own shade card | done |
 | Install and open an APK with `install_apk` (no Shizuku) | done |
 | Shared-storage paths follow this phone's real storage root and Downloads folder | done |
-| Book and note reader (txt, Markdown, HTML, FB2, EPUB, or a zip of those) with pages, bookmarks, and notes | done |
+| Book and note reader (txt, Markdown, HTML, FB2, EPUB, or a zip of those) with pages, bookmarks, notes, and a book chat | done |
 | Foreground layout and tap (`fetch_system_layout`, `execute_system_action`) when Shizuku or root is already allowed | done |
 | Longer agent runs send a stable prompt, load rare tools on demand, and keep file reads and command output short | done |
 | Prepaid balance for the API key in Language models (DeepSeek and other hosts that publish one) | done |
@@ -127,7 +127,7 @@ the foreground UI XML and `execute_system_action` taps one point taken from that
 
 ## Reading
 
-Long-press a file and choose **Read**, or open it and tap the book icon. txt, Markdown, HTML, FB2, and EPUB are shown as text, not raw markup. Pictures inside FB2, EPUB, and HTML are shown on their own page. A catalog FB2 is often a zip, and a zip of those files opens as one book. Headings, lists, wiki links, and tables become readable lines. Pages are fitted to the screen and laid out again when you rotate or change the type. Tap the center, then the sliders icon, for size, serif or sans, spacing, and day, sepia, or night paper. Bookmarks and notes stay on this phone.
+Long-press a file and choose **Read**, or open it and tap the book icon. txt, Markdown, HTML, FB2, and EPUB are shown as text, not raw markup. Pictures inside FB2, EPUB, and HTML are shown on their own page. Pinch a picture to look closer. **Pen** draws on the page and places keyboard text you can move, rotate, and resize. **Notes** opens that page's comments under the text. **Contents** jumps by chapter, by a saved moment, or along the book. **Book** opens a chat that stays with this file. It reads the book text and does not use the project chat or the file catalog. Question text follows the day, sepia, or night paper. A catalog FB2 is often a zip, and a zip of those files opens as one book. Headings, lists, wiki links, and tables become readable lines. Pages are fitted to the screen and laid out again when you rotate or change the type. Tap the center, then the sliders icon, for size, serif or sans, spacing, and day, sepia, or night paper. Bookmarks and notes stay on this phone.
 
 ## Several projects
 

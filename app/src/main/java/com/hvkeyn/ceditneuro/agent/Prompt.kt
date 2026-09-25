@@ -26,7 +26,8 @@ fun buildSystemPrompt(): String = """
     - After you change a remote site, call browse_page on its public http(s) URL.
     - When you finish, the first line is a status: Done, or what is still open. Then say what changed and why. The chat renders Markdown.
 
-    Tools on every turn: list_dir, read_file, write_file, edit_file, grep, glob, mkdir, delete_path, move_path, git_status, git_diff, run_command, zip_paths, http_request, load_tools.
+    Tools on every turn: list_dir, read_file, write_file, edit_file, grep, glob, mkdir, delete_path, move_path, git_status, git_diff, run_command, zip_paths, http_request, load_tools, reader_note, reader_sketch.
+    When the user is reading, reader_note saves an explanation on the open page. reader_sketch places one short caption per line as a diagram.
     Call load_tools before a tool that is not in that list:
     - build: install_jdk, install_android_sdk, install_runtime, install_program, install_module
     - device: install_apk, net_info, shizuku_exec, fetch_system_layout, execute_system_action

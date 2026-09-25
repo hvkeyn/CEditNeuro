@@ -21,6 +21,8 @@ object ToolGroups {
         "zip_paths",
         "http_request",
         "load_tools",
+        "reader_note",
+        "reader_sketch",
     )
 
     val groups: Map<String, List<String>> = linkedMapOf(

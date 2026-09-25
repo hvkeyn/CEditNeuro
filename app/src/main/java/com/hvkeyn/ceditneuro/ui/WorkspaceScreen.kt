@@ -584,6 +584,14 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                     onBookmark = viewModel::readerToggleBookmark,
                     onAddNote = viewModel::readerAddNote,
                     onDeleteNote = viewModel::readerDeleteNote,
+                    onInk = viewModel::readerAddInk,
+                    onLabel = viewModel::readerAddLabel,
+                    onMoveLabel = viewModel::readerMoveLabel,
+                    onDeleteMarkup = viewModel::readerDeleteMarkup,
+                    onClearPage = viewModel::readerClearPage,
+                    onRestyle = viewModel::readerRestyle,
+                    onExplain = viewModel::readerExplain,
+                    onAsk = viewModel::readerAsk,
                     modifier = Modifier
                         .fillMaxSize()
                         .zIndex(if (state.readerInFront) 2f else -1f),
