@@ -12,7 +12,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -27,12 +30,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,6 +61,19 @@ import kotlin.math.min
 
 private data class Paper(val background: Color, val ink: Color, val muted: Color)
 
+@Composable
+private fun paperFieldColors(paper: Paper) = OutlinedTextFieldDefaults.colors(
+    focusedTextColor = paper.ink,
+    unfocusedTextColor = paper.ink,
+    cursorColor = paper.ink,
+    focusedBorderColor = paper.ink,
+    unfocusedBorderColor = paper.muted,
+    focusedLabelColor = paper.ink,
+    unfocusedLabelColor = paper.muted,
+    focusedContainerColor = paper.background,
+    unfocusedContainerColor = paper.background,
+)
+
 private fun paper(theme: String): Paper = when (theme) {
     "night" -> Paper(Color(0xFF1C1A17), Color(0xFFE6E0D6), Color(0xFFB3AA9E))
     "day" -> Paper(Color(0xFFF7F4EF), Color(0xFF1E1A16), Color(0xFF5C564E))
@@ -75,6 +93,14 @@ fun ReaderPane(
     onBookmark: () -> Unit,
     onAddNote: (String) -> Unit,
     onDeleteNote: (ReaderNote) -> Unit,
+    onInk: (page: Int, color: Long, width: Float, points: List<com.hvkeyn.ceditneuro.data.InkPoint>) -> Unit = { _, _, _, _ -> },
+    onLabel: (page: Int, text: String, x: Float, y: Float, color: Long) -> Unit = { _, _, _, _, _ -> },
+    onMoveLabel: (id: String, x: Float, y: Float, scale: Float, rotation: Float) -> Unit = { _, _, _, _, _ -> },
+    onDeleteMarkup: (String) -> Unit = {},
+    onClearPage: (Int) -> Unit = {},
+    onRestyle: (id: String, color: Long?, width: Float?, scale: Float?, rotation: Float?) -> Unit = { _, _, _, _, _ -> },
+    onExplain: (page: Int, passage: String) -> Unit = { _, _ -> },
+    onAsk: (page: Int, passage: String, question: String) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     val paper = paper(reader.theme)
@@ -85,6 +111,16 @@ fun ReaderPane(
     var toc by remember { mutableStateOf(false) }
     var notes by remember { mutableStateOf(false) }
     var draft by remember { mutableStateOf("") }
+    var mode by remember { mutableStateOf("read") }
+    var penColor by remember { mutableStateOf(markupColors[0]) }
+    var textColor by remember { mutableStateOf(markupColors[1]) }
+    var penWidth by remember { mutableFloatStateOf(7f) }
+    var selectedLabel by remember { mutableStateOf<String?>(null) }
+    var penTool by remember { mutableStateOf("draw") }
+    var showLayer by remember { mutableStateOf(true) }
+    var dockPanel by remember { mutableStateOf("") }
+    var noteDraft by remember { mutableStateOf("") }
+    var bookQuestion by remember { mutableStateOf("") }
     var page by remember(pageText) { mutableIntStateOf(reader.page) }
     val font = when (reader.fontName) {
         "sans" -> FontFamily.SansSerif
@@ -135,12 +171,14 @@ fun ReaderPane(
                         }
                     }
                     if (bitmap != null) {
-                        Image(
-                            bitmap = bitmap.asImageBitmap(),
-                            contentDescription = imageId,
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.weight(1f).fillMaxHeight(),
-                        )
+                        ZoomableImage(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                            Image(
+                                bitmap = bitmap.asImageBitmap(),
+                                contentDescription = imageId,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
                     } else {
                         Text(
                             text = column,
@@ -151,13 +189,31 @@ fun ReaderPane(
                 }
             }
             Text(
-                text = "${page + 1} / $count  ·  ${((page + 1) * 100 / count)}%",
+                text = "${page + 1} / $count  ·  ${reader.chapter.ifBlank { "page" }}  ·  ${((page + 1) * 100 / count)}%",
                 color = paper.muted,
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp),
             )
         }
-        Row(modifier = Modifier.fillMaxSize()) {
+        if (showLayer) InkLayer(
+                page = page,
+                ink = reader.ink,
+                labels = reader.labels,
+                color = penColor.toLong(),
+                width = penWidth,
+                drawing = mode == "pen" && penTool == "draw",
+                erasing = mode == "pen" && penTool == "erase",
+                selecting = mode == "pen" && penTool == "select",
+                selectedId = selectedLabel,
+                onStroke = { points -> onInk(page, penColor.toLong(), penWidth, points) },
+                onMove = { label, x, y -> onMoveLabel(label.id, x, y, label.scale, label.rotation) },
+                onSelect = { selectedLabel = it },
+                onDelete = {
+                    onDeleteMarkup(it)
+                    if (selectedLabel == it) selectedLabel = null
+                },
+        )
+        if (mode == "read") Row(modifier = Modifier.fillMaxSize()) {
             Box(modifier = Modifier.weight(1f).fillMaxSize().clickable {
                 page = (page - columns).coerceAtLeast(0)
             })
@@ -168,14 +224,17 @@ fun ReaderPane(
         }
         if (chrome) {
             Surface(color = paper.background.copy(alpha = 0.94f), modifier = Modifier.align(Alignment.TopCenter)) {
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Close reader", tint = paper.ink) }
                     Text(
                         text = reader.title,
                         color = paper.ink,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.widthIn(max = 160.dp),
                     )
                     IconButton(onClick = { toc = true }) { Icon(Icons.Default.List, "Contents", tint = paper.ink) }
                     IconButton(onClick = onBookmark) {
@@ -186,7 +245,145 @@ fun ReaderPane(
                         )
                     }
                     IconButton(onClick = { settings = true }) { Icon(Icons.Default.Tune, "Text settings", tint = paper.ink) }
-                    TextButton(onClick = { notes = true }) { Text("Notes", color = paper.ink) }
+                    TextButton(onClick = { mode = if (mode == "pen") "read" else "pen" }) { Text("Pen", color = paper.ink) }
+                    TextButton(onClick = { showLayer = !showLayer }) { Text(if (showLayer) "Layer" else "Layer off", color = paper.ink) }
+                    TextButton(onClick = { mode = if (mode == "notes") "read" else "notes" }) { Text("Notes", color = paper.ink) }
+                    TextButton(onClick = {
+                        mode = "book"
+                        chrome = false
+                    }) { Text("Book", color = paper.ink) }
+                }
+            }
+        }
+        if (mode == "pen") {
+            val selected = reader.labels.find { it.id == selectedLabel }
+            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
+            MarkupDock(
+                tool = penTool,
+                panel = dockPanel,
+                layerOn = showLayer,
+                penColor = penColor,
+                width = penWidth,
+                draft = draft,
+                selected = selected != null || reader.ink.any { it.id == selectedLabel },
+                textSelected = selected != null,
+                onTool = { penTool = it },
+                onPanel = { dockPanel = it },
+                onLayer = { showLayer = it },
+                onPenColor = { chosen ->
+                    penColor = chosen
+                    textColor = chosen
+                    selectedLabel?.let { onRestyle(it, chosen.toLong(), null, null, null) }
+                },
+                onWidth = { value ->
+                    penWidth = value
+                    val ink = reader.ink.find { it.id == selectedLabel }
+                    if (ink != null) onRestyle(ink.id, null, value, null, null)
+                },
+                onDraft = { draft = it },
+                onPlace = {
+                    onLabel(page, draft, 0.2f, 0.35f, penColor.toLong())
+                    draft = ""
+                },
+                onClearPage = { onClearPage(page) },
+                onBigger = { selected?.let { onMoveLabel(it.id, it.x, it.y, it.scale * 1.15f, it.rotation) } },
+                onSmaller = { selected?.let { onMoveLabel(it.id, it.x, it.y, it.scale / 1.15f, it.rotation) } },
+                onRotate = { selected?.let { onMoveLabel(it.id, it.x, it.y, it.scale, it.rotation + 15f) } },
+                onDelete = {
+                    selectedLabel?.let(onDeleteMarkup)
+                    selectedLabel = null
+                },
+            )
+            }
+        }
+        if (mode == "book") {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .heightIn(min = 240.dp, max = 420.dp)
+                    .background(paper.background)
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text("Book chat · page ${page + 1}", color = paper.ink, style = MaterialTheme.typography.titleMedium)
+                Text("This chat stays with the book and reads the whole file.", color = paper.muted, style = MaterialTheme.typography.labelSmall)
+                Column(
+                    modifier = Modifier.weight(1f, fill = false).heightIn(max = 220.dp).verticalScroll(rememberScrollState()),
+                ) {
+                    if (reader.bookChat.isEmpty()) {
+                        Text("Ask about this book.", color = paper.muted)
+                    }
+                    reader.bookChat.forEach { line ->
+                        Text(
+                            text = if (line.mine) "You: ${line.text}" else line.text,
+                            color = paper.ink,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(vertical = 3.dp),
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    value = bookQuestion,
+                    onValueChange = { bookQuestion = it },
+                    label = { Text("About this book", color = paper.ink) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = paperFieldColors(paper),
+                )
+                Row {
+                    TextButton(onClick = {
+                        onExplain(page, shown.joinToString("\n"))
+                    }) { Text("Explain page", color = paper.ink) }
+                    TextButton(
+                        onClick = {
+                            onAsk(page, shown.joinToString("\n"), bookQuestion)
+                            bookQuestion = ""
+                        },
+                        enabled = bookQuestion.isNotBlank(),
+                    ) { Text("Ask", color = paper.ink) }
+                    TextButton(onClick = { mode = "read" }) { Text("Close", color = paper.ink) }
+                }
+            }
+        }
+        if (mode == "notes") {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .heightIn(min = 220.dp, max = 360.dp)
+                    .background(paper.background)
+                    .padding(12.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text("Notes · page ${page + 1}", color = paper.ink, style = MaterialTheme.typography.titleMedium)
+                val pageNotes = reader.notes.filter { it.page == page }
+                if (pageNotes.isEmpty()) {
+                    Text("No records on this page yet.", color = paper.muted)
+                }
+                pageNotes.forEach { note ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.weight(1f)) { NoteCard("Saved", note.text, markupColor(0xFF175CD3)) }
+                        TextButton(onClick = { onDeleteNote(note) }) { Text("Delete", color = paper.ink) }
+                    }
+                }
+                OutlinedTextField(
+                    value = noteDraft,
+                    onValueChange = { noteDraft = it },
+                    label = { Text("Record for this page", color = paper.ink) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = paperFieldColors(paper),
+                )
+                Row {
+                    TextButton(
+                        onClick = {
+                            onAddNote(noteDraft)
+                            noteDraft = ""
+                        },
+                        enabled = noteDraft.isNotBlank(),
+                    ) { Text("Add", color = paper.ink) }
+                    TextButton(onClick = { mode = "read" }) { Text("Close", color = paper.ink) }
                 }
             }
         }
@@ -242,6 +439,21 @@ fun ReaderPane(
                 title = { Text("Contents") },
                 text = {
                     Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                        Text("Page ${page + 1} of $count")
+                        androidx.compose.material3.Slider(
+                            value = page.toFloat(),
+                            onValueChange = { page = it.toInt().coerceIn(0, count - 1) },
+                            valueRange = 0f..(count - 1).coerceAtLeast(0).toFloat(),
+                        )
+                        if (reader.bookmarks.isNotEmpty()) {
+                            Text("Moments")
+                            reader.bookmarks.forEach { mark ->
+                                Text(
+                                    text = "p.${mark + 1}",
+                                    modifier = Modifier.clickable { toc = false; page = mark.coerceIn(0, count - 1) }.padding(vertical = 4.dp),
+                                )
+                            }
+                        }
                         spread.chapters.forEachIndexed { index, title ->
                             if (title.isNotBlank() && (index == 0 || title != spread.chapters[index - 1])) {
                                 Text(

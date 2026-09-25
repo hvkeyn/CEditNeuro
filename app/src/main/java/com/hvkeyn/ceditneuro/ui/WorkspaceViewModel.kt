@@ -45,6 +45,8 @@ import com.hvkeyn.ceditneuro.tools.InstallJdkTool
 import com.hvkeyn.ceditneuro.tools.InstallProgramTool
 import com.hvkeyn.ceditneuro.tools.InstallRuntimeTool
 import com.hvkeyn.ceditneuro.tools.LoadToolsTool
+import com.hvkeyn.ceditneuro.tools.ReaderNoteTool
+import com.hvkeyn.ceditneuro.tools.ReaderSketchTool
 import com.hvkeyn.ceditneuro.tools.ToolGroups
 import com.hvkeyn.ceditneuro.tools.ToolSession
 import com.hvkeyn.ceditneuro.tools.ExecuteSystemActionTool
@@ -128,6 +130,8 @@ data class HostTrustPrompt(val serverId: String, val host: String, val fingerpri
 
 data class ReaderToc(val title: String, val page: Int)
 
+data class BookLine(val mine: Boolean, val text: String)
+
 data class ReaderView(
     val path: String,
     val title: String,
@@ -143,6 +147,9 @@ data class ReaderView(
     val toc: List<ReaderToc>,
     val bookmarks: List<Int>,
     val notes: List<com.hvkeyn.ceditneuro.data.ReaderNote>,
+    val ink: List<com.hvkeyn.ceditneuro.data.PageInk> = emptyList(),
+    val labels: List<com.hvkeyn.ceditneuro.data.PageLabel> = emptyList(),
+    val bookChat: List<BookLine> = emptyList(),
 )
 
 data class WorkspaceUiState(
@@ -246,6 +253,9 @@ class WorkspaceViewModel(
     private val remoteClient = RemoteClient(::ensureHostTrusted)
     private val library = ProjectLibrary(appContext)
     private val readerStore = com.hvkeyn.ceditneuro.data.ReaderStore(appContext)
+    private val bookChats = HashMap<String, List<BookLine>>()
+    private var pendingMarkup: com.hvkeyn.ceditneuro.data.ReaderRecord? = null
+    private var markupJob: kotlinx.coroutines.Job? = null
     private var openPages: List<com.hvkeyn.ceditneuro.reader.BookPage> = emptyList()
     private var readerImages: Map<String, ByteArray> = emptyMap()
     private var openBookKey: String? = null
@@ -751,6 +761,184 @@ class WorkspaceViewModel(
         publishReader(reader.path, reader.page, reader.theme, reader.fontSp)
     }
 
+    fun readerAddInk(page: Int, color: Long, width: Float, points: List<com.hvkeyn.ceditneuro.data.InkPoint>) {
+        val reader = _state.value.reader ?: return
+        if (points.size < 2) return
+        val stroke = com.hvkeyn.ceditneuro.data.PageInk(
+            id = java.util.UUID.randomUUID().toString(),
+            page = page,
+            color = color,
+            width = width,
+            points = points,
+        )
+        patchMarkup(reader) { it.copy(ink = it.ink + stroke) }
+    }
+
+    fun readerAddLabel(page: Int, text: String, x: Float, y: Float, color: Long) {
+        val reader = _state.value.reader ?: return
+        if (text.isBlank()) return
+        val record = readerStore.read(reader.path)
+        val label = com.hvkeyn.ceditneuro.data.PageLabel(
+            id = java.util.UUID.randomUUID().toString(),
+            page = page,
+            text = text.trim(),
+            x = x.coerceIn(0.05f, 0.9f),
+            y = y.coerceIn(0.05f, 0.9f),
+            color = color,
+        )
+        patchMarkup(reader) { it.copy(labels = it.labels + label) }
+    }
+
+    fun readerMoveLabel(id: String, x: Float, y: Float, scale: Float, rotation: Float) {
+        val reader = _state.value.reader ?: return
+        patchMarkup(reader) { record ->
+            record.copy(
+                labels = record.labels.map { label ->
+                    if (label.id != id) label else label.copy(
+                        x = x.coerceIn(0f, 1f),
+                        y = y.coerceIn(0f, 1f),
+                        scale = scale.coerceIn(0.4f, 4f),
+                        rotation = rotation,
+                    )
+                },
+            )
+        }
+    }
+
+    fun readerClearPage(page: Int) {
+        val reader = _state.value.reader ?: return
+        patchMarkup(reader) { record ->
+            record.copy(
+                ink = record.ink.filterNot { it.page == page },
+                labels = record.labels.filterNot { it.page == page },
+            )
+        }
+    }
+
+    fun readerRestyle(id: String, color: Long? = null, width: Float? = null, scale: Float? = null, rotation: Float? = null) {
+        val reader = _state.value.reader ?: return
+        patchMarkup(reader) { record ->
+            record.copy(
+                ink = record.ink.map { stroke ->
+                    if (stroke.id != id) stroke else stroke.copy(
+                        color = color ?: stroke.color,
+                        width = width ?: stroke.width,
+                    )
+                },
+                labels = record.labels.map { label ->
+                    if (label.id != id) label else label.copy(
+                        color = color ?: label.color,
+                        scale = scale ?: label.scale,
+                        rotation = rotation ?: label.rotation,
+                    )
+                },
+            )
+        }
+    }
+
+    fun readerDeleteMarkup(id: String) {
+        val reader = _state.value.reader ?: return
+        patchMarkup(reader) { record ->
+            record.copy(
+                ink = record.ink.filterNot { it.id == id },
+                labels = record.labels.filterNot { it.id == id },
+            )
+        }
+    }
+
+    private fun patchMarkup(
+        reader: ReaderView,
+        transform: (com.hvkeyn.ceditneuro.data.ReaderRecord) -> com.hvkeyn.ceditneuro.data.ReaderRecord,
+    ) {
+        val base = pendingMarkup?.takeIf { it.path == reader.path } ?: readerStore.read(reader.path)
+        val next = transform(base)
+        pendingMarkup = next
+        _state.update { state ->
+            val open = state.reader ?: return@update state
+            if (open.path != reader.path) state else state.copy(reader = open.copy(ink = next.ink, labels = next.labels))
+        }
+        markupJob?.cancel()
+        markupJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(350)
+            val save = pendingMarkup ?: return@launch
+            pendingMarkup = null
+            readerStore.write(save)
+        }
+    }
+
+    fun readerExplain(page: Int, passage: String) {
+        readerAsk(page, passage, "Explain this page.")
+    }
+
+    fun readerAsk(page: Int, passage: String, question: String) {
+        val reader = _state.value.reader ?: return
+        val asked = question.trim().ifBlank { return }
+        val book = bookPlain().ifBlank { passage.trim() }.ifBlank { "(This book has no text.)" }
+        val prior = bookChats[reader.path].orEmpty()
+        val shown = prior + BookLine(true, asked) + BookLine(false, "…")
+        bookChats[reader.path] = shown
+        _state.update { state ->
+            val open = state.reader ?: return@update state
+            state.copy(reader = open.copy(bookChat = shown), chatVisible = false, readerInFront = true)
+        }
+        viewModelScope.launch {
+            val reply = StringBuilder()
+            val messages = buildList {
+                add(
+                    com.hvkeyn.ceditneuro.agent.ChatMessage.system(
+                        "You answer only from this one book. Use the book text below and the question. " +
+                            "The reader is on the page named in the question. " +
+                            "Do not browse files, do not list a folder, and do not use tools.",
+                    ),
+                )
+                prior.takeLast(8).forEach { line ->
+                    add(
+                        if (line.mine) com.hvkeyn.ceditneuro.agent.ChatMessage.user(line.text)
+                        else com.hvkeyn.ceditneuro.agent.ChatMessage.assistant(line.text)
+                    )
+                }
+                add(
+                    com.hvkeyn.ceditneuro.agent.ChatMessage.user(
+                        "Open page ${page + 1}.\n\nBook:\n$book\n\nQuestion: $asked",
+                    ),
+                )
+            }
+            runCatching {
+                com.hvkeyn.ceditneuro.agent.deepseek.DeepSeekBackend { settingsStore.current }
+                    .complete(messages, emptyList())
+                    .collect { chunk ->
+                        if (chunk is com.hvkeyn.ceditneuro.agent.BackendChunk.Text) {
+                            reply.append(chunk.value)
+                            replaceBookReply(reader.path, reply.toString())
+                        }
+                    }
+            }.onFailure { error ->
+                replaceBookReply(reader.path, error.message ?: "The book chat stopped.")
+            }
+            if (reply.isEmpty()) replaceBookReply(reader.path, "No answer.")
+        }
+    }
+
+    private fun bookPlain(): String {
+        val plain = sourceText
+            .replace('\u0000', '\n')
+            .replace(Regex("\u0001[^\u0001]*\u0001"), " ")
+            .trim()
+        val cap = 48_000
+        return if (plain.length <= cap) plain else plain.take(cap) + "\n\n[The rest of the file was cut to fit.]"
+    }
+
+    private fun replaceBookReply(path: String, text: String) {
+        val lines = bookChats[path].orEmpty()
+        if (lines.isEmpty()) return
+        val next = lines.dropLast(1) + BookLine(false, text)
+        bookChats[path] = next
+        _state.update { state ->
+            val open = state.reader ?: return@update state
+            if (open.path != path) state else state.copy(reader = open.copy(bookChat = next))
+        }
+    }
+
     private fun loadReader(path: String, keepPlace: Boolean) {
         val ws = workspace ?: return
         val file = ws.resolve(path)
@@ -792,6 +980,12 @@ class WorkspaceViewModel(
         fontName: String? = null,
         spacing: Float? = null,
     ) {
+        pendingMarkup?.let { pending ->
+            if (pending.path == path) {
+                readerStore.write(pending)
+                pendingMarkup = null
+            }
+        }
         val record = readerStore.read(path)
         val shown = openPages.getOrNull(page)
         val count = openPages.size.coerceAtLeast(1)
@@ -814,6 +1008,9 @@ class WorkspaceViewModel(
             toc = toc,
             bookmarks = record.bookmarks.filter { it in openPages.indices },
             notes = record.notes,
+            ink = record.ink,
+            labels = record.labels,
+            bookChat = bookChats[path].orEmpty(),
         )
         readerStore.write(
             record.copy(
@@ -2049,6 +2246,12 @@ class WorkspaceViewModel(
             ),
             ShizukuExecTool(ws, shizukuShell, this::prepareShizuku),
             LoadToolsTool(toolSession),
+            ReaderNoteTool { text -> readerAddNote(text) },
+            ReaderSketchTool { labels ->
+                val page = _state.value.reader?.page ?: 0
+                val body = labels.mapIndexed { index, line -> "${index + 1}. $line" }.joinToString("\n")
+                readerAddLabel(page, body, 0.08f, 0.12f, 0xFF175CD3)
+            },
             FetchSystemLayoutTool(
                 shizukuCommands,
                 this::prepareShizuku,
