@@ -1368,8 +1368,15 @@ class WorkspaceViewModel(
         viewModelScope.launch {
             kotlinx.coroutines.delay(12_000)
             if (_state.value.linkNote == "Joining $trimmed…") {
+                val mine = _state.value.shareOffer
+                if (!mine.isNullOrBlank()) openBeacon(mine, lead = true)
                 _state.update {
-                    it.copy(linkNote = "No answer on $trimmed. The other phone must keep Connection open. Disconnect and try again.")
+                    it.copy(
+                        linkNote = "No answer on $trimmed. Back on your code. The other phone enters it and presses Join.",
+                        linkActive = 0,
+                        linkClients = 0,
+                        linkPeer = "",
+                    )
                 }
             }
         }
