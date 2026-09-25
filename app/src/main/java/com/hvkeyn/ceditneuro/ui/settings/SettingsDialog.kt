@@ -34,11 +34,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import android.content.Intent
+import android.provider.Settings
 import com.hvkeyn.ceditneuro.data.AgentSettings
 import com.hvkeyn.ceditneuro.data.CatalogModel
 import com.hvkeyn.ceditneuro.data.ModelProvider
@@ -208,6 +211,121 @@ fun SettingsDialog(
                             draft = draft,
                             onDraft = { draft = it },
                             onTest = onTestRemote,
+                        )
+                    }
+                    SettingsSection(
+                        title = "Proxy",
+                        summary = if (draft.proxy.usable()) "${draft.proxy.type} ${draft.proxy.host}:${draft.proxy.port}" else "Off",
+                        expanded = openSection == "proxy",
+                        onToggle = { openSection = if (openSection == "proxy") "" else "proxy" },
+                    ) {
+                        Text(
+                            text = "Used for this app's requests to your servers: HTTP, FTP, SFTP, and mail. The model chat stays direct.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        ToggleRow(
+                            title = "Use proxy",
+                            detail = "Turn this on after the host and port are filled.",
+                            checked = draft.proxy.enabled,
+                            onCheckedChange = { draft = draft.copy(proxy = draft.proxy.copy(enabled = it)) },
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf("socks", "http").forEach { kind ->
+                                FilterChip(
+                                    selected = draft.proxy.type == kind,
+                                    onClick = { draft = draft.copy(proxy = draft.proxy.copy(type = kind)) },
+                                    label = { Text(kind) },
+                                )
+                            }
+                        }
+                        OutlinedTextField(
+                            value = draft.proxy.host,
+                            onValueChange = { draft = draft.copy(proxy = draft.proxy.copy(host = it.trim())) },
+                            label = { Text("Host") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = draft.proxy.port.toString(),
+                            onValueChange = { draft = draft.copy(proxy = draft.proxy.copy(port = it.toIntOrNull() ?: draft.proxy.port)) },
+                            label = { Text("Port") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = draft.proxy.username,
+                            onValueChange = { draft = draft.copy(proxy = draft.proxy.copy(username = it)) },
+                            label = { Text("Username, if the proxy asks") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = draft.proxy.password,
+                            onValueChange = { draft = draft.copy(proxy = draft.proxy.copy(password = it)) },
+                            label = { Text("Password") },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    SettingsSection(
+                        title = "Desk",
+                        summary = draft.mailHost.ifBlank { "Mail and notifications" },
+                        expanded = openSection == "desk",
+                        onToggle = { openSection = if (openSection == "desk") "" else "desk" },
+                    ) {
+                        val context = LocalContext.current
+                        Text(
+                            text = "The agent can list, reply to, and clear notifications, and read or send mail, after you allow access and save the mailbox.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        TextButton(onClick = {
+                            context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                        }) { Text("Allow notification access") }
+                        OutlinedTextField(
+                            value = draft.mailHost,
+                            onValueChange = { draft = draft.copy(mailHost = it.trim()) },
+                            label = { Text("IMAP host") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = draft.mailPort.toString(),
+                            onValueChange = { draft = draft.copy(mailPort = it.toIntOrNull() ?: draft.mailPort) },
+                            label = { Text("IMAP port") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = draft.mailUsername,
+                            onValueChange = { draft = draft.copy(mailUsername = it.trim()) },
+                            label = { Text("Mail login") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = draft.mailPassword,
+                            onValueChange = { draft = draft.copy(mailPassword = it) },
+                            label = { Text("Mail password") },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = draft.smtpHost,
+                            onValueChange = { draft = draft.copy(smtpHost = it.trim()) },
+                            label = { Text("SMTP host, if different") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = draft.smtpPort.toString(),
+                            onValueChange = { draft = draft.copy(smtpPort = it.toIntOrNull() ?: draft.smtpPort) },
+                            label = { Text("SMTP port") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                     SettingsSection(

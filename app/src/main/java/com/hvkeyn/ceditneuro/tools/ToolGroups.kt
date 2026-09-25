@@ -20,6 +20,7 @@ object ToolGroups {
         "run_command",
         "zip_paths",
         "http_request",
+        "set_timer",
         "load_tools",
         "reader_note",
         "reader_sketch",
@@ -50,6 +51,17 @@ object ToolGroups {
             "space_sync",
             "ssh_exec",
             "browse_page",
+            "remote_mkdir",
+            "remote_delete",
+            "remote_rename",
+        ),
+        "desk" to listOf(
+            "notifications",
+            "notification_reply",
+            "notification_dismiss",
+            "mail_list",
+            "mail_read",
+            "mail_send",
         ),
     )
 

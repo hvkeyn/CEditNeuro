@@ -1,5 +1,6 @@
 package com.hvkeyn.ceditneuro.net
 
+import okhttp3.Credentials
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -13,9 +14,11 @@ import java.util.concurrent.TimeUnit
  * The agent's internet. The app already holds the install-time INTERNET permission;
  * this client is what the tools and the shell downloader share.
  */
-class AgentNet {
+class AgentNet(
+    private val proxy: () -> NetProxy = { NetProxy() },
+) {
 
-    private val client = OkHttpClient.Builder()
+    private val base = OkHttpClient.Builder()
         .followRedirects(true)
         .followSslRedirects(true)
         .connectTimeout(20, TimeUnit.SECONDS)
@@ -23,11 +26,26 @@ class AgentNet {
         .callTimeout(120, TimeUnit.SECONDS)
         .build()
 
+    private fun client(): OkHttpClient {
+        val chosen = proxy()
+        val jump = chosen.javaProxy() ?: return base
+        chosen.applyCredentials()
+        val builder = base.newBuilder().proxy(jump)
+        if (chosen.type == "http" && chosen.username.isNotBlank()) {
+            builder.proxyAuthenticator { _, response ->
+                response.request.newBuilder()
+                    .header("Proxy-Authorization", Credentials.basic(chosen.username, chosen.password))
+                    .build()
+            }
+        }
+        return builder.build()
+    }
+
     fun download(url: String, dest: File, maxBytes: Long, timeoutSeconds: Long = 120) {
         val httpUrl = parseUrl(url)
         dest.parentFile?.mkdirs()
         val request = Request.Builder().url(httpUrl).header("User-Agent", USER_AGENT).build()
-        val caller = client.newBuilder()
+        val caller = client().newBuilder()
             .callTimeout(timeoutSeconds, TimeUnit.SECONDS)
             .readTimeout(timeoutSeconds, TimeUnit.SECONDS)
             .build()
@@ -80,7 +98,7 @@ class AgentNet {
         headers.forEach { (name, value) ->
             if (!name.equals("Content-Type", ignoreCase = true)) builder.header(name, value)
         }
-        client.newCall(builder.build()).execute().use { response ->
+        client().newCall(builder.build()).execute().use { response ->
             val bytes = response.body?.bytes() ?: ByteArray(0)
             if (bytes.size > maxBytes) {
                 throw IOException("Response is ${bytes.size} bytes, limit is $maxBytes.")

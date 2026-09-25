@@ -15,6 +15,15 @@ class ShellExitTest {
     }
 
     @Test
+    fun aRejectedLoginIsNotRetried() {
+        val output = """exit=1
+login(otp) -> 401 b'{"status":401,"error":{"type":"Unauthorized","title":"Incorrect user data"}}'"""
+        val adjusted = ShellExit.adjust("python login.py", 1, output)
+        assertEquals(0, adjusted.exitCode)
+        assertTrue(adjusted.note.contains("Do not repeat this login"))
+    }
+
+    @Test
     fun aRealFailureStaysAFailure() {
         val adjusted = ShellExit.adjust("ls /missing", 1)
         assertEquals(1, adjusted.exitCode)

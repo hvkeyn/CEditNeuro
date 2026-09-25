@@ -40,6 +40,11 @@ class HttpRequestTool(
     override suspend fun execute(args: JsonObject): ToolResult = withContext(Dispatchers.IO) {
         if (!allowed()) return@withContext ToolResult.error("Network is disabled in Settings.")
         val url = args.stringArg("url") ?: return@withContext ToolResult.error("Missing 'url'.")
+        if (url.contains("allorigins.win", ignoreCase = true) || url.contains("corsproxy.io", ignoreCase = true)) {
+            return@withContext ToolResult.error(
+                "That host is a browser proxy. Request the page URL directly with http_request. Do not call the proxy again.",
+            )
+        }
         val method = args.stringArg("method") ?: "GET"
         val savePath = args.stringArg("save_path")?.trim()?.trimStart('/')
         val maxChars = (args.intArg("max_chars") ?: 16_000).coerceIn(200, 40_000)
@@ -68,14 +73,14 @@ class HttpRequestTool(
             if (file.isDirectory) return@withContext ToolResult.error("$savePath is a directory.")
             file.parentFile?.mkdirs()
             runCatching { net.download(url, file, AgentNet.MAX_FILE_BYTES, 180) }
-                .getOrElse { return@withContext ToolResult.error(it.message ?: "Request failed.") }
+                .getOrElse { return@withContext ToolResult.error(httpFailure(it.message)) }
             onSaved(savePath)
             return@withContext ToolResult.ok("HTTP GET\nSaved ${file.length()} bytes to $savePath")
         }
 
         val exchange = runCatching {
             net.exchange(url, method, headers, body, AgentNet.MAX_DOWNLOAD_BYTES)
-        }.getOrElse { return@withContext ToolResult.error(it.message ?: "Request failed.") }
+        }.getOrElse { return@withContext ToolResult.error(httpFailure(it.message)) }
 
         if (!savePath.isNullOrEmpty()) {
             val file = runCatching { workspace.resolve(savePath) }
@@ -92,6 +97,14 @@ class HttpRequestTool(
         val text = exchange.body.toString(Charset.forName("UTF-8"))
         val shown = if (text.length <= maxChars) text else text.take(maxChars) + "\n… truncated"
         val type = exchange.contentType.ifBlank { "unknown" }
-        ToolResult.ok("HTTP ${exchange.code} ($type)\n$shown")
+        val refusal = com.hvkeyn.ceditneuro.shell.ShellExit.refusal(shown)
+        val status = if (refusal.isEmpty()) "HTTP ${exchange.code} ($type)\n$shown" else "HTTP ${exchange.code} ($type)\n$shown\n$refusal"
+        if (exchange.code == 401 || refusal.isNotEmpty()) ToolResult.error(status) else ToolResult.ok(status)
+    }
+
+    private fun httpFailure(message: String?): String {
+        val detail = message ?: "Request failed."
+        val refusal = com.hvkeyn.ceditneuro.shell.ShellExit.refusal(detail)
+        return if (refusal.isEmpty()) detail else "$detail $refusal"
     }
 }
