@@ -66,6 +66,7 @@ import com.hvkeyn.ceditneuro.tools.ReadFileTool
 import com.hvkeyn.ceditneuro.tools.RemoteConnectTool
 import com.hvkeyn.ceditneuro.tools.RemoteGetTool
 import com.hvkeyn.ceditneuro.tools.RemoteListTool
+import com.hvkeyn.ceditneuro.tools.SpaceSyncTool
 import com.hvkeyn.ceditneuro.tools.RemotePutTool
 import com.hvkeyn.ceditneuro.tools.RemoteReadTool
 import com.hvkeyn.ceditneuro.tools.RemoteWriteTool
@@ -172,6 +173,7 @@ data class WorkspaceUiState(
     val message: String? = null,
     val execPrompt: String? = null,
     val hostPrompt: HostTrustPrompt? = null,
+    val shareOffer: String? = null,
     val webVisible: Boolean = false,
     /** True while the running agent is waiting on the in-app browser. */
     val agentBrowsing: Boolean = false,
@@ -251,6 +253,11 @@ class WorkspaceViewModel(
     private var shizukuPrompted = false
     private var browseReportJob: Job? = null
     private val remoteClient = RemoteClient(::ensureHostTrusted)
+    private val beacon = com.hvkeyn.ceditneuro.net.BeaconClient()
+    private val peerLines = ArrayDeque<String>()
+    private var beaconRole: String = ""
+    @Volatile
+    private var parallelPeer: String = ""
     private val library = ProjectLibrary(appContext)
     private val readerStore = com.hvkeyn.ceditneuro.data.ReaderStore(appContext)
     private val bookChats = HashMap<String, List<BookLine>>()
@@ -1298,6 +1305,53 @@ class WorkspaceViewModel(
         }
     }
 
+    fun createShare() {
+        val project = current ?: run {
+            showMessage("Open a project folder first.")
+            return
+        }
+        val remote = activeRemote() ?: run {
+            showMessage("Add the same server on both phones in Settings. The password stays on each phone.")
+            return
+        }
+        val code = (100000..999999).random().toString()
+        viewModelScope.launch {
+            runCatching {
+                val sync = com.hvkeyn.ceditneuro.net.SpaceSync(remoteClient)
+                sync.publish(remote, code)
+                sync.sync(remote, project.workspace.root, android.os.Build.MODEL.replace(Regex("[^A-Za-z0-9]"), ""))
+                openBeacon(code, lead = true)
+                _state.update { it.copy(shareOffer = sync.link(remote) + "\n" + code) }
+            }.onFailure { showMessage(it.message ?: "Could not share this folder.") }
+        }
+    }
+
+    fun joinShare(code: String) {
+        val project = current ?: return
+        val remote = activeRemote() ?: return
+        viewModelScope.launch {
+            val sync = com.hvkeyn.ceditneuro.net.SpaceSync(remoteClient)
+            val ok = runCatching { sync.check(remote, code.trim()) }.getOrDefault(false)
+            if (!ok) {
+                showMessage("That code does not match the shared folder.")
+                return@launch
+            }
+            openBeacon(code.trim(), lead = false)
+            val note = runCatching {
+                sync.sync(remote, project.workspace.root, android.os.Build.MODEL.replace(Regex("[^A-Za-z0-9]"), ""))
+            }.getOrElse {
+                showMessage(it.message ?: "Sync failed.")
+                return@launch
+            }
+            _state.update { it.copy(shareOffer = null, message = note) }
+            refreshProjectTree(project)
+        }
+    }
+
+    fun dismissShare() {
+        _state.update { it.copy(shareOffer = null) }
+    }
+
     private fun activeRemote(): RemoteServer? =
         settingsStore.current.remotes.find { it.id == settingsStore.current.activeRemoteId }
 
@@ -1365,10 +1419,15 @@ class WorkspaceViewModel(
             appContext, project.workspace.root, prompt, attachments,
         )
         val images = if (settingsStore.current.model.seesImages()) prepared.imageDataUrls else emptyList()
-        startPrompt(project, prepared.prompt, images)
+        startPrompt(project, prepared.prompt, images, fromPeer = false)
     }
 
-    private fun startPrompt(project: LiveProject, prompt: String, images: List<String> = emptyList()) {
+    private fun startPrompt(
+        project: LiveProject,
+        prompt: String,
+        images: List<String> = emptyList(),
+        fromPeer: Boolean = false,
+    ) {
         if (prompt.isBlank() || project.agentJob?.isActive == true) return
 
         appendChat(project, ChatRole.User, prompt)
@@ -1400,6 +1459,9 @@ class WorkspaceViewModel(
             )
         }
         publishStatus(project, force = true)
+        if (!fromPeer && beaconRole == "lead") {
+            beacon.send("TASK " + prompt.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty().take(180))
+        }
 
         project.agentJob = agentScope.launch {
             runCatching {
@@ -1441,6 +1503,9 @@ class WorkspaceViewModel(
                 agentStatus(project, outcome, workLine(), activity?.focus.orEmpty(), started)
             }
             AgentNotifications.settle(appContext, status)
+            val report = (summary ?: outcome ?: "done").take(180)
+            if (beaconRole == "follow") beacon.send("AUDIT $report")
+            else if (!fromPeer && beaconRole == "lead") beacon.send("FIX $report")
             persistNow(project)
         }
     }
@@ -2053,7 +2118,68 @@ class WorkspaceViewModel(
             false -> "Programs off"
             null -> "Programs ask"
         }
-        return "$work · $network · $programs"
+        return "$work · $network · $programs" +
+            (if (beaconRole == "lead") " · Lead" else if (beaconRole == "follow") " · Support" else "") +
+            parallelPeer.takeIf { it.isNotBlank() }?.let { "\nParallel: $it" }.orEmpty()
+    }
+
+    private fun openBeacon(code: String, lead: Boolean) {
+        beaconRole = if (lead) "lead" else "follow"
+        val device = android.os.Build.MODEL.replace(Regex("[^A-Za-z0-9]"), "").ifBlank { "phone" }
+        beacon.start(code, device) { name, text ->
+            viewModelScope.launch {
+                val project = current ?: return@launch
+                val running = project.agentJob?.isActive == true
+                val body = text.removePrefix("TASK ").removePrefix("AUDIT ").removePrefix("FIX ")
+                val started = when {
+                    text.startsWith("TASK ") && beaconRole == "follow" && !running -> {
+                        startPrompt(
+                            project,
+                            "You are the supporting agent. Do this part of the lead's task. " +
+                                "End with corrections the lead should apply.\n$body",
+                            fromPeer = true,
+                        )
+                        true
+                    }
+                    text.startsWith("AUDIT ") && beaconRole == "lead" && !running -> {
+                        startPrompt(
+                            project,
+                            "Apply this audit from the supporting agent. Correct your work where the audit is right. " +
+                                "Do not assign the same task again.\n$body",
+                            fromPeer = true,
+                        )
+                        true
+                    }
+                    text.startsWith("FIX ") && beaconRole == "follow" && !running -> {
+                        startPrompt(
+                            project,
+                            "The lead finished this. Check it and end with only the corrections.\n$body",
+                            fromPeer = true,
+                        )
+                        true
+                    }
+                    else -> false
+                }
+                val line = "$name: $text"
+                synchronized(peerLines) {
+                    peerLines.add(line)
+                    while (peerLines.size > 8) peerLines.removeFirst()
+                }
+                parallelPeer = line.take(140)
+                if (!started) appendChat(project, ChatRole.Reasoning, "Peer $line")
+                if (project.ui.agentRunning) publishStatus(project, force = true)
+                else if (!started) {
+                    AgentNotifications.publish(
+                        appContext,
+                        agentStatus(project, "Parallel · $name", line, "", System.currentTimeMillis()),
+                    )
+                }
+            }
+        }
+    }
+
+    private fun takePeerFeed(): String = synchronized(peerLines) {
+        if (peerLines.isEmpty()) "" else peerLines.joinToString("\n").also { peerLines.clear() }
     }
 
     private fun accessLine(): String {
@@ -2081,6 +2207,7 @@ class WorkspaceViewModel(
             .ifBlank { project.thoughtTail.trim() }
             .take(140)
         setActivity(project, phase = "Thinking", focus = line)
+        beacon.send(line)
     }
 
     private fun toolFocus(name: String, arguments: String): String {
@@ -2291,6 +2418,7 @@ class WorkspaceViewModel(
                 if (project.epoch.get() == epochAtBuild) onAgentEditedFile(project, path)
             },
             SshExecTool(::activeRemote, remoteClient),
+            SpaceSyncTool(ws, ::activeRemote, remoteClient, android.os.Build.MODEL.replace(Regex("[^A-Za-z0-9]"), "")),
         )
 
         val remote = activeRemote()
@@ -2308,6 +2436,7 @@ class WorkspaceViewModel(
             toolRegistry = ToolRegistry(tools),
             toolSession = toolSession,
             systemPrompt = buildSystemPrompt(),
+            peerFeed = ::takePeerFeed,
             setupPrompt = buildSetupPrompt(
                 projectRoot = ws.root.absolutePath,
                 toolchainBin = deviceShell.toolchainBin.absolutePath,

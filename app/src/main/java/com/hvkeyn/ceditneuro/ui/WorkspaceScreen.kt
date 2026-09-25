@@ -305,6 +305,34 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
         )
     }
 
+    state.shareOffer?.let { offer ->
+        val parts = offer.split('\n')
+        var code by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissShare() },
+            title = { Text("Shared folder") },
+            text = {
+                Column {
+                    Text("Send the link and the code. The password stays in Settings on each phone. Both agents connect through the beacon with that code and see each other's reasoning. They do not log into the server.")
+                    Text(parts.getOrElse(0) { "" })
+                    Text("Code: ${parts.getOrElse(1) { "" }}")
+                    OutlinedTextField(
+                        value = code,
+                        onValueChange = { code = it },
+                        label = { Text("Join with a code") },
+                        singleLine = true,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.joinShare(code) }) { Text("Join") }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissShare() }) { Text("Close") }
+            },
+        )
+    }
+
     val screen = LocalConfiguration.current
     val shortLandscape = screen.screenHeightDp < 520 && screen.screenWidthDp > screen.screenHeightDp
 
@@ -340,6 +368,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                             },
                             onChooseFolder = { folderPicker.launch(null) },
                             onToggleFiles = { projectPanelOpen = !projectPanelOpen },
+                            onShare = { viewModel.createShare() },
                         )
                     }
                 },
@@ -798,6 +827,7 @@ private fun ProjectTitleMenu(
     onOpenProject: (String) -> Unit,
     onChooseFolder: () -> Unit,
     onToggleFiles: () -> Unit,
+    onShare: () -> Unit,
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         if (state.recentProjects.isEmpty()) {
@@ -850,6 +880,13 @@ private fun ProjectTitleMenu(
             onClick = {
                 onDismiss()
                 onChooseFolder()
+            },
+        )
+        DropdownMenuItem(
+            text = { Text("Share this folder") },
+            onClick = {
+                onDismiss()
+                onShare()
             },
         )
         DropdownMenuItem(
