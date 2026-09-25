@@ -177,6 +177,10 @@ data class WorkspaceUiState(
     val linkPeer: String = "",
     val linkSent: Int = 0,
     val linkGot: Int = 0,
+    val linkDirect: Boolean = false,
+    val linkClients: Int = 0,
+    val linkActive: Int = 0,
+    val linkSpeed: Int = 0,
     val webVisible: Boolean = false,
     /** True while the running agent is waiting on the in-app browser. */
     val agentBrowsing: Boolean = false,
@@ -259,8 +263,11 @@ class WorkspaceViewModel(
     private val beacon = com.hvkeyn.ceditneuro.net.BeaconClient()
     private val peerLines = ArrayDeque<String>()
     private var beaconRole: String = ""
+    private val seenPeers = mutableSetOf<String>()
     @Volatile
     private var parallelPeer: String = ""
+    private var speedBytes = 0
+    private var speedMark = System.currentTimeMillis()
     private val library = ProjectLibrary(appContext)
     private val readerStore = com.hvkeyn.ceditneuro.data.ReaderStore(appContext)
     private val bookChats = HashMap<String, List<BookLine>>()
@@ -1313,22 +1320,20 @@ class WorkspaceViewModel(
             showMessage("Open a project folder first.")
             return
         }
+        seenPeers.clear()
         val code = (100000..999999).random().toString()
-        _state.update { it.copy(shareOffer = code, linkPeer = "", linkSent = 0, linkGot = 0) }
+        _state.update { it.copy(shareOffer = code, linkPeer = "", linkSent = 0, linkGot = 0, linkDirect = false) }
         openBeacon(code, lead = true)
     }
 
     fun joinShare(code: String) {
-        val project = current ?: run {
-            showMessage("Open a project folder first.")
-            return
-        }
         val trimmed = code.trim()
         if (trimmed.length != 6 || trimmed.any { !it.isDigit() }) {
             showMessage("Enter the 6-digit code from the other phone.")
             return
         }
-        _state.update { it.copy(shareOffer = trimmed, linkPeer = "", linkSent = 0, linkGot = 0) }
+        seenPeers.clear()
+        _state.update { it.copy(shareOffer = trimmed, linkPeer = "", linkSent = 0, linkGot = 0, linkDirect = false, linkClients = 0, linkActive = 0) }
         openBeacon(trimmed, lead = false)
     }
 
@@ -2114,24 +2119,44 @@ class WorkspaceViewModel(
     private fun openBeacon(code: String, lead: Boolean) {
         beaconRole = if (lead) "lead" else "follow"
         val device = android.os.Build.MODEL.replace(Regex("[^A-Za-z0-9]"), "").ifBlank { "phone" }
-        beacon.start(code, device, onReady = { beacon.send("HERE") }) { name, text ->
+        beacon.start(code, device, onReady = {
+            beacon.send("HERE")
+            current?.workspace?.root?.name?.let { beacon.send("FOLDER $it") }
+        }, onDirect = { direct ->
+            _state.update { it.copy(linkDirect = direct) }
+        }, onRoster = { body ->
+            val names = body.split(' ').drop(1).filter { it.isNotBlank() }
+            val total = synchronized(seenPeers) {
+                seenPeers += names
+                seenPeers.size
+            }
+            _state.update {
+                it.copy(linkActive = names.size, linkClients = total, linkPeer = names.joinToString())
+            }
+        }) { name, text ->
             viewModelScope.launch {
-                val project = current ?: return@launch
+                noteSpeed(text.length)
+                val project = current
+                if (text.startsWith("FOLDER ") && project == null) {
+                    ensurePeerFolder(text.removePrefix("FOLDER "))
+                    return@launch
+                }
+                val open = project ?: return@launch
                 _state.update { it.copy(linkGot = it.linkGot + 1, linkPeer = name) }
                 if (text == "HERE") {
-                    if (beaconRole == "lead") pushFolder(project)
+                    if (beaconRole == "lead") pushFolder(open)
                     return@launch
                 }
                 if (text.startsWith("FILE ")) {
-                    saveSharedFile(project, text.removePrefix("FILE "))
+                    saveSharedFile(open, text.removePrefix("FILE "))
                     return@launch
                 }
-                val running = project.agentJob?.isActive == true
+                val running = open.agentJob?.isActive == true
                 val body = text.removePrefix("TASK ").removePrefix("AUDIT ").removePrefix("FIX ")
                 val started = when {
                     text.startsWith("TASK ") && beaconRole == "follow" && !running -> {
                         startPrompt(
-                            project,
+                            open,
                             "You are the supporting agent. Do this part of the lead's task. " +
                                 "End with corrections the lead should apply.\n$body",
                             fromPeer = true,
@@ -2140,7 +2165,7 @@ class WorkspaceViewModel(
                     }
                     text.startsWith("AUDIT ") && beaconRole == "lead" && !running -> {
                         startPrompt(
-                            project,
+                            open,
                             "Apply this audit from the supporting agent. Correct your work where the audit is right. " +
                                 "Do not assign the same task again.\n$body",
                             fromPeer = true,
@@ -2149,7 +2174,7 @@ class WorkspaceViewModel(
                     }
                     text.startsWith("FIX ") && beaconRole == "follow" && !running -> {
                         startPrompt(
-                            project,
+                            open,
                             "The lead finished this. Check it and end with only the corrections.\n$body",
                             fromPeer = true,
                         )
@@ -2163,16 +2188,39 @@ class WorkspaceViewModel(
                     while (peerLines.size > 8) peerLines.removeFirst()
                 }
                 parallelPeer = line.take(140)
-                if (!started) appendChat(project, ChatRole.Reasoning, "Peer $line")
-                if (project.ui.agentRunning) publishStatus(project, force = true)
+                if (!started) appendChat(open, ChatRole.Reasoning, "Peer $line")
+                if (open.ui.agentRunning) publishStatus(open, force = true)
                 else if (!started) {
                     AgentNotifications.publish(
                         appContext,
-                        agentStatus(project, "Parallel · $name", line, "", System.currentTimeMillis()),
+                        agentStatus(open, "Parallel · $name", line, "", System.currentTimeMillis()),
                     )
                 }
             }
         }
+    }
+
+    private fun ensurePeerFolder(name: String) {
+        val safe = name.replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "shared" }
+        val root = com.hvkeyn.ceditneuro.workspace.StoragePaths.primaryRoot()
+        var dir = java.io.File(root, safe)
+        var n = 2
+        while (dir.exists()) {
+            dir = java.io.File(root, "$safe-$n")
+            n++
+        }
+        dir.mkdirs()
+        openProject(dir)
+    }
+
+    private fun noteSpeed(bytes: Int) {
+        speedBytes += bytes
+        val now = System.currentTimeMillis()
+        if (now - speedMark < 1_000) return
+        val speed = (speedBytes * 1000 / (now - speedMark)).toInt()
+        speedBytes = 0
+        speedMark = now
+        _state.update { it.copy(linkSpeed = speed) }
     }
 
     private fun pushFolder(project: LiveProject) {
