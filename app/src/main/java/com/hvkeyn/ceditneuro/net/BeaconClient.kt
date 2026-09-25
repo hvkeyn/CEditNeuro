@@ -37,6 +37,7 @@ class BeaconClient(
         onReady: () -> Unit = {},
         onDirect: (Boolean) -> Unit = {},
         onRoster: (String) -> Unit = {},
+        onError: (String) -> Unit = {},
         onPeer: (name: String, text: String) -> Unit,
     ) {
         stop()
@@ -78,7 +79,7 @@ class BeaconClient(
                     val reader = BufferedReader(InputStreamReader(link.getInputStream(), Charsets.UTF_8))
                     writer.write("JOIN $code $device\n")
                     writer.flush()
-                    onReady()
+                    runCatching { onReady() }
                     punch.send(datagram("PING $code $device", InetAddress.getByName(host), PORT))
                     val pump = Thread {
                         while (running.get() && !link.isClosed) {
@@ -94,7 +95,7 @@ class BeaconClient(
                     while (running.get()) {
                         val line = reader.readLine() ?: break
                         if (line.startsWith("N ")) {
-                            onRoster(line.removePrefix("N "))
+                            runCatching { onRoster(line.removePrefix("N ")) }
                             continue
                         }
                         if (line.startsWith("A ")) {
@@ -102,11 +103,14 @@ class BeaconClient(
                             if (bits.size >= 4) poke(punch, code, bits[2], bits[3].toIntOrNull() ?: continue)
                         }
                         val parts = line.split(' ', limit = 3)
-                        if (parts.size == 3 && parts[0] == "P") onPeer(parts[1], parts[2])
+                        if (parts.size == 3 && parts[0] == "P") runCatching { onPeer(parts[1], parts[2]) }
                     }
                     pump.interrupt()
-                } catch (_: Exception) {
-                    if (gen == generation.get()) Thread.sleep(2_000)
+                } catch (error: Exception) {
+                    if (gen == generation.get()) {
+                        runCatching { onError(error.message ?: "Link failed") }
+                        Thread.sleep(2_000)
+                    }
                 } finally {
                     runCatching { socket?.close() }
                     socket = null

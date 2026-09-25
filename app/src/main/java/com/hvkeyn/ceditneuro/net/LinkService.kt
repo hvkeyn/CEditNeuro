@@ -25,20 +25,29 @@ class LinkService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val code = intent?.getStringExtra(EXTRA_CODE).orEmpty()
         val detail = intent?.getStringExtra(EXTRA_DETAIL).orEmpty()
-        if (intent?.action == ACTION_STOP) {
-            (application as CEditNeuroApp).workspaceModel.disconnectLink()
+        val shown = runCatching { promote(build(this, code, detail)) }.getOrDefault(false)
+        if (!shown) {
+            runCatching { promote(build(this, code, "Link")) }
+            stopSelf()
             return START_NOT_STICKY
         }
-        val note = build(this, code, detail)
-        if (Build.VERSION.SDK_INT >= 29) {
-            val started = runCatching {
-                startForeground(ID, note, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-            }
-            if (started.isFailure) startForeground(ID, note)
-        } else {
-            startForeground(ID, note)
+        if (intent?.action == ACTION_STOP) {
+            runCatching { (application as CEditNeuroApp).workspaceModel.disconnectLink() }
+            return START_NOT_STICKY
         }
         return START_STICKY
+    }
+
+    private fun promote(note: Notification): Boolean {
+        val started = runCatching {
+            if (Build.VERSION.SDK_INT >= 29) {
+                startForeground(ID, note, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            } else {
+                startForeground(ID, note)
+            }
+        }
+        if (started.isSuccess) return true
+        return runCatching { startForeground(ID, note) }.isSuccess
     }
 
     override fun onDestroy() {
@@ -58,10 +67,12 @@ class LinkService : Service() {
             val intent = Intent(app, LinkService::class.java)
                 .putExtra(EXTRA_CODE, code)
                 .putExtra(EXTRA_DETAIL, detail)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                app.startForegroundService(intent)
-            } else {
-                app.startService(intent)
+            runCatching {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    app.startForegroundService(intent)
+                } else {
+                    app.startService(intent)
+                }
             }
         }
 
@@ -95,7 +106,7 @@ class LinkService : Service() {
             )
             val text = detail.ifBlank { "Code $code. Stays on until you disconnect." }
             return NotificationCompat.Builder(context, CHANNEL)
-                .setSmallIcon(android.R.drawable.stat_sys_download_done)
+                .setSmallIcon(android.R.drawable.stat_notify_sync)
                 .setContentTitle("Linked · $code")
                 .setContentText(text)
                 .setContentIntent(open)

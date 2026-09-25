@@ -31,10 +31,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -48,6 +50,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -73,6 +76,19 @@ private fun paperFieldColors(paper: Paper) = OutlinedTextFieldDefaults.colors(
     focusedContainerColor = paper.background,
     unfocusedContainerColor = paper.background,
 )
+
+private fun screenBrightness(view: android.view.View, value: Float) {
+    var context = view.context
+    while (context is android.content.ContextWrapper) {
+        if (context is android.app.Activity) {
+            val attrs = context.window.attributes
+            attrs.screenBrightness = value
+            context.window.attributes = attrs
+            return
+        }
+        context = context.baseContext
+    }
+}
 
 private fun paper(theme: String): Paper = when (theme) {
     "night" -> Paper(Color(0xFF1C1A17), Color(0xFFE6E0D6), Color(0xFFB3AA9E))
@@ -121,6 +137,11 @@ fun ReaderPane(
     var dockPanel by remember { mutableStateOf("") }
     var noteDraft by remember { mutableStateOf("") }
     var bookQuestion by remember { mutableStateOf("") }
+    val view = LocalView.current
+    var brightness by remember { mutableFloatStateOf(0.7f) }
+    DisposableEffect(view) {
+        onDispose { screenBrightness(view, -1f) }
+    }
     var page by remember(pageText) { mutableIntStateOf(reader.page) }
     val font = when (reader.fontName) {
         "sans" -> FontFamily.SansSerif
@@ -418,6 +439,15 @@ fun ReaderPane(
                                 )
                             }
                         }
+                        Text("Brightness")
+                        Slider(
+                            value = brightness,
+                            onValueChange = {
+                                brightness = it
+                                screenBrightness(view, it)
+                            },
+                            valueRange = 0.05f..1f,
+                        )
                         Text("Paper")
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             listOf("day", "sepia", "night").forEach { theme ->
