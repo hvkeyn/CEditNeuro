@@ -71,6 +71,11 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <service
+            android:name=".net.LinkService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
         <receiver
             android:name=".update.UpdateResultReceiver"
             android:exported="false">

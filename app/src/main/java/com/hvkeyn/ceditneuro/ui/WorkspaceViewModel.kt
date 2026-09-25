@@ -1365,6 +1365,33 @@ class WorkspaceViewModel(
             )
         }
         openBeacon(trimmed, lead = false)
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(12_000)
+            if (_state.value.linkNote == "Joining $trimmed…") {
+                _state.update {
+                    it.copy(linkNote = "No answer on $trimmed. The other phone must keep Connection open. Disconnect and try again.")
+                }
+            }
+        }
+    }
+
+    fun disconnectLink() {
+        com.hvkeyn.ceditneuro.net.LinkService.stop(appContext)
+        beacon.leave()
+        beaconRole = ""
+        seenPeers.clear()
+        current?.let { project ->
+            appendChat(project, ChatRole.Error, "Link closed. The lead and the other phones are told this phone left.")
+        }
+        _state.update {
+            it.copy(
+                linkNote = "Disconnected.",
+                linkActive = 0,
+                linkClients = 0,
+                linkPeer = "",
+                linkDirect = false,
+            )
+        }
     }
 
     fun dismissShare() {
@@ -2148,6 +2175,7 @@ class WorkspaceViewModel(
 
     private fun openBeacon(code: String, lead: Boolean) {
         beaconRole = if (lead) "lead" else "follow"
+        com.hvkeyn.ceditneuro.net.LinkService.start(appContext, code, "Waiting for the other phone.")
         val device = android.os.Build.MODEL.replace(Regex("[^A-Za-z0-9]"), "").ifBlank { "phone" }
         beacon.start(code, device, onReady = {
             beacon.send("HERE")
@@ -2169,6 +2197,12 @@ class WorkspaceViewModel(
                     else "On the code. Waiting for the other phone.",
                 )
             }
+            com.hvkeyn.ceditneuro.net.LinkService.update(
+                appContext,
+                code,
+                if (names.size > 1) "$total in this code, ${names.size} active."
+                else "Waiting for the other phone.",
+            )
         }) { name, text ->
             viewModelScope.launch {
                 noteSpeed(text.length)
@@ -2179,6 +2213,11 @@ class WorkspaceViewModel(
                 }
                 val open = project ?: return@launch
                 _state.update { it.copy(linkGot = it.linkGot + 1, linkPeer = name) }
+                if (text == "LEFT") {
+                    appendChat(open, ChatRole.Error, "$name left the link. Do not wait for that phone.")
+                    synchronized(peerLines) { peerLines.add("$name left the link") }
+                    return@launch
+                }
                 if (text == "HERE") {
                     if (beaconRole == "lead") pushFolder(open)
                     return@launch
