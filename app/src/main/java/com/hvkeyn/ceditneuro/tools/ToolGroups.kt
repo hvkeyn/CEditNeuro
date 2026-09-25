@@ -36,6 +36,7 @@ object ToolGroups {
         ),
         "device" to listOf(
             "install_apk",
+            "uninstall_apk",
             "net_info",
             "shizuku_exec",
             "fetch_system_layout",

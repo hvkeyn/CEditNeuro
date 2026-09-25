@@ -24,6 +24,14 @@ login(otp) -> 401 b'{"status":401,"error":{"type":"Unauthorized","title":"Incorr
     }
 
     @Test
+    fun aWrittenFileIsNotAFailure() {
+        val output = "FB2 записан: /storage/emulated/0/Books/book.fb2 (3568907 байт)"
+        val adjusted = ShellExit.adjust("python make_fb2.py", 1, output)
+        assertEquals(0, adjusted.exitCode)
+        assertTrue(adjusted.note.contains("Do not run this command again"))
+    }
+
+    @Test
     fun aRealFailureStaysAFailure() {
         val adjusted = ShellExit.adjust("ls /missing", 1)
         assertEquals(1, adjusted.exitCode)

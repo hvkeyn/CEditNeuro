@@ -23,6 +23,9 @@ object AgentDoctor {
             }
             session.chat.forEach { entry ->
                 if (entry.role != "Error") return@forEach
+                if (entry.text.startsWith("Link closed.")) return@forEach
+                if (entry.text.startsWith("Stopped by the user.")) return@forEach
+                if ("schema is loaded now" in entry.text) return@forEach
                 val kind = kindOf(entry.text) ?: "error"
                 add(findings, kind, entry.toolName ?: "chat", folder, entry.text)
             }
@@ -84,8 +87,10 @@ object AgentDoctor {
             "securityexception" in line -> "SecurityException"
             "permission denied" in line -> "Permission denied"
             "unable to resolve host" in line || "no address associated" in line -> "host did not resolve"
-            "shizuku is not running" in line || "cannot grant itself" in line || "shell access is not available" in line ->
+            "shizuku is not running" in line || "cannot grant itself" in line ||
+                "shell access is not available" in line || "shizuku permission was not granted" in line ->
                 "shell access missing"
+            "ui dump was killed" in line -> "ui dump held"
             "cannot link" in line -> "binary will not start"
             "timed out" in line -> "timed out"
             "tool_calls" in line && "400" in line -> "tool call rejected"
@@ -100,6 +105,9 @@ object AgentDoctor {
 
     private fun advice(kinds: Set<String>): List<String> {
         val lines = mutableListOf<String>()
+        if ("ui dump held" in kinds) {
+            lines += "Do not call fetch_system_layout again. Install with install_apk and remove with uninstall_apk. Do not tap through the app."
+        }
         if ("shell access missing" in kinds || "SecurityException" in kinds) {
             lines += "Do not call shizuku_exec, fetch_system_layout, or execute_system_action again. They cannot run until the user starts Shizuku or roots the phone. Use run_command, net_info, and install_apk."
         }

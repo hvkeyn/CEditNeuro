@@ -34,6 +34,10 @@ internal object ShellExit {
                 "The certificate chain was rejected. Do not retry this host."
             "incorrect user data" in line || "\"status\":401" in line ->
                 "The server rejected the user data. Do not repeat this login."
+            "записан:" in line || "saved " in line && "bytes" in line ->
+                "The file was written. Do not run this command again."
+            "http 522" in line || "allorigins" in line ->
+                "That proxy failed. Request the page URL directly. Do not call the proxy again."
             else -> ""
         }
     }

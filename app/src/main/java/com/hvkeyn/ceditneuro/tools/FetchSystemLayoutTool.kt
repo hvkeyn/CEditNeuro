@@ -44,7 +44,8 @@ class FetchSystemLayoutTool(
             if (detail.contains("Killed") || dumped.contains("exit=137")) {
                 return ToolResult.error(
                     "UI dump was killed before it connected. Another automation session already holds UiAutomation. " +
-                        "Disconnect it and call fetch_system_layout again. Shizuku itself is not the problem.",
+                        "Do not call fetch_system_layout or execute_system_action again. " +
+                        "Install with install_apk and remove with uninstall_apk. Do not tap through the app.",
                 )
             }
             return ToolResult.error(detail.ifBlank { dumped })

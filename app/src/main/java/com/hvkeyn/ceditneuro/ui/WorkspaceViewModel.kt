@@ -46,6 +46,7 @@ import com.hvkeyn.ceditneuro.tools.NotificationReplyTool
 import com.hvkeyn.ceditneuro.tools.NotificationsTool
 import com.hvkeyn.ceditneuro.tools.TimerTool
 import com.hvkeyn.ceditneuro.tools.InstallApkTool
+import com.hvkeyn.ceditneuro.tools.UninstallApkTool
 import com.hvkeyn.ceditneuro.tools.InstallModuleTool
 import com.hvkeyn.ceditneuro.tools.InstallAndroidSdkTool
 import com.hvkeyn.ceditneuro.tools.InstallJdkTool
@@ -269,7 +270,7 @@ class WorkspaceViewModel(
     private var hostWaiter: CompletableDeferred<Boolean>? = null
     private var browseWaiter: CompletableDeferred<String>? = null
     private var browseGeneration = 0
-    private var shizukuPrompted = false
+    private var shizukuDenied = false
     private var browseReportJob: Job? = null
     private val remoteClient = RemoteClient(::ensureHostTrusted) { settingsStore.current.proxy }
     private val beacon = com.hvkeyn.ceditneuro.net.BeaconClient()
@@ -2042,17 +2043,15 @@ class WorkspaceViewModel(
     private suspend fun prepareShizuku(): String? {
         if (!runCatching { Shizuku.pingBinder() }.getOrDefault(false)) {
             if (com.hvkeyn.ceditneuro.shizuku.SuShell.available()) return null
-            val launch = appContext.packageManager.getLaunchIntentForPackage("moe.shizuku.privileged.api")
-            if (launch != null && !shizukuPrompted) {
-                shizukuPrompted = true
-                launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                runCatching { appContext.startActivity(launch) }
-            }
             return "Shell access is not available. Root is not present and Shizuku is not running. " +
-                "Do not call shizuku_exec, fetch_system_layout, or execute_system_action again until the user starts Shizuku or roots the phone. " +
-                "Use run_command for files, net_info for this app's network, and install_apk for an APK."
+                "Do not call shizuku_exec, fetch_system_layout, or execute_system_action again. " +
+                "Do not open Shizuku or another app. Install with install_apk and remove with uninstall_apk."
         }
         if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) return null
+        if (shizukuDenied) {
+            return "Shizuku permission was not granted. Do not call shizuku_exec, fetch_system_layout, or execute_system_action again. " +
+                "Install with install_apk and remove with uninstall_apk. Do not open the app and tap through it."
+        }
         return withContext(Dispatchers.Main) {
             val waiter = CompletableDeferred<Boolean>()
             val listener = Shizuku.OnRequestPermissionResultListener { _, result ->
@@ -2061,8 +2060,14 @@ class WorkspaceViewModel(
             Shizuku.addRequestPermissionResultListener(listener)
             try {
                 Shizuku.requestPermission(SHIZUKU_REQUEST)
-                val granted = withTimeoutOrNull(60_000) { waiter.await() } == true
-                if (granted) null else "Shizuku permission was not granted."
+                val granted = withTimeoutOrNull(15_000) { waiter.await() } == true
+                if (granted) {
+                    null
+                } else {
+                    shizukuDenied = true
+                    "Shizuku permission was not granted. Do not call shizuku_exec, fetch_system_layout, or execute_system_action again. " +
+                        "Install with install_apk and remove with uninstall_apk. Do not open the app and tap through it."
+                }
             } finally {
                 Shizuku.removeRequestPermissionResultListener(listener)
             }
@@ -2550,6 +2555,7 @@ class WorkspaceViewModel(
             ExecuteSystemActionTool(shizukuCommands, this::prepareShizuku),
             NetInfoTool(appContext),
             InstallApkTool(appContext, ws),
+            UninstallApkTool(appContext),
             InstallAndroidSdkTool(
                 toolchain = deviceShell.toolchain,
                 net = agentNet,

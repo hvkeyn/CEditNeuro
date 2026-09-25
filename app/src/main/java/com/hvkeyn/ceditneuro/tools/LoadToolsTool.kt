@@ -8,7 +8,7 @@ class LoadToolsTool(private val session: ToolSession) : Tool {
     override val description =
         "Load the schema for a tool group before calling those tools. " +
             "build: install_jdk, install_android_sdk, install_runtime, install_program, install_module. " +
-            "device: install_apk, net_info, shizuku_exec, fetch_system_layout, execute_system_action. " +
+            "device: install_apk, uninstall_apk, net_info, shizuku_exec, fetch_system_layout, execute_system_action. " +
             "remote: remote_connect, remote_list, remote_read, remote_write, remote_put, remote_get, ssh_exec, browse_page."
     override val parameters = objectSchema(
         properties = mapOf(

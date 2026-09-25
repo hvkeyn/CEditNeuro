@@ -26,6 +26,22 @@ class AgentNet(
         .callTimeout(120, TimeUnit.SECONDS)
         .build()
 
+    private val rejectedHosts = HashSet<String>()
+
+    private fun refuseHost(url: String) {
+        val host = url.toHttpUrlOrNull()?.host?.lowercase() ?: return
+        if (host in rejectedHosts) {
+            throw IOException("The certificate or proxy for $host was already rejected. Do not retry this host.")
+        }
+    }
+
+    private fun rememberHost(url: String, error: IOException) {
+        val text = error.message.orEmpty().lowercase()
+        val rejected = "chain validation" in text || "certpathvalidator" in text || "http 522" in text
+        if (!rejected) return
+        url.toHttpUrlOrNull()?.host?.lowercase()?.let { rejectedHosts += it }
+    }
+
     private fun client(): OkHttpClient {
         val chosen = proxy()
         val jump = chosen.javaProxy() ?: return base
@@ -42,6 +58,16 @@ class AgentNet(
     }
 
     fun download(url: String, dest: File, maxBytes: Long, timeoutSeconds: Long = 120) {
+        refuseHost(url)
+        try {
+            downloadBody(url, dest, maxBytes, timeoutSeconds)
+        } catch (error: IOException) {
+            rememberHost(url, error)
+            throw error
+        }
+    }
+
+    private fun downloadBody(url: String, dest: File, maxBytes: Long, timeoutSeconds: Long) {
         val httpUrl = parseUrl(url)
         dest.parentFile?.mkdirs()
         val request = Request.Builder().url(httpUrl).header("User-Agent", USER_AGENT).build()
@@ -51,7 +77,8 @@ class AgentNet(
             .build()
         caller.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
-                throw IOException("HTTP ${response.code} for $url")
+                val extra = if (response.code == 522) " That proxy failed. Do not call it again." else ""
+                throw IOException("HTTP ${response.code} for $url.$extra")
             }
             val body = response.body ?: throw IOException("Empty response from $url")
             val length = body.contentLength()
@@ -76,6 +103,22 @@ class AgentNet(
     }
 
     fun exchange(
+        url: String,
+        method: String,
+        headers: Map<String, String>,
+        body: String?,
+        maxBytes: Long,
+    ): HttpExchange {
+        refuseHost(url)
+        try {
+            return exchangeBody(url, method, headers, body, maxBytes)
+        } catch (error: IOException) {
+            rememberHost(url, error)
+            throw error
+        }
+    }
+
+    private fun exchangeBody(
         url: String,
         method: String,
         headers: Map<String, String>,
