@@ -31,6 +31,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
@@ -740,17 +741,19 @@ private fun ThinkingBlock(entry: ChatEntry) {
             }
         }
         if (open) {
-            val compact = LocalConfiguration.current.let {
-                it.screenHeightDp < 520 && it.screenWidthDp > it.screenHeightDp
+            Copyable(entry.text) {
+                val compact = LocalConfiguration.current.let {
+                    it.screenHeightDp < 520 && it.screenWidthDp > it.screenHeightDp
+                }
+                Text(
+                    text = entry.text,
+                    style = MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = if (compact && entry.streaming) 3 else Int.MAX_VALUE,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
             }
-            Text(
-                text = entry.text,
-                style = MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = if (compact && entry.streaming) 3 else Int.MAX_VALUE,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 4.dp),
-            )
         } else {
             Text(
                 text = entry.text.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty(),
@@ -784,36 +787,69 @@ private fun MessageBlock(
         horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start,
     ) {
         Text(text = label, style = MaterialTheme.typography.labelSmall, color = labelColor)
-        if (markdown) {
-            MarkdownText(
-                text = text,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = bubble,
-            )
-        } else {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = bubble,
-            )
+        Copyable(text) {
+            if (markdown) {
+                MarkdownText(
+                    text = text,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = bubble,
+                )
+            } else {
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = bubble,
+                )
+            }
         }
     }
 }
 
 @Composable
+private fun Copyable(text: String, content: @Composable () -> Unit) {
+    Column {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            CopyLabel(text)
+        }
+        SelectionContainer { content() }
+    }
+}
+
+@Composable
+private fun CopyLabel(text: String) {
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    Text(
+        text = "Copy",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier
+            .padding(horizontal = 4.dp)
+            .clickable {
+                clipboard.setText(androidx.compose.ui.text.AnnotatedString(text))
+            },
+    )
+}
+
+@Composable
 private fun ToolBlock(label: String, text: String, error: Boolean) {
     Column(modifier = Modifier.fillMaxWidth().padding(start = 8.dp)) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline,
-        )
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 2.dp),
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline,
+                modifier = Modifier.weight(1f),
+            )
+            CopyLabel(text)
+        }
+        SelectionContainer {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
     }
 }
