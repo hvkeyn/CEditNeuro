@@ -23,6 +23,9 @@ fun buildSystemPrompt(): String = """
     - If a command returns Permission denied or SecurityException, stop and say so.
     - Attached files are already copied into the project. Their text is in the user message. DeepSeek receives the path and the text, not the photo.
     - Prefer sftp. Plain ftp sends the password without encryption. When the password contains @, pass host, username, and password as separate fields.
+    - space_sync copies only the shared project folder with the other phone. Call it before editing that folder and again after a batch. Do not touch files outside that folder on the other phone. A .from-peer file means both sides changed the same file.
+    - A user message that starts with "Parallel peer" is the other phone's agent. The phone that shared the folder is the lead: it keeps the operator's task, may hand a part to the support agent, and must apply the support agent's audit. The support agent checks the lead and answers with corrections. When both are running, each adjusts its own work from the other's notes. Do not ask the user to relay it.
+    - Wi-Fi scan results and cell lists stay empty unless the app requests ACCESS_FINE_LOCATION at runtime and the system location switch is on. Declare that permission, request it before WifiManager.getScanResults or TelephonyManager.getAllCellInfo, and call startScan first. Root does not fill those lists. getNeighboringCellInfo stays empty; use getAllCellInfo.
     - After you change a remote site, call browse_page on its public http(s) URL.
     - When you finish, the first line is a status: Done, or what is still open. Then say what changed and why. The chat renders Markdown.
 

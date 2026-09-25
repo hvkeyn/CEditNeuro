@@ -57,6 +57,9 @@ class RemoteClient(
         return "Connected to ${server.host}. ${entries.size} item(s) in ${server.startPath.ifBlank { "/" }}."
     }
 
+    suspend fun mkdir(server: RemoteServer, path: String) =
+        use(server) { it.mkdir(resolve(server, path)) }
+
     private suspend fun <T> use(server: RemoteServer, block: (RemoteOps) -> T): T {
         try {
             return withContext(Dispatchers.IO) { open(server).use(block) }
@@ -88,6 +91,7 @@ private interface RemoteOps : AutoCloseable {
     fun read(path: String): ByteArray
     fun write(path: String, bytes: ByteArray)
     fun exec(command: String): String
+    fun mkdir(path: String)
 }
 
 private class SftpOps(server: RemoteServer) : RemoteOps {
@@ -163,6 +167,10 @@ private class SftpOps(server: RemoteServer) : RemoteOps {
         return "exit=$code\n$text"
     }
 
+    override fun mkdir(path: String) {
+        runCatching { sftp.mkdir(path) }
+    }
+
     override fun close() {
         sftp.disconnect()
         session.disconnect()
@@ -234,6 +242,10 @@ private class FtpOps(server: RemoteServer) : RemoteOps {
 
     override fun exec(command: String): String =
         throw IOException("Remote commands need an SFTP server.")
+
+    override fun mkdir(path: String) {
+        ftp.makeDirectory(path)
+    }
 
     override fun close() {
         runCatching { ftp.logout() }

@@ -47,6 +47,7 @@ object ToolGroups {
             "remote_write",
             "remote_put",
             "remote_get",
+            "space_sync",
             "ssh_exec",
             "browse_page",
         ),

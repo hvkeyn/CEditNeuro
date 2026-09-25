@@ -22,6 +22,7 @@ class AgentLoop(
     private val toolSession: ToolSession,
     private val systemPrompt: String,
     private val setupPrompt: String,
+    private val peerFeed: () -> String = { "" },
     private val maxToolRounds: Int = 40,
 ) {
     private companion object {
@@ -64,6 +65,13 @@ class AgentLoop(
             var pendingCalls: List<ToolCall> = emptyList()
             var finishReason: String? = null
             var cacheNote: String? = null
+            val peer = peerFeed().trim()
+            if (peer.isNotEmpty()) {
+                messages += ChatMessage.user(
+                    "Parallel peer. If you are the lead, give the other agent a part and apply its audit. " +
+                        "If you are supporting, check the lead and send corrections. Keep working:\n$peer",
+                )
+            }
             emit(activity(messages, round))
 
             var attempt = 0
