@@ -175,7 +175,7 @@ class BeaconClient(
     }
 
     companion object {
-        const val HOST = "458043.vm.hosted-by-spacecore.pro"
+        const val HOST = "vmi3481754.contaboserver.net"
         const val PORT = 8756
     }
 }
