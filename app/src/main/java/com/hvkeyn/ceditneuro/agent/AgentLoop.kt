@@ -32,6 +32,8 @@ class AgentLoop(
         const val MAX_AUTO_BATCHES = 15
     }
 
+    private val failedCalls = HashSet<String>()
+
     private val json = Json {
         ignoreUnknownKeys = true
         explicitNulls = false
@@ -219,17 +221,26 @@ class AgentLoop(
                     toolSession.visible(toolRegistry).joinToString { it.name },
             )
         val held = toolSession.holdUntilLoaded(call.function.name)
-        if (held != null) return ToolResult.error(held)
+        if (held != null) return ToolResult.ok(held)
 
         val rawArguments = call.function.arguments.ifBlank { "{}" }
+        val signature = call.function.name + "\n" + rawArguments.trim()
+        if (signature in failedCalls) {
+            return ToolResult.error(
+                "This exact ${call.function.name} call already failed. " +
+                    "Change the path, the arguments, or the tool. Do not repeat it.",
+            )
+        }
         val args = runCatching { json.parseToJsonElement(rawArguments) }.getOrNull() as? JsonObject
             ?: return ToolResult.error(
                 "Tool arguments must be a JSON object, got: ${rawArguments.take(200)}",
-            )
+            ).also { failedCalls += signature }
 
-        return runCatching { tool.execute(args) }
+        val result = runCatching { tool.execute(args) }
             .getOrElse { error ->
                 ToolResult.error("Tool '${call.function.name}' failed: ${error.message ?: error::class.java.simpleName}")
             }
+        if (result.isError) failedCalls += signature
+        return result
     }
 }

@@ -40,6 +40,7 @@ layer is wired end to end.
 | Phone profile in `CEditNeuro/profiles` survives uninstall and loads on the next install | done |
 | Optional SOCKS or HTTP proxy for the user's own servers, FTP, SFTP, and mail | done |
 | Timer notification, notification access, and a mailbox in Settings → Desk | done |
+| System install and uninstall (`install_apk`, `uninstall_apk`); a failed tool call is not repeated with the same arguments | done |
 | `install_jdk`, `install_android_sdk`, `install_runtime` from the Termux mirror | done |
 | Zed-style per-edit Accept/Reject diffs | not yet — edits apply immediately |
 

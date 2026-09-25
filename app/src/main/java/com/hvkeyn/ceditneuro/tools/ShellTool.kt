@@ -52,11 +52,18 @@ class ShellTool(
             onFinished(command, denied)
             return ToolResult.error(denied)
         }
-        val rendered = withContext(Dispatchers.IO) {
-            spill(shell.run(command, cwd, timeoutSeconds).render())
+        val raw = withContext(Dispatchers.IO) {
+            shell.run(command, cwd, timeoutSeconds).render()
         }
+        val failed = raw.startsWith("exit=") && !raw.startsWith("exit=0")
+        val noted = if (failed && "Do not repeat" !in raw) {
+            raw + "\nDo not repeat this exact command. Change the path, the arguments, or the tool."
+        } else {
+            raw
+        }
+        val rendered = spill(noted)
         onFinished(command, rendered)
-        return if (rendered.startsWith("timed out")) {
+        return if (failed || rendered.startsWith("timed out")) {
             ToolResult.error(rendered)
         } else {
             ToolResult.ok(rendered)
