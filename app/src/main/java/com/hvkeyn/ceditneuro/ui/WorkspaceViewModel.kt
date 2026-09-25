@@ -174,6 +174,9 @@ data class WorkspaceUiState(
     val execPrompt: String? = null,
     val hostPrompt: HostTrustPrompt? = null,
     val shareOffer: String? = null,
+    val linkPeer: String = "",
+    val linkSent: Int = 0,
+    val linkGot: Int = 0,
     val webVisible: Boolean = false,
     /** True while the running agent is waiting on the in-app browser. */
     val agentBrowsing: Boolean = false,
@@ -1311,22 +1314,8 @@ class WorkspaceViewModel(
             return
         }
         val code = (100000..999999).random().toString()
+        _state.update { it.copy(shareOffer = code, linkPeer = "", linkSent = 0, linkGot = 0) }
         openBeacon(code, lead = true)
-        val remote = activeRemote()
-        val link = if (remote == null) {
-            "No server saved yet. The code still connects the agents."
-        } else {
-            com.hvkeyn.ceditneuro.net.SpaceSync(remoteClient).link(remote)
-        }
-        _state.update { it.copy(shareOffer = link + "\n" + code) }
-        if (remote == null) return
-        viewModelScope.launch {
-            runCatching {
-                val sync = com.hvkeyn.ceditneuro.net.SpaceSync(remoteClient)
-                sync.publish(remote, code)
-                sync.sync(remote, project.workspace.root, android.os.Build.MODEL.replace(Regex("[^A-Za-z0-9]"), ""))
-            }.onFailure { showMessage(it.message ?: "Agents are connected. File sync failed.") }
-        }
     }
 
     fun joinShare(code: String) {
@@ -1339,34 +1328,16 @@ class WorkspaceViewModel(
             showMessage("Enter the 6-digit code from the other phone.")
             return
         }
+        _state.update { it.copy(shareOffer = trimmed, linkPeer = "", linkSent = 0, linkGot = 0) }
         openBeacon(trimmed, lead = false)
-        val remote = activeRemote()
-        if (remote == null) {
-            _state.update { it.copy(shareOffer = null, message = "Connected with code $trimmed.") }
-            return
-        }
-        viewModelScope.launch {
-            val sync = com.hvkeyn.ceditneuro.net.SpaceSync(remoteClient)
-            val ok = runCatching { sync.check(remote, trimmed) }.getOrDefault(false)
-            if (!ok) {
-                _state.update {
-                    it.copy(shareOffer = null, message = "Connected with code $trimmed. This server folder uses a different code, so files were not synced.")
-                }
-                return@launch
-            }
-            val note = runCatching {
-                sync.sync(remote, project.workspace.root, android.os.Build.MODEL.replace(Regex("[^A-Za-z0-9]"), ""))
-            }.getOrElse {
-                showMessage(it.message ?: "Connected. File sync failed.")
-                return@launch
-            }
-            _state.update { it.copy(shareOffer = null, message = note) }
-            refreshProjectTree(project)
-        }
     }
 
     fun dismissShare() {
         _state.update { it.copy(shareOffer = null) }
+    }
+
+    fun showCopied() {
+        showMessage("Code copied.")
     }
 
     private fun activeRemote(): RemoteServer? =
@@ -2143,9 +2114,18 @@ class WorkspaceViewModel(
     private fun openBeacon(code: String, lead: Boolean) {
         beaconRole = if (lead) "lead" else "follow"
         val device = android.os.Build.MODEL.replace(Regex("[^A-Za-z0-9]"), "").ifBlank { "phone" }
-        beacon.start(code, device) { name, text ->
+        beacon.start(code, device, onReady = { beacon.send("HERE") }) { name, text ->
             viewModelScope.launch {
                 val project = current ?: return@launch
+                _state.update { it.copy(linkGot = it.linkGot + 1, linkPeer = name) }
+                if (text == "HERE") {
+                    if (beaconRole == "lead") pushFolder(project)
+                    return@launch
+                }
+                if (text.startsWith("FILE ")) {
+                    saveSharedFile(project, text.removePrefix("FILE "))
+                    return@launch
+                }
                 val running = project.agentJob?.isActive == true
                 val body = text.removePrefix("TASK ").removePrefix("AUDIT ").removePrefix("FIX ")
                 val started = when {
@@ -2193,6 +2173,28 @@ class WorkspaceViewModel(
                 }
             }
         }
+    }
+
+    private fun pushFolder(project: LiveProject) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val root = project.workspace.root
+            root.walkTopDown().filter { it.isFile && it.length() in 1..40_000 }.take(30).forEach { file ->
+                val relative = file.relativeTo(root).invariantSeparatorsPath
+                if (relative.startsWith(".git") || relative.contains("/build/")) return@forEach
+                beacon.sendFile(relative, file.readBytes())
+                _state.update { it.copy(linkSent = it.linkSent + 1) }
+            }
+        }
+    }
+
+    private fun saveSharedFile(project: LiveProject, body: String) {
+        val parts = body.split(' ', limit = 2)
+        if (parts.size < 2 || parts[0].contains("..") || parts[0].startsWith("/")) return
+        val bytes = android.util.Base64.decode(parts[1], android.util.Base64.NO_WRAP)
+        val dest = java.io.File(project.workspace.root, parts[0])
+        dest.parentFile?.mkdirs()
+        dest.writeBytes(bytes)
+        refreshProjectTree(project)
     }
 
     private fun takePeerFeed(): String = synchronized(peerLines) {

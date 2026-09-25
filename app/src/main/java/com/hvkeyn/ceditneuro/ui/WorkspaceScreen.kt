@@ -128,6 +128,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
     val versionName = remember { AppUpdater.localVersion(context) }
     var projectPanelOpen by rememberSaveable { mutableStateOf(true) }
     var projectsMenu by remember { mutableStateOf(false) }
+    var joinCode by remember { mutableStateOf("") }
     var savedFlash by remember { mutableIntStateOf(0) }
     var showSaved by remember { mutableStateOf(false) }
     LaunchedEffect(savedFlash) {
@@ -306,30 +307,48 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
         )
     }
 
-    state.shareOffer?.let { offer ->
-        val parts = offer.split('\n')
-        var code by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
+    state.shareOffer?.let { code ->
+        val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+        val linked = state.linkPeer.isNotBlank()
         AlertDialog(
             onDismissRequest = { viewModel.dismissShare() },
-            title = { Text("Shared folder") },
+            title = { Text(if (linked) "Linked" else "Connection") },
             text = {
-                Column {
-                    Text("Give this code to the other phone. There, tap the link icon and enter the code. Agents connect through the beacon. Files also sync when both phones have the same server in Settings.")
-                    Text(parts.getOrElse(0) { "" })
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Tap the code to copy it, then send it to the other phone.")
                     Text(
-                        text = parts.getOrElse(1) { "" },
+                        text = code,
                         style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.clickable {
+                            clipboard.setText(androidx.compose.ui.text.AnnotatedString(code))
+                            viewModel.showCopied()
+                        },
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("This phone")
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = 8.dp)
+                                .size(width = 36.dp, height = 4.dp)
+                                .background(if (linked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
+                        )
+                        Text(if (linked) state.linkPeer else "Waiting")
+                    }
+                    Text(
+                        if (linked) "Channel open. Sent ${state.linkSent}, received ${state.linkGot}."
+                        else "Waiting for the other phone to enter this code.",
                     )
                     OutlinedTextField(
-                        value = code,
-                        onValueChange = { code = it },
-                        label = { Text("Join with a code") },
+                        value = joinCode,
+                        onValueChange = { joinCode = it },
+                        label = { Text("Enter a code") },
                         singleLine = true,
                     )
                 }
             },
             confirmButton = {
-                TextButton(onClick = { viewModel.joinShare(code) }) { Text("Join") }
+                TextButton(onClick = { viewModel.joinShare(joinCode) }) { Text("Join") }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.dismissShare() }) { Text("Close") }

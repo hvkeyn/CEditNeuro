@@ -23,7 +23,7 @@ class BeaconClient(
     @Volatile
     private var socket: Socket? = null
 
-    fun start(code: String, device: String, onPeer: (name: String, text: String) -> Unit) {
+    fun start(code: String, device: String, onReady: () -> Unit = {}, onPeer: (name: String, text: String) -> Unit) {
         stop()
         val gen = generation.incrementAndGet()
         running.set(true)
@@ -38,13 +38,14 @@ class BeaconClient(
                     val reader = BufferedReader(InputStreamReader(link.getInputStream(), Charsets.UTF_8))
                     writer.write("JOIN $code $device\n")
                     writer.flush()
+                    onReady()
                     val pump = Thread {
                         while (running.get() && !link.isClosed) {
                             val line = outgoing.poll() ?: run {
                                 Thread.sleep(200)
                                 null
                             } ?: continue
-                            writer.write("T $line\n")
+                            writer.write(line + "\n")
                             writer.flush()
                         }
                     }
@@ -66,7 +67,16 @@ class BeaconClient(
     }
 
     fun send(text: String) {
-        val clean = text.replace('\n', ' ').trim().take(240)
+        offer("T $text")
+    }
+
+    fun sendFile(relative: String, bytes: ByteArray) {
+        val payload = "F $relative " + android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+        offer(payload)
+    }
+
+    private fun offer(line: String) {
+        val clean = line.replace('\n', ' ').trim().take(60_000)
         if (clean.isBlank() || !running.get()) return
         if (!outgoing.offer(clean)) {
             outgoing.poll()

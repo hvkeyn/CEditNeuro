@@ -81,9 +81,9 @@ Published builds are on the [GitHub releases](https://github.com/hvkeyn/CEditNeu
    A model that accepts images also receives the photo. DeepSeek receives the file text
    and path. **Doctor** reads saved agent sessions, lists mistakes that repeat, and can
    send that report back so the agent fixes them. **Share this folder** uses a server both
-   phones already saved. The link icon in the top bar shows the connection code. The other
-   phone enters that code from the same icon. The phone that shared is the lead, the other
-   checks that work and sends corrections.
+   phones already saved. The link icon shows a code. Tap the code to copy it. The channel
+   stays on screen and shows when the other phone is linked and data is moving. The phone
+   that shared is the lead, the other checks that work and sends corrections.
    Opening another project does not stop the agent you left running.
 
 ## Profiles

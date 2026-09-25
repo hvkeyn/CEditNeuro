@@ -28,16 +28,26 @@ def handle(conn):
         name = "".join(ch for ch in parts[2] if ch.isalnum())[:24] or "phone"
         peer = (conn, name)
         room(code).add(peer)
+        hello = f"P {name} HERE\n".encode()
+        with lock:
+            others = [item for item in rooms.get(code, ()) if item is not peer]
+        for other, _ in others:
+            try:
+                other.sendall(hello)
+            except OSError:
+                pass
         reader = conn.makefile("r", encoding="utf-8", newline="\n")
         while True:
-            line = reader.readline(400)
+            line = reader.readline(80_000)
             if not line:
                 break
             line = line.strip()
-            if not line.startswith("T ") or len(line) > 300:
+            if line.startswith("T ") and len(line) <= 300:
+                payload = f"P {name} {line[2:]}\n".encode()
+            elif line.startswith("F ") and len(line) <= 70_000:
+                payload = f"P {name} FILE {line[2:]}\n".encode()
+            else:
                 continue
-            text = line[2:].replace("\n", " ")
-            payload = f"P {name} {text}\n".encode()
             with lock:
                 targets = [item for item in rooms.get(code, ()) if item is not peer]
             for other, _ in targets:
