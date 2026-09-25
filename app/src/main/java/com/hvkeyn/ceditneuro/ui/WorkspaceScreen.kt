@@ -50,6 +50,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Public
@@ -313,9 +314,12 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
             title = { Text("Shared folder") },
             text = {
                 Column {
-                    Text("Send the link and the code. The password stays in Settings on each phone. Both agents connect through the beacon with that code and see each other's reasoning. They do not log into the server.")
+                    Text("Give this code to the other phone. There, tap the link icon and enter the code. Agents connect through the beacon. Files also sync when both phones have the same server in Settings.")
                     Text(parts.getOrElse(0) { "" })
-                    Text("Code: ${parts.getOrElse(1) { "" }}")
+                    Text(
+                        text = parts.getOrElse(1) { "" },
+                        style = MaterialTheme.typography.headlineMedium,
+                    )
                     OutlinedTextField(
                         value = code,
                         onValueChange = { code = it },
@@ -438,6 +442,13 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                                     )
                                 }
                             }
+                        BarIcon(
+                            icon = Icons.Default.Link,
+                            description = "Connection code",
+                            active = state.shareOffer != null,
+                            onClick = { viewModel.createShare() },
+                            size = barButton,
+                        )
                         BarIcon(
                             icon = Icons.Default.Settings,
                             description = "Settings",
