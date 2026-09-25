@@ -174,6 +174,8 @@ data class WorkspaceUiState(
     val execPrompt: String? = null,
     val hostPrompt: HostTrustPrompt? = null,
     val shareOffer: String? = null,
+    val linkVisible: Boolean = false,
+    val linkNote: String = "",
     val linkPeer: String = "",
     val linkSent: Int = 0,
     val linkGot: Int = 0,
@@ -1320,25 +1322,53 @@ class WorkspaceViewModel(
             showMessage("Open a project folder first.")
             return
         }
+        if (_state.value.shareOffer != null) {
+            _state.update { it.copy(linkVisible = true) }
+            return
+        }
         seenPeers.clear()
         val code = (100000..999999).random().toString()
-        _state.update { it.copy(shareOffer = code, linkPeer = "", linkSent = 0, linkGot = 0, linkDirect = false) }
+        _state.update {
+            it.copy(
+                shareOffer = code,
+                linkVisible = true,
+                linkNote = "This code stays yours. The other phone enters it and presses Join.",
+                linkPeer = "",
+                linkSent = 0,
+                linkGot = 0,
+                linkDirect = false,
+            )
+        }
         openBeacon(code, lead = true)
     }
 
     fun joinShare(code: String) {
-        val trimmed = code.trim()
-        if (trimmed.length != 6 || trimmed.any { !it.isDigit() }) {
-            showMessage("Enter the 6-digit code from the other phone.")
+        val trimmed = code.filter { it.isDigit() }
+        val mine = _state.value.shareOffer
+        if (trimmed.length != 6) {
+            _state.update { it.copy(linkNote = "Enter the 6-digit code from the other phone.") }
+            return
+        }
+        if (trimmed == mine) {
+            _state.update { it.copy(linkNote = "That is your code. Send it to the other phone. They press Join.") }
             return
         }
         seenPeers.clear()
-        _state.update { it.copy(shareOffer = trimmed, linkPeer = "", linkSent = 0, linkGot = 0, linkDirect = false, linkClients = 0, linkActive = 0) }
+        _state.update {
+            it.copy(
+                linkVisible = true,
+                linkNote = "Joining $trimmed…",
+                linkPeer = "",
+                linkActive = 0,
+                linkClients = 0,
+                linkDirect = false,
+            )
+        }
         openBeacon(trimmed, lead = false)
     }
 
     fun dismissShare() {
-        _state.update { it.copy(shareOffer = null) }
+        _state.update { it.copy(linkVisible = false) }
     }
 
     fun showCopied() {
@@ -2131,7 +2161,13 @@ class WorkspaceViewModel(
                 seenPeers.size
             }
             _state.update {
-                it.copy(linkActive = names.size, linkClients = total, linkPeer = names.joinToString())
+                it.copy(
+                    linkActive = names.size,
+                    linkClients = total,
+                    linkPeer = names.joinToString(),
+                    linkNote = if (names.size > 1) "Linked. $total in this code, ${names.size} active."
+                    else "On the code. Waiting for the other phone.",
+                )
             }
         }) { name, text ->
             viewModelScope.launch {

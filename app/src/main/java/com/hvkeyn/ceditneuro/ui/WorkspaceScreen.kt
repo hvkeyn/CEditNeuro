@@ -308,14 +308,15 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
     }
 
     state.shareOffer?.let { code ->
+        if (!state.linkVisible) return@let
         val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
-        val linked = state.linkPeer.isNotBlank()
+        val linked = state.linkActive > 1 || state.linkPeer.contains(" ")
         AlertDialog(
             onDismissRequest = { viewModel.dismissShare() },
             title = { Text(if (linked) "Linked" else "Connection") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Tap the code to copy it, then send it to the other phone.")
+                    Text("Your code. Tap to copy. It does not change when you join.")
                     Text(
                         text = code,
                         style = MaterialTheme.typography.headlineMedium,
@@ -325,6 +326,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                             viewModel.showCopied()
                         },
                     )
+                    Text(state.linkNote.ifBlank { "Waiting for the other phone to enter this code." })
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("This phone")
                         Box(
@@ -333,17 +335,13 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                                 .size(width = 36.dp, height = 4.dp)
                                 .background(if (linked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
                         )
-                        Text(if (linked) state.linkPeer else "Waiting")
+                        Text(if (state.linkActive > 1) "${state.linkActive} active" else "Waiting")
                     }
-                    Text(
-                        if (!linked) "Waiting for the other phone to enter this code."
-                        else if (state.linkDirect) "Direct. ${state.linkActive} active of ${state.linkClients}. ${state.linkSpeed} B/s. Sent ${state.linkSent}, received ${state.linkGot}."
-                        else "Beacon handshake. ${state.linkActive} active of ${state.linkClients}. ${state.linkSpeed} B/s. Sent ${state.linkSent}, received ${state.linkGot}."
-                    )
+                    Text("${state.linkActive} active of ${state.linkClients}. ${state.linkSpeed} B/s.")
                     OutlinedTextField(
                         value = joinCode,
                         onValueChange = { joinCode = it },
-                        label = { Text("Enter a code") },
+                        label = { Text("Code from the other phone") },
                         singleLine = true,
                     )
                 }
@@ -477,7 +475,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                         BarIcon(
                             icon = Icons.Default.Link,
                             description = "Connection code",
-                            active = state.shareOffer != null,
+                            active = state.linkVisible,
                             onClick = { viewModel.createShare() },
                             size = barButton,
                         )
