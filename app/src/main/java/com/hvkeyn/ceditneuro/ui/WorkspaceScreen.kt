@@ -337,7 +337,10 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                         )
                         Text(if (state.linkActive > 1) "${state.linkActive} active" else "Waiting")
                     }
-                    Text("${state.linkActive} active of ${state.linkClients}. ${state.linkSpeed} B/s.")
+                    Text(
+                        if (state.linkActive > 1) "${state.linkActive} phones. ${state.linkSpeed} B/s."
+                        else "Only this phone, waiting. ${state.linkSpeed} B/s.",
+                    )
                     OutlinedTextField(
                         value = joinCode,
                         onValueChange = { joinCode = it },
@@ -397,7 +400,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                 },
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (state.linkClients > 0) {
+                        if (state.linkActive > 1) {
                             Icon(Icons.Default.Link, contentDescription = "Linked folder", modifier = Modifier.size(16.dp))
                         }
                         Text(
@@ -406,7 +409,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.clickable { projectsMenu = true },
                         )
-                        if (state.linkClients > 0) {
+                        if (state.linkActive > 1) {
                             Text(
                                 text = " ${state.linkActive}/${state.linkClients}",
                                 style = MaterialTheme.typography.labelMedium,

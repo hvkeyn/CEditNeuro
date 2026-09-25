@@ -905,8 +905,8 @@ class WorkspaceViewModel(
             val messages = buildList {
                 add(
                     com.hvkeyn.ceditneuro.agent.ChatMessage.system(
-                        "You answer only from this one book. Use the book text below and the question. " +
-                            "The reader is on the page named in the question. " +
+                        "Answer only from this one book, in Russian. Russian is the default language for every book answer. " +
+                            "Use the book text below and the question. The reader is on the page named in the question. " +
                             "Do not browse files, do not list a folder, and do not use tools.",
                     ),
                 )
@@ -2201,7 +2201,7 @@ class WorkspaceViewModel(
                     linkClients = total,
                     linkPeer = names.joinToString(),
                     linkNote = if (names.size > 1) "Linked. $total in this code, ${names.size} active."
-                    else "On the code. Waiting for the other phone.",
+                    else "Only this phone. Waiting for the other one.",
                 )
             }
             com.hvkeyn.ceditneuro.net.LinkService.update(
@@ -2210,6 +2210,8 @@ class WorkspaceViewModel(
                 if (names.size > 1) "$total in this code, ${names.size} active."
                 else "Waiting for the other phone.",
             )
+        }, onError = { message ->
+            _state.update { it.copy(linkNote = "Link error: $message") }
         }) { name, text ->
             viewModelScope.launch {
                 noteSpeed(text.length)
