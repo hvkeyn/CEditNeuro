@@ -26,6 +26,8 @@ class BeaconClient(
     @Volatile
     private var socket: Socket? = null
     @Volatile
+    private var writerOut: BufferedWriter? = null
+    @Volatile
     private var direct: InetSocketAddress? = null
     private var udp: DatagramSocket? = null
 
@@ -72,6 +74,7 @@ class BeaconClient(
                     link.soTimeout = 0
                     socket = link
                     val writer = BufferedWriter(OutputStreamWriter(link.getOutputStream(), Charsets.UTF_8))
+                    writerOut = writer
                     val reader = BufferedReader(InputStreamReader(link.getInputStream(), Charsets.UTF_8))
                     writer.write("JOIN $code $device\n")
                     writer.flush()
@@ -154,10 +157,19 @@ class BeaconClient(
         }
     }
 
+    fun leave() {
+        runCatching {
+            writerOut?.write("T LEFT\n")
+            writerOut?.flush()
+        }
+        stop()
+    }
+
     fun stop() {
         running.set(false)
         generation.incrementAndGet()
         direct = null
+        writerOut = null
         runCatching { socket?.close() }
         runCatching { udp?.close() }
     }

@@ -344,6 +344,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                         label = { Text("Code from the other phone") },
                         singleLine = true,
                     )
+                    TextButton(onClick = { viewModel.disconnectLink() }) { Text("Disconnect") }
                 }
             },
             confirmButton = {
