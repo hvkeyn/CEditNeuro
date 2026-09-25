@@ -1310,37 +1310,54 @@ class WorkspaceViewModel(
             showMessage("Open a project folder first.")
             return
         }
-        val remote = activeRemote() ?: run {
-            showMessage("Add the same server on both phones in Settings. The password stays on each phone.")
-            return
-        }
         val code = (100000..999999).random().toString()
+        openBeacon(code, lead = true)
+        val remote = activeRemote()
+        val link = if (remote == null) {
+            "No server saved yet. The code still connects the agents."
+        } else {
+            com.hvkeyn.ceditneuro.net.SpaceSync(remoteClient).link(remote)
+        }
+        _state.update { it.copy(shareOffer = link + "\n" + code) }
+        if (remote == null) return
         viewModelScope.launch {
             runCatching {
                 val sync = com.hvkeyn.ceditneuro.net.SpaceSync(remoteClient)
                 sync.publish(remote, code)
                 sync.sync(remote, project.workspace.root, android.os.Build.MODEL.replace(Regex("[^A-Za-z0-9]"), ""))
-                openBeacon(code, lead = true)
-                _state.update { it.copy(shareOffer = sync.link(remote) + "\n" + code) }
-            }.onFailure { showMessage(it.message ?: "Could not share this folder.") }
+            }.onFailure { showMessage(it.message ?: "Agents are connected. File sync failed.") }
         }
     }
 
     fun joinShare(code: String) {
-        val project = current ?: return
-        val remote = activeRemote() ?: return
+        val project = current ?: run {
+            showMessage("Open a project folder first.")
+            return
+        }
+        val trimmed = code.trim()
+        if (trimmed.length != 6 || trimmed.any { !it.isDigit() }) {
+            showMessage("Enter the 6-digit code from the other phone.")
+            return
+        }
+        openBeacon(trimmed, lead = false)
+        val remote = activeRemote()
+        if (remote == null) {
+            _state.update { it.copy(shareOffer = null, message = "Connected with code $trimmed.") }
+            return
+        }
         viewModelScope.launch {
             val sync = com.hvkeyn.ceditneuro.net.SpaceSync(remoteClient)
-            val ok = runCatching { sync.check(remote, code.trim()) }.getOrDefault(false)
+            val ok = runCatching { sync.check(remote, trimmed) }.getOrDefault(false)
             if (!ok) {
-                showMessage("That code does not match the shared folder.")
+                _state.update {
+                    it.copy(shareOffer = null, message = "Connected with code $trimmed. This server folder uses a different code, so files were not synced.")
+                }
                 return@launch
             }
-            openBeacon(code.trim(), lead = false)
             val note = runCatching {
                 sync.sync(remote, project.workspace.root, android.os.Build.MODEL.replace(Regex("[^A-Za-z0-9]"), ""))
             }.getOrElse {
-                showMessage(it.message ?: "Sync failed.")
+                showMessage(it.message ?: "Connected. File sync failed.")
                 return@launch
             }
             _state.update { it.copy(shareOffer = null, message = note) }
