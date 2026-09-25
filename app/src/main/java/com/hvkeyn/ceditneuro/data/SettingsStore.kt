@@ -8,6 +8,7 @@ import androidx.security.crypto.MasterKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import com.hvkeyn.ceditneuro.net.NetProxy
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -29,6 +30,13 @@ data class AgentSettings(
     val workFocus: String = WORK_EDIT,
     val remotes: List<RemoteServer> = emptyList(),
     val activeRemoteId: String = "",
+    val proxy: NetProxy = NetProxy(),
+    val mailHost: String = "",
+    val mailPort: Int = 993,
+    val mailUsername: String = "",
+    val mailPassword: String = "",
+    val smtpHost: String = "",
+    val smtpPort: Int = 587,
 ) {
     val provider: ModelProvider
         get() = providers.find { it.id == activeProviderId }
@@ -113,6 +121,15 @@ class SettingsStore(context: Context) {
                 runCatching { json.decodeFromString<List<RemoteServer>>(raw) }.getOrNull()
             }.orEmpty(),
             activeRemoteId = prefs.getString(KEY_ACTIVE_REMOTE, null).orEmpty(),
+            proxy = prefs.getString(KEY_PROXY, null)?.let { raw ->
+                runCatching { json.decodeFromString<NetProxy>(raw) }.getOrNull()
+            } ?: NetProxy(),
+            mailHost = prefs.getString(KEY_MAIL_HOST, null).orEmpty(),
+            mailPort = prefs.getInt(KEY_MAIL_PORT, 993),
+            mailUsername = prefs.getString(KEY_MAIL_USER, null).orEmpty(),
+            mailPassword = prefs.getString(KEY_MAIL_PASSWORD, null).orEmpty(),
+            smtpHost = prefs.getString(KEY_SMTP_HOST, null).orEmpty(),
+            smtpPort = prefs.getInt(KEY_SMTP_PORT, 587),
         ).normalized()
         return importDebugSeed(context, loaded)
     }
@@ -171,6 +188,13 @@ class SettingsStore(context: Context) {
         editor.putString(KEY_WORK, settings.workFocus)
             .putString(KEY_REMOTES, json.encodeToString(settings.remotes))
             .putString(KEY_ACTIVE_REMOTE, settings.activeRemoteId)
+            .putString(KEY_PROXY, json.encodeToString(settings.proxy))
+            .putString(KEY_MAIL_HOST, settings.mailHost)
+            .putInt(KEY_MAIL_PORT, settings.mailPort)
+            .putString(KEY_MAIL_USER, settings.mailUsername)
+            .putString(KEY_MAIL_PASSWORD, settings.mailPassword)
+            .putString(KEY_SMTP_HOST, settings.smtpHost)
+            .putInt(KEY_SMTP_PORT, settings.smtpPort)
             .apply()
     }
 
@@ -203,6 +227,13 @@ class SettingsStore(context: Context) {
         const val KEY_WORK = "work_focus"
         const val KEY_REMOTES = "remote_servers"
         const val KEY_ACTIVE_REMOTE = "active_remote"
+        const val KEY_PROXY = "net_proxy"
+        const val KEY_MAIL_HOST = "mail_host"
+        const val KEY_MAIL_PORT = "mail_port"
+        const val KEY_MAIL_USER = "mail_user"
+        const val KEY_MAIL_PASSWORD = "mail_password"
+        const val KEY_SMTP_HOST = "smtp_host"
+        const val KEY_SMTP_PORT = "smtp_port"
         const val LEGACY_BASE_URL = "base_url"
         const val LEGACY_MODEL = "model"
         const val LEGACY_API_KEY = "api_key"

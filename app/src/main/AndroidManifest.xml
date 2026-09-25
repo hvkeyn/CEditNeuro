@@ -77,6 +77,19 @@
             android:foregroundServiceType="dataSync" />
 
         <receiver
+            android:name=".agent.TimerReceiver"
+            android:exported="false" />
+
+        <service
+            android:name=".desk.NoticeService"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <receiver
             android:name=".update.UpdateResultReceiver"
             android:exported="false">
             <intent-filter>

@@ -88,7 +88,9 @@ object AgentDoctor {
                 "shell access missing"
             "cannot link" in line -> "binary will not start"
             "timed out" in line -> "timed out"
-            "http 400" in line || "tool_calls" in line && "400" in line -> "tool call rejected"
+            "tool_calls" in line && "400" in line -> "tool call rejected"
+            "chain validation" in line || "certificate chain was rejected" in line -> "certificate rejected"
+            "incorrect user data" in line || "do not repeat this login" in line -> "login rejected"
             line.startsWith("exit=") && !line.startsWith("exit=0") -> "command failed"
             "not a file" in line || "no such file" in line -> "missing file"
             "stopped:" in line -> "run stopped"
@@ -103,6 +105,12 @@ object AgentDoctor {
         }
         if ("host did not resolve" in kinds) {
             lines += "That hostname did not resolve. Do not fetch it again. Choose a different URL."
+        }
+        if ("certificate rejected" in kinds) {
+            lines += "The certificate was rejected. Do not retry that host."
+        }
+        if ("login rejected" in kinds) {
+            lines += "The server rejected the user data. Do not repeat that login."
         }
         if ("Permission denied" in kinds) {
             lines += "Do not read /proc/net or another app's data. Stay on paths the tool already returned."

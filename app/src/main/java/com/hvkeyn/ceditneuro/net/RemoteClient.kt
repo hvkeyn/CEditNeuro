@@ -35,6 +35,7 @@ data class RemoteEntry(val name: String, val directory: Boolean, val size: Long)
  */
 class RemoteClient(
     private val trust: suspend (serverId: String, host: String, fingerprint: String) -> Boolean,
+    private val proxy: () -> NetProxy = { NetProxy() },
 ) {
     suspend fun list(server: RemoteServer, path: String): List<RemoteEntry> =
         use(server) { it.list(resolve(server, path)) }
@@ -60,6 +61,12 @@ class RemoteClient(
     suspend fun mkdir(server: RemoteServer, path: String) =
         use(server) { it.mkdir(resolve(server, path)) }
 
+    suspend fun delete(server: RemoteServer, path: String, recursive: Boolean) =
+        use(server) { it.delete(resolve(server, path), recursive) }
+
+    suspend fun rename(server: RemoteServer, from: String, to: String) =
+        use(server) { it.rename(resolve(server, from), resolve(server, to)) }
+
     private suspend fun <T> use(server: RemoteServer, block: (RemoteOps) -> T): T {
         try {
             return withContext(Dispatchers.IO) { open(server).use(block) }
@@ -70,10 +77,13 @@ class RemoteClient(
         }
     }
 
-    private fun open(server: RemoteServer): RemoteOps = when (server.protocol) {
-        "sftp" -> SftpOps(server)
-        "ftp", "ftps" -> FtpOps(server)
-        else -> throw IOException("Unknown protocol ${server.protocol}.")
+    private fun open(server: RemoteServer): RemoteOps {
+        val jump = proxy()
+        return when (server.protocol) {
+            "sftp" -> SftpOps(server, jump)
+            "ftp", "ftps" -> FtpOps(server, jump)
+            else -> throw IOException("Unknown protocol ${server.protocol}.")
+        }
     }
 
     private fun resolve(server: RemoteServer, path: String): String {
@@ -92,9 +102,11 @@ private interface RemoteOps : AutoCloseable {
     fun write(path: String, bytes: ByteArray)
     fun exec(command: String): String
     fun mkdir(path: String)
+    fun delete(path: String, recursive: Boolean)
+    fun rename(from: String, to: String)
 }
 
-private class SftpOps(server: RemoteServer) : RemoteOps {
+private class SftpOps(server: RemoteServer, proxy: NetProxy) : RemoteOps {
     private val session: Session
     private val sftp: ChannelSftp
 
@@ -103,6 +115,19 @@ private class SftpOps(server: RemoteServer) : RemoteOps {
         val jsch = JSch()
         session = jsch.getSession(server.username, server.host, server.port)
         session.setPassword(server.password)
+        if (proxy.usable()) {
+            proxy.applyCredentials()
+            val tunnel = if (proxy.type == "http") {
+                com.jcraft.jsch.ProxyHTTP(proxy.host, proxy.port).also {
+                    if (proxy.username.isNotBlank()) it.setUserPasswd(proxy.username, proxy.password)
+                }
+            } else {
+                com.jcraft.jsch.ProxySOCKS5(proxy.host, proxy.port).also {
+                    if (proxy.username.isNotBlank()) it.setUserPasswd(proxy.username, proxy.password)
+                }
+            }
+            session.setProxy(tunnel)
+        }
         session.hostKeyRepository = FingerprintKeys(server.trustedFingerprint, seen)
         session.setConfig("StrictHostKeyChecking", "yes")
         session.userInfo = DenyUserInfo
@@ -171,13 +196,31 @@ private class SftpOps(server: RemoteServer) : RemoteOps {
         runCatching { sftp.mkdir(path) }
     }
 
+    override fun delete(path: String, recursive: Boolean) {
+        if (path == "/" || path.isBlank()) throw IOException("Refusing to delete the remote root.")
+        val stat = sftp.lstat(path)
+        if (stat.isDir) {
+            if (!recursive) throw IOException("$path is a directory. Set recursive true to delete it.")
+            for (child in list(path)) {
+                delete("$path/${child.name}", true)
+            }
+            sftp.rmdir(path)
+        } else {
+            sftp.rm(path)
+        }
+    }
+
+    override fun rename(from: String, to: String) {
+        sftp.rename(from, to)
+    }
+
     override fun close() {
         sftp.disconnect()
         session.disconnect()
     }
 }
 
-private class FtpOps(server: RemoteServer) : RemoteOps {
+private class FtpOps(server: RemoteServer, proxy: NetProxy) : RemoteOps {
     private val ftp: FTPClient = if (server.protocol == "ftps") {
         FTPSClient(server.port == 990)
     } else {
@@ -189,6 +232,10 @@ private class FtpOps(server: RemoteServer) : RemoteOps {
         ftp.connectTimeout = 20_000
         ftp.defaultTimeout = 20_000
         ftp.controlEncoding = "UTF-8"
+        proxy.javaProxy()?.let {
+            proxy.applyCredentials()
+            ftp.proxy = it
+        }
         if (ftp is FTPSClient) {
             ftp.trustManager = FingerprintTrust(server.trustedFingerprint, seen)
         }
@@ -245,6 +292,24 @@ private class FtpOps(server: RemoteServer) : RemoteOps {
 
     override fun mkdir(path: String) {
         ftp.makeDirectory(path)
+    }
+
+    override fun delete(path: String, recursive: Boolean) {
+        if (path == "/" || path.isBlank()) throw IOException("Refusing to delete the remote root.")
+        if (ftp.deleteFile(path)) return
+        if (!recursive) {
+            throw IOException("FTP delete failed: ${ftp.replyString.trim()} A directory needs recursive true.")
+        }
+        for (file in ftp.listFiles(path).orEmpty()) {
+            val name = file.name ?: continue
+            if (name == "." || name == "..") continue
+            delete("$path/$name", true)
+        }
+        if (!ftp.removeDirectory(path)) throw IOException("FTP delete failed: ${ftp.replyString.trim()}")
+    }
+
+    override fun rename(from: String, to: String) {
+        if (!ftp.rename(from, to)) throw IOException("FTP rename failed: ${ftp.replyString.trim()}")
     }
 
     override fun close() {

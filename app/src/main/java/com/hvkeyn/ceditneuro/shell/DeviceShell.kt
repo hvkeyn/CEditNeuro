@@ -16,6 +16,7 @@ import java.util.concurrent.TimeUnit
 class DeviceShell(
     context: Context,
     private val networkAllowed: () -> Boolean = { true },
+    proxy: () -> com.hvkeyn.ceditneuro.net.NetProxy = { com.hvkeyn.ceditneuro.net.NetProxy() },
 ) {
 
     private val home: File = File(context.filesDir, "home").apply { mkdirs() }
@@ -23,7 +24,7 @@ class DeviceShell(
     val toolchain: File = File(context.filesDir, "toolchain").apply { mkdirs() }
     val toolchainBin: File = File(toolchain, "bin").apply { mkdirs() }
     private val toolchainLib: File = File(toolchain, "lib").apply { mkdirs() }
-    private val net = AgentNet()
+    private val net = AgentNet(proxy)
 
     fun run(command: String, workDir: File, timeoutSeconds: Int): ShellOutput {
         val timeout = timeoutSeconds.coerceIn(5, 900)
@@ -120,8 +121,8 @@ class DeviceShell(
             )
         }
         pumps.forEach { it.join(2_000) }
-        val adjusted = ShellExit.adjust(rewritten, process.exitValue())
         val body = renderOutput(stdout, stderr, truncated.get()) + StoragePaths.noteVisibleFiles(rewritten)
+        val adjusted = ShellExit.adjust(rewritten, process.exitValue(), body)
         val noted = if (adjusted.note.isBlank()) body else body + "\n" + adjusted.note
         return ShellOutput(
             exitCode = adjusted.exitCode,
@@ -168,13 +169,13 @@ class DeviceShell(
         }.getOrElse { error ->
             part.delete()
             val detail = error.message ?: "Download failed."
-            val text = if (
+            val refusal = ShellExit.refusal(detail)
+            val text = when {
+                refusal.isNotEmpty() -> "$detail $refusal"
                 detail.contains("Unable to resolve host", ignoreCase = true) ||
-                detail.contains("No address associated", ignoreCase = true)
-            ) {
-                "$detail Do not retry this URL."
-            } else {
-                detail
+                    detail.contains("No address associated", ignoreCase = true) ->
+                    "$detail Do not retry this URL."
+                else -> detail
             }
             ShellOutput(1, text, timedOut = false)
         }

@@ -38,6 +38,13 @@ import com.hvkeyn.ceditneuro.shell.ProgramRun
 import com.hvkeyn.ceditneuro.tools.BrowsePageTool
 import com.hvkeyn.ceditneuro.tools.EditFileTool
 import com.hvkeyn.ceditneuro.tools.HttpRequestTool
+import com.hvkeyn.ceditneuro.tools.MailListTool
+import com.hvkeyn.ceditneuro.tools.MailReadTool
+import com.hvkeyn.ceditneuro.tools.MailSendTool
+import com.hvkeyn.ceditneuro.tools.NotificationDismissTool
+import com.hvkeyn.ceditneuro.tools.NotificationReplyTool
+import com.hvkeyn.ceditneuro.tools.NotificationsTool
+import com.hvkeyn.ceditneuro.tools.TimerTool
 import com.hvkeyn.ceditneuro.tools.InstallApkTool
 import com.hvkeyn.ceditneuro.tools.InstallModuleTool
 import com.hvkeyn.ceditneuro.tools.InstallAndroidSdkTool
@@ -65,7 +72,10 @@ import com.hvkeyn.ceditneuro.tools.ListDirTool
 import com.hvkeyn.ceditneuro.tools.ReadFileTool
 import com.hvkeyn.ceditneuro.tools.RemoteConnectTool
 import com.hvkeyn.ceditneuro.tools.RemoteGetTool
+import com.hvkeyn.ceditneuro.tools.RemoteDeleteTool
 import com.hvkeyn.ceditneuro.tools.RemoteListTool
+import com.hvkeyn.ceditneuro.tools.RemoteMkdirTool
+import com.hvkeyn.ceditneuro.tools.RemoteRenameTool
 import com.hvkeyn.ceditneuro.tools.SpaceSyncTool
 import com.hvkeyn.ceditneuro.tools.RemotePutTool
 import com.hvkeyn.ceditneuro.tools.RemoteReadTool
@@ -250,9 +260,9 @@ class WorkspaceViewModel(
     private var workspace: Workspace? = null
     private val projects = linkedMapOf<String, LiveProject>()
     private var current: LiveProject? = null
-    private val deviceShell = DeviceShell(appContext) { settingsStore.current.networkEnabled }
+    private val deviceShell = DeviceShell(appContext, { settingsStore.current.networkEnabled }) { settingsStore.current.proxy }
     private val shizukuShell = ShizukuShell(appContext)
-    private val agentNet = AgentNet()
+    private val agentNet = AgentNet { settingsStore.current.proxy }
     private val execMutex = Mutex()
     private var execWaiter: CompletableDeferred<Boolean>? = null
     private val hostMutex = Mutex()
@@ -261,7 +271,7 @@ class WorkspaceViewModel(
     private var browseGeneration = 0
     private var shizukuPrompted = false
     private var browseReportJob: Job? = null
-    private val remoteClient = RemoteClient(::ensureHostTrusted)
+    private val remoteClient = RemoteClient(::ensureHostTrusted) { settingsStore.current.proxy }
     private val beacon = com.hvkeyn.ceditneuro.net.BeaconClient()
     private val peerLines = ArrayDeque<String>()
     private var beaconRole: String = ""
@@ -1388,7 +1398,7 @@ class WorkspaceViewModel(
         beaconRole = ""
         seenPeers.clear()
         current?.let { project ->
-            appendChat(project, ChatRole.Error, "Link closed. The lead and the other phones are told this phone left.")
+            appendChat(project, ChatRole.Tool, "Link closed. The lead and the other phones are told this phone left.", "link")
         }
         _state.update {
             it.copy(
@@ -2116,6 +2126,7 @@ class WorkspaceViewModel(
             "run_command" -> "Running a command"
             "zip_paths" -> "Packing a zip"
             "http_request" -> "Requesting a page"
+            "set_timer" -> "Setting a timer"
             "load_tools" -> "Loading tools"
             "fetch_system_layout" -> "Reading the screen"
             "execute_system_action" -> "Tapping the screen"
@@ -2510,6 +2521,7 @@ class WorkspaceViewModel(
                 appendShellLine(project, command, rendered)
                 refreshProjectTree(project)
             },
+            TimerTool(appContext),
             HttpRequestTool(ws, agentNet, { settingsStore.current.networkEnabled }) { path ->
                 if (project.epoch.get() == epochAtBuild) onAgentEditedFile(project, path)
             },
@@ -2569,6 +2581,15 @@ class WorkspaceViewModel(
                 if (project.epoch.get() == epochAtBuild) onAgentEditedFile(project, path)
             },
             SshExecTool(::activeRemote, remoteClient),
+            RemoteMkdirTool(::activeRemote, remoteClient),
+            RemoteDeleteTool(::activeRemote, remoteClient),
+            RemoteRenameTool(::activeRemote, remoteClient),
+            NotificationsTool(),
+            NotificationReplyTool(),
+            NotificationDismissTool(),
+            MailListTool { settingsStore.current },
+            MailReadTool { settingsStore.current },
+            MailSendTool { settingsStore.current },
             SpaceSyncTool(ws, ::activeRemote, remoteClient, android.os.Build.MODEL.replace(Regex("[^A-Za-z0-9]"), "")),
         )
 

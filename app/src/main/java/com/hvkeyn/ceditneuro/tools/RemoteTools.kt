@@ -47,6 +47,24 @@ private class RemoteBridge(
 
     suspend fun exec(command: String): String = client.exec(requireServer(), command)
 
+    suspend fun mkdir(path: String): String {
+        val active = requireServer()
+        client.mkdir(active, path)
+        return "Created $path on ${active.host}."
+    }
+
+    suspend fun delete(path: String, recursive: Boolean): String {
+        val active = requireServer()
+        client.delete(active, path, recursive)
+        return "Deleted $path on ${active.host}."
+    }
+
+    suspend fun rename(from: String, to: String): String {
+        val active = requireServer()
+        client.rename(active, from, to)
+        return "Renamed $from to $to on ${active.host}."
+    }
+
     suspend fun put(localPath: String, remotePath: String): String {
         val ws = workspace ?: throw IllegalStateException("No project is open.")
         val file = ws.resolve(localPath)
@@ -79,7 +97,7 @@ class RemoteConnectTool(
     override val name = "remote_connect"
     override val description =
         "Connect to an FTP, FTPS, or SFTP server with credentials the user just gave you in the chat. " +
-            "Call this before remote_list, remote_read, remote_write, remote_put, remote_get, or ssh_exec. " +
+            "Call this before remote_list, remote_read, remote_write, remote_put, remote_get, remote_mkdir, remote_delete, remote_rename, or ssh_exec. " +
             "ssh means SFTP. Do not ask the user to retype the same login into Settings."
     override val parameters = objectSchema(
         properties = mapOf(
@@ -243,6 +261,60 @@ class RemoteGetTool(
         val remote = args.stringArg("remote_path") ?: return ToolResult.error("Missing 'remote_path'.")
         val local = args.stringArg("local_path") ?: return ToolResult.error("Missing 'local_path'.")
         return remoteResult { bridge.get(remote, local) }
+    }
+}
+
+class RemoteMkdirTool(server: () -> RemoteServer?, client: RemoteClient) : Tool {
+    private val bridge = RemoteBridge(server, client)
+    override val name = "remote_mkdir"
+    override val description = "Create a directory on the connected FTP or SFTP server."
+    override val parameters = objectSchema(
+        properties = mapOf("path" to stringProp("Remote directory to create.")),
+        required = listOf("path"),
+    )
+
+    override suspend fun execute(args: JsonObject): ToolResult {
+        val path = args.stringArg("path") ?: return ToolResult.error("Missing 'path'.")
+        return remoteResult { bridge.mkdir(path) }
+    }
+}
+
+class RemoteDeleteTool(server: () -> RemoteServer?, client: RemoteClient) : Tool {
+    private val bridge = RemoteBridge(server, client)
+    override val name = "remote_delete"
+    override val description =
+        "Delete a file or directory on the connected FTP or SFTP server. " +
+            "Set recursive true to delete a directory and what is inside it. Refuses the remote root."
+    override val parameters = objectSchema(
+        properties = mapOf(
+            "path" to stringProp("Remote file or directory."),
+            "recursive" to com.hvkeyn.ceditneuro.tools.boolProp("Delete a directory and its contents."),
+        ),
+        required = listOf("path"),
+    )
+
+    override suspend fun execute(args: JsonObject): ToolResult {
+        val path = args.stringArg("path") ?: return ToolResult.error("Missing 'path'.")
+        return remoteResult { bridge.delete(path, args.boolArg("recursive") == true) }
+    }
+}
+
+class RemoteRenameTool(server: () -> RemoteServer?, client: RemoteClient) : Tool {
+    private val bridge = RemoteBridge(server, client)
+    override val name = "remote_rename"
+    override val description = "Rename or move a file on the connected FTP or SFTP server."
+    override val parameters = objectSchema(
+        properties = mapOf(
+            "from" to stringProp("Current remote path."),
+            "to" to stringProp("New remote path."),
+        ),
+        required = listOf("from", "to"),
+    )
+
+    override suspend fun execute(args: JsonObject): ToolResult {
+        val from = args.stringArg("from") ?: return ToolResult.error("Missing 'from'.")
+        val to = args.stringArg("to") ?: return ToolResult.error("Missing 'to'.")
+        return remoteResult { bridge.rename(from, to) }
     }
 }
 

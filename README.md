@@ -23,7 +23,7 @@ layer is wired end to end.
 | Tools: read / write / edit / list / grep / glob | done |
 | Tools: git status, git diff (JGit) | done |
 | Built-in shell (`run_command`, mksh/toybox) | done |
-| FTP, FTPS, and SFTP (`remote_list`, `remote_read`, `remote_write`, `remote_put`, `remote_get`) | done |
+| FTP, FTPS, and SFTP, including mkdir, delete, and rename | done |
 | SSH command on the selected SFTP server (`ssh_exec`) and in-app site preview | done |
 | Collapsible chat panel, shell, and in-app page preview | done |
 | Tree-sitter highlighting for Java, Kotlin, Python, JSON, and XML | done |
@@ -38,6 +38,8 @@ layer is wired end to end.
 | Prepaid balance for the API key in Language models (DeepSeek and other hosts that publish one) | done |
 | Update check at the bottom of Language models settings | done — install starts only after confirmation |
 | Phone profile in `CEditNeuro/profiles` survives uninstall and loads on the next install | done |
+| Optional SOCKS or HTTP proxy for the user's own servers, FTP, SFTP, and mail | done |
+| Timer notification, notification access, and a mailbox in Settings → Desk | done |
 | `install_jdk`, `install_android_sdk`, `install_runtime` from the Termux mirror | done |
 | Zed-style per-edit Accept/Reject diffs | not yet — edits apply immediately |
 
