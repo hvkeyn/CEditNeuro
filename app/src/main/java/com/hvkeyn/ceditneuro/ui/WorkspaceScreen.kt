@@ -336,8 +336,9 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                         Text(if (linked) state.linkPeer else "Waiting")
                     }
                     Text(
-                        if (linked) "Channel open. Sent ${state.linkSent}, received ${state.linkGot}."
-                        else "Waiting for the other phone to enter this code.",
+                        if (!linked) "Waiting for the other phone to enter this code."
+                        else if (state.linkDirect) "Direct. ${state.linkActive} active of ${state.linkClients}. ${state.linkSpeed} B/s. Sent ${state.linkSent}, received ${state.linkGot}."
+                        else "Beacon handshake. ${state.linkActive} active of ${state.linkClients}. ${state.linkSpeed} B/s. Sent ${state.linkSent}, received ${state.linkGot}."
                     )
                     OutlinedTextField(
                         value = joinCode,
@@ -396,12 +397,24 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                     }
                 },
                 title = {
-                    Text(
-                        text = state.projectName ?: "CEditNeuro",
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.clickable { projectsMenu = true },
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (state.linkClients > 0) {
+                            Icon(Icons.Default.Link, contentDescription = "Linked folder", modifier = Modifier.size(16.dp))
+                        }
+                        Text(
+                            text = state.projectName ?: "CEditNeuro",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.clickable { projectsMenu = true },
+                        )
+                        if (state.linkClients > 0) {
+                            Text(
+                                text = " ${state.linkActive}/${state.linkClients}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
                 },
                 actions = {
                     Row {
