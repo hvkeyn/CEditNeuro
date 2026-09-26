@@ -92,7 +92,8 @@ object AgentDoctor {
                 "shell access missing"
             "ui dump was killed" in line -> "ui dump held"
             "cannot link" in line -> "binary will not start"
-            "timed out" in line -> "timed out"
+            "timed out" in line || line.trim() == "timeout" || line.trim().startsWith("timeout\n") ||
+                "sockettimeout" in line -> "timed out"
             "tool_calls" in line && "400" in line -> "tool call rejected"
             "chain validation" in line || "certificate chain was rejected" in line -> "certificate rejected"
             "incorrect user data" in line || "do not repeat this login" in line -> "login rejected"

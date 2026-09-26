@@ -55,6 +55,7 @@ layer is wired end to end.
 | PNG, JPG, WebP, GIF, BMP, SVG, and HTML open as a preview, with a switch back to the text | done |
 | A ticked skill stays on for that chat (up to three) and the agent follows it on every run | done |
 | Reader tools are labelled icons: contents, find, listen, text, pen, layer, notes, and the book chat | done |
+| A reasoning-only assistant turn still continues, and a failed command, URL, or login is not sent again | done |
 | Starter phone skills `android-debug` and `book-notes`; a deleted starter skill stays deleted | done |
 | `install_jdk`, `install_android_sdk`, `install_runtime` from the Termux mirror | done |
 | Zed-style per-edit Accept/Reject diffs | not yet — edits apply immediately |
