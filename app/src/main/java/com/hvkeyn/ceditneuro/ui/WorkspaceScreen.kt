@@ -285,6 +285,10 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
             onSaveProfile = viewModel::saveProfileAs,
             onUseProfile = viewModel::useProfile,
             onCheckUpdate = { viewModel.checkForUpdate(manual = true) },
+            onListSkills = viewModel::listSkills,
+            onReadSkill = viewModel::readSkill,
+            onWriteSkill = viewModel::writeSkill,
+            onDeleteSkill = viewModel::deleteSkill,
             onDismiss = { showSettings = false },
         )
     }

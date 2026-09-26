@@ -586,6 +586,15 @@ private fun AgentActivityBar(activity: AgentActivity, compact: Boolean) {
                 modifier = Modifier.padding(start = 8.dp).weight(1f),
             )
         }
+        if (activity.goal.isNotBlank()) {
+            Text(
+                text = activity.goal,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = if (compact) 1 else 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         if (!compact) {
             val bars = agentBars(activity.phase)
             LinearProgressIndicator(

@@ -33,5 +33,8 @@ class HarnessEfficiencyTest {
         assertFalse(prompt.contains("/storage"))
         assertFalse(prompt.contains("project rooted"))
         assertTrue(prompt.contains("load_tools"))
+        assertTrue(prompt.contains("list_skills"))
+        assertTrue(prompt.contains("search_sessions"))
+        assertFalse(prompt.contains("sk-"))
     }
 }

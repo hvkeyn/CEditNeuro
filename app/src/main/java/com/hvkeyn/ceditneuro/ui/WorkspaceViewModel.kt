@@ -16,6 +16,10 @@ import com.hvkeyn.ceditneuro.agent.AgentDoctor
 import com.hvkeyn.ceditneuro.agent.AgentLoop
 import com.hvkeyn.ceditneuro.agent.ChatMessage
 import com.hvkeyn.ceditneuro.agent.ToolTranscript
+import com.hvkeyn.ceditneuro.agent.ProjectMemory
+import com.hvkeyn.ceditneuro.agent.SkillEntry
+import com.hvkeyn.ceditneuro.agent.SkillLibrary
+import com.hvkeyn.ceditneuro.agent.SkillNote
 import com.hvkeyn.ceditneuro.agent.buildSetupPrompt
 import com.hvkeyn.ceditneuro.agent.buildSystemPrompt
 import com.hvkeyn.ceditneuro.agent.deepseek.DeepSeekBackend
@@ -52,7 +56,14 @@ import com.hvkeyn.ceditneuro.tools.InstallAndroidSdkTool
 import com.hvkeyn.ceditneuro.tools.InstallJdkTool
 import com.hvkeyn.ceditneuro.tools.InstallProgramTool
 import com.hvkeyn.ceditneuro.tools.InstallRuntimeTool
+import com.hvkeyn.ceditneuro.tools.AppendSkillTool
+import com.hvkeyn.ceditneuro.tools.DeleteSkillTool
+import com.hvkeyn.ceditneuro.tools.ListSkillsTool
 import com.hvkeyn.ceditneuro.tools.LoadToolsTool
+import com.hvkeyn.ceditneuro.tools.ReadSkillTool
+import com.hvkeyn.ceditneuro.tools.RememberTool
+import com.hvkeyn.ceditneuro.tools.SaveSkillTool
+import com.hvkeyn.ceditneuro.tools.SearchSessionsTool
 import com.hvkeyn.ceditneuro.tools.ReaderNoteTool
 import com.hvkeyn.ceditneuro.tools.ReaderSketchTool
 import com.hvkeyn.ceditneuro.tools.ToolGroups
@@ -225,6 +236,7 @@ data class AgentActivity(
     val context: String,
     val focus: String,
     val startedAt: Long,
+    val goal: String = "",
 )
 
 private class LiveProject(
@@ -1505,8 +1517,9 @@ class WorkspaceViewModel(
         val epoch = project.epoch.get()
         val openFile = _state.value.activePath?.substringAfterLast('/').orEmpty()
         val preparedChars = history.sumOf { it.content?.length ?: 0 } + prompt.length
+        val goal = prompt.lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() }?.take(140).orEmpty()
 
-        val loop = buildAgentLoop(project)
+        val loop = buildAgentLoop(project, goal)
         val finalText = StringBuilder()
         project.liveAnswer.clear()
         project.runOutcome = null
@@ -1523,6 +1536,7 @@ class WorkspaceViewModel(
                     context = formatActivityContext(project, history.size + 1, preparedChars),
                     focus = if (openFile.isBlank()) "" else "open $openFile",
                     startedAt = System.currentTimeMillis(),
+                    goal = goal,
                 ),
             )
         }
@@ -2096,6 +2110,7 @@ class WorkspaceViewModel(
                     context = context ?: previous?.context.orEmpty(),
                     focus = focus ?: previous?.focus.orEmpty(),
                     startedAt = started,
+                    goal = previous?.goal.orEmpty(),
                 ),
             )
         }
@@ -2151,6 +2166,13 @@ class WorkspaceViewModel(
             "remote_get" -> "Downloading"
             "ssh_exec" -> "Running a remote command"
             "browse_page" -> "Opening a page"
+            "list_skills" -> "Listing skills"
+            "read_skill" -> "Reading a skill"
+            "save_skill" -> "Saving a skill"
+            "append_skill" -> "Extending a skill"
+            "delete_skill" -> "Deleting a skill"
+            "remember" -> "Saving a project note"
+            "search_sessions" -> "Searching past chat"
             else -> name.replace('_', ' ').replaceFirstChar { it.uppercase() }
         }
         return when {
@@ -2495,7 +2517,34 @@ class WorkspaceViewModel(
         return parts.indices.map { index -> parts.take(index + 1).joinToString("/") }.toSet()
     }
 
-    private fun buildAgentLoop(project: LiveProject): AgentLoop {
+    fun listSkills(): List<SkillEntry> = skillLibrary(current).list()
+
+    fun readSkill(name: String, scope: String): SkillNote = skillLibrary(current).read(name, scope)
+
+    fun writeSkill(name: String, body: String, scope: String, append: Boolean): SkillNote {
+        val library = skillLibrary(current)
+        return if (append) library.append(name, body, scope) else library.save(name, body, scope)
+    }
+
+    fun deleteSkill(name: String, scope: String): SkillNote = skillLibrary(current).delete(name, scope)
+
+    private fun skillLibrary(project: LiveProject?): SkillLibrary =
+        SkillLibrary(project?.workspace?.root, appSkillsDir())
+
+    private fun appSkillsDir(): File {
+        val shared = File(StoragePaths.primaryRoot(), "CEditNeuro/skills")
+        val allowed = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            android.os.Environment.isExternalStorageManager()
+        } else {
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                appContext,
+                android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        }
+        return (if (allowed) shared else File(appContext.filesDir, "skills")).apply { mkdirs() }
+    }
+
+    private fun buildAgentLoop(project: LiveProject, goal: String = ""): AgentLoop {
         val ws = project.workspace
         val epochAtBuild = project.epoch.get()
         val changeListener: (String, String, String) -> Unit = { path, _, _ ->
@@ -2598,6 +2647,28 @@ class WorkspaceViewModel(
             MailSendTool { settingsStore.current },
             SpaceSyncTool(ws, ::activeRemote, remoteClient, android.os.Build.MODEL.replace(Regex("[^A-Za-z0-9]"), "")),
         )
+        val skills = skillLibrary(project)
+        tools += listOf(
+            ListSkillsTool(skills),
+            ReadSkillTool(skills),
+            SaveSkillTool(skills),
+            AppendSkillTool(skills),
+            DeleteSkillTool(skills),
+            RememberTool(ws.root),
+            SearchSessionsTool {
+                val saved = library.load(ws.root.canonicalPath)
+                val shown = if (current === project) _state.value else project.ui
+                saved.copy(
+                    chat = shown.chat.takeLast(MAX_STORED_CHAT).map { entry ->
+                        StoredChat(entry.id, entry.role.name, entry.text, entry.toolName)
+                    },
+                    conversation = project.conversation.toList(),
+                    shell = shown.shellLines.filterNot { it.running }.takeLast(MAX_STORED_SHELL).map { line ->
+                        StoredShell(line.id, line.command, line.output)
+                    },
+                )
+            },
+        )
 
         val remote = activeRemote()
         val remoteSummary = if (remote == null) {
@@ -2633,6 +2704,9 @@ class WorkspaceViewModel(
                         append("Ask which folder to open, or use an absolute path the user already gave.")
                     }
                 },
+                goal = goal,
+                memory = ProjectMemory.read(ws.root),
+                skillCatalog = skills.catalog(),
             ),
         )
     }

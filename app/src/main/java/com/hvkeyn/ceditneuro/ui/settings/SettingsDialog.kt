@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -42,6 +43,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import android.content.Intent
 import android.provider.Settings
+import com.hvkeyn.ceditneuro.agent.SkillEntry
+import com.hvkeyn.ceditneuro.agent.SkillNote
 import com.hvkeyn.ceditneuro.data.AgentSettings
 import com.hvkeyn.ceditneuro.data.CatalogModel
 import com.hvkeyn.ceditneuro.data.ModelProvider
@@ -62,6 +65,10 @@ fun SettingsDialog(
     onSaveProfile: (String) -> Unit,
     onUseProfile: (String) -> Unit,
     onCheckUpdate: () -> Unit,
+    onListSkills: () -> List<SkillEntry>,
+    onReadSkill: (String, String) -> SkillNote,
+    onWriteSkill: (String, String, String, Boolean) -> SkillNote,
+    onDeleteSkill: (String, String) -> SkillNote,
     onDismiss: () -> Unit,
 ) {
     var draft by remember(settings) { mutableStateOf(settings) }
@@ -327,6 +334,14 @@ fun SettingsDialog(
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
+                    }
+                    SettingsSection(
+                        title = "Skills",
+                        summary = "Procedures the agent can follow",
+                        expanded = openSection == "skills",
+                        onToggle = { openSection = if (openSection == "skills") "" else "skills" },
+                    ) {
+                        SkillsEditor(onListSkills, onReadSkill, onWriteSkill, onDeleteSkill)
                     }
                     SettingsSection(
                         title = "Profile",
@@ -699,4 +714,97 @@ private fun AddProviderForm(onAdd: (ModelProvider) -> Unit) {
             enabled = name.isNotBlank() && apiUrl.isNotBlank() && modelId.isNotBlank(),
         ) { Text("Add provider") }
     }
+}
+
+@Composable
+private fun SkillsEditor(
+    onListSkills: () -> List<SkillEntry>,
+    onReadSkill: (String, String) -> SkillNote,
+    onWriteSkill: (String, String, String, Boolean) -> SkillNote,
+    onDeleteSkill: (String, String) -> SkillNote,
+) {
+    var scope by rememberSaveable { mutableStateOf("project") }
+    var name by rememberSaveable { mutableStateOf("") }
+    var body by rememberSaveable { mutableStateOf("") }
+    var note by rememberSaveable { mutableStateOf("") }
+    var entries by remember { mutableStateOf(onListSkills()) }
+    val shown = entries.filter { it.scope == scope }
+    Text(
+        text = "A skill is a short procedure. Project skills stay in the open folder. Phone skills are available in every project. The agent can list, read, save, and extend them.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FilterChip(selected = scope == "project", onClick = { scope = "project" }, label = { Text("This project") })
+        FilterChip(selected = scope == "app", onClick = { scope = "app" }, label = { Text("On this phone") })
+    }
+    if (shown.isNotEmpty()) {
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            shown.forEach { entry ->
+                FilterChip(
+                    selected = name == entry.name,
+                    onClick = {
+                        name = entry.name
+                        val loaded = onReadSkill(entry.name, entry.scope)
+                        if (loaded.error) note = loaded.text else body = loaded.text
+                    },
+                    label = { Text(entry.name) },
+                )
+            }
+        }
+    }
+    OutlinedTextField(
+        value = name,
+        onValueChange = { name = it },
+        label = { Text("Name") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    OutlinedTextField(
+        value = body,
+        onValueChange = { body = it },
+        label = { Text("Procedure") },
+        modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp, max = 180.dp),
+    )
+    Row {
+        TextButton(onClick = {
+            val saved = onWriteSkill(name, body, scope, false)
+            note = saved.text
+            if (!saved.error) {
+                name = SkillLibraryName.normalize(name).orEmpty().ifBlank { name }
+                entries = onListSkills()
+            }
+        }) { Text("Save") }
+        TextButton(onClick = {
+            val saved = onWriteSkill(name, body, scope, true)
+            note = saved.text
+            if (!saved.error) {
+                val loaded = onReadSkill(name, scope)
+                if (!loaded.error) body = loaded.text
+                entries = onListSkills()
+            }
+        }) { Text("Extend") }
+        TextButton(onClick = {
+            val removed = onDeleteSkill(name, scope)
+            note = removed.text
+            if (!removed.error) {
+                body = ""
+                entries = onListSkills()
+            }
+        }) { Text("Delete") }
+    }
+    if (note.isNotEmpty()) {
+        Text(
+            text = note,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private object SkillLibraryName {
+    fun normalize(raw: String): String? = com.hvkeyn.ceditneuro.agent.SkillLibrary.normalizeName(raw)
 }

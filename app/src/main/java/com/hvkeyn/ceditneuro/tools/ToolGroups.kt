@@ -24,6 +24,13 @@ object ToolGroups {
         "load_tools",
         "reader_note",
         "reader_sketch",
+        "list_skills",
+        "read_skill",
+        "save_skill",
+        "append_skill",
+        "delete_skill",
+        "remember",
+        "search_sessions",
     )
 
     val groups: Map<String, List<String>> = linkedMapOf(
