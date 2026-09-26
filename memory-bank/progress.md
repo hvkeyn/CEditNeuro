@@ -1,6 +1,6 @@
 # Progress
 
-Released: v0.45.0 through v0.52.0 (offline send block, chat links, SVG in chat and reader; see activeContext.md). Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, `SkillLibraryTest`, and `ChatLinkTest`.
+Released: v0.45.0 through v0.53.0 (scheme names in backticks draw in the reader and in chat; see activeContext.md). Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, `SkillLibraryTest`, and `ChatLinkTest`.
 
 Known gaps:
 - The file tree does not refresh by itself when files appear on disk; reselecting the project reloads it.

@@ -86,6 +86,7 @@ import com.hvkeyn.ceditneuro.reader.BookText
 import com.hvkeyn.ceditneuro.reader.PagePiece
 import com.hvkeyn.ceditneuro.ui.ReaderView
 import com.hvkeyn.ceditneuro.ui.editor.MarkupPreview
+import com.hvkeyn.ceditneuro.ui.editor.svgAspect
 import kotlin.math.min
 
 private data class Paper(val background: Color, val ink: Color, val muted: Color)
@@ -847,7 +848,7 @@ private fun ReaderColumn(
                 is PagePiece.Figure -> FigureBlock(
                     piece.id,
                     images,
-                    Modifier.fillMaxWidth().height(240.dp),
+                    Modifier.fillMaxWidth(),
                     fill = false,
                 )
             }
@@ -865,8 +866,19 @@ private fun FigureBlock(
     val bytes = images[id] ?: return
     if (BookText.isSvgBytes(bytes)) {
         val text = remember(id, bytes) { bytes.toString(Charsets.UTF_8) }
-        Box(if (fill) modifier else Modifier.fillMaxWidth().height(240.dp)) {
-            MarkupPreview("svg", text, null, Modifier.fillMaxSize())
+        if (fill) {
+            Box(modifier) { MarkupPreview("svg", text, null, Modifier.fillMaxSize()) }
+        } else {
+            val aspect = svgAspect(text)
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height((maxWidth * aspect).coerceIn(140.dp, 720.dp)),
+                ) {
+                    MarkupPreview("svg", text, null, Modifier.fillMaxSize())
+                }
+            }
         }
         return
     }
