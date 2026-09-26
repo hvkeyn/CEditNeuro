@@ -82,6 +82,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.hvkeyn.ceditneuro.agent.SkillEntry
 import com.hvkeyn.ceditneuro.agent.agentBars
 import com.hvkeyn.ceditneuro.data.AgentSettings
 import com.hvkeyn.ceditneuro.ui.AgentActivity
@@ -102,6 +103,8 @@ fun ChatPanel(
     onClose: () -> Unit,
     onDoctor: () -> String,
     onSelectModel: (providerId: String, modelName: String) -> Unit,
+    onSelectFocus: (String) -> Unit,
+    onListSkills: () -> List<SkillEntry>,
     modifier: Modifier = Modifier,
 ) {
     var input by rememberSaveable { mutableStateOf("") }
@@ -182,6 +185,12 @@ fun ChatPanel(
                 onClose = onClose,
                 onDoctor = onDoctor,
                 onSendReport = { text -> onSend(text, emptyList()) },
+                onSelectFocus = onSelectFocus,
+                onListSkills = onListSkills,
+                onUseSkill = { entry ->
+                    val ask = "Read and follow the ${entry.name} skill (${entry.scope}). "
+                    input = if (input.isBlank()) ask else ask + input
+                },
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
@@ -352,12 +361,24 @@ private fun ComposerActions(
     onCancel: () -> Unit,
     onSend: () -> Unit,
 ) {
+    if (state.agentRunning && !listening) {
+        RoundAction(
+            icon = Icons.Filled.Stop,
+            description = "Stop",
+            filled = true,
+            danger = true,
+            size = buttonSize,
+            enabled = true,
+            onClick = onCancel,
+        )
+        return
+    }
     RoundAction(
         icon = Icons.Filled.AttachFile,
         description = "Attach a file",
         filled = attachments.isNotEmpty(),
         size = buttonSize,
-        enabled = state.projectRoot != null && !state.agentRunning,
+        enabled = state.projectRoot != null,
         onClick = onAttach,
     )
     RoundAction(
@@ -366,35 +387,29 @@ private fun ComposerActions(
         filled = listening,
         danger = listening,
         size = buttonSize,
-        enabled = state.projectRoot != null && (!state.agentRunning || listening),
+        enabled = state.projectRoot != null,
         onClick = onMic,
     )
-    RoundAction(
-        icon = Icons.Filled.PlayArrow,
-        description = "Continue",
-        filled = false,
-        size = buttonSize,
-        enabled = !state.agentRunning && state.projectRoot != null && state.chat.isNotEmpty(),
-        onClick = onContinue,
-    )
-    RoundAction(
-        icon = Icons.Filled.Stop,
-        description = "Stop",
-        filled = state.agentRunning,
-        danger = true,
-        size = buttonSize,
-        enabled = state.agentRunning,
-        onClick = onCancel,
-    )
-    RoundAction(
-        icon = Icons.AutoMirrored.Filled.Send,
-        description = "Send",
-        filled = true,
-        size = buttonSize,
-        enabled = !state.agentRunning && state.projectRoot != null &&
-            (input.isNotBlank() || attachments.isNotEmpty()),
-        onClick = onSend,
-    )
+    val hasDraft = input.isNotBlank() || attachments.isNotEmpty()
+    if (!hasDraft && state.chat.isNotEmpty()) {
+        RoundAction(
+            icon = Icons.Filled.PlayArrow,
+            description = "Continue",
+            filled = false,
+            size = buttonSize,
+            enabled = state.projectRoot != null,
+            onClick = onContinue,
+        )
+    } else {
+        RoundAction(
+            icon = Icons.AutoMirrored.Filled.Send,
+            description = "Send",
+            filled = true,
+            size = buttonSize,
+            enabled = state.projectRoot != null && hasDraft,
+            onClick = onSend,
+        )
+    }
 }
 
 @Composable
@@ -405,8 +420,14 @@ private fun AgentToolbar(
     onClose: () -> Unit,
     onDoctor: () -> String,
     onSendReport: (String) -> Unit,
+    onSelectFocus: (String) -> Unit,
+    onListSkills: () -> List<SkillEntry>,
+    onUseSkill: (SkillEntry) -> Unit,
 ) {
     var modelOpen by rememberSaveable { mutableStateOf(false) }
+    var focusOpen by remember { mutableStateOf(false) }
+    var skillsOpen by remember { mutableStateOf(false) }
+    var skillList by remember { mutableStateOf<List<SkillEntry>>(emptyList()) }
     var doctorOpen by remember { mutableStateOf(false) }
     var doctorText by remember { mutableStateOf("") }
     Column {
@@ -436,6 +457,61 @@ private fun AgentToolbar(
                                 },
                             )
                         }
+                    }
+                }
+            }
+            Box {
+                Pill(text = focusLabel(settings.workFocus), compact = compact, onClick = { focusOpen = true })
+                DropdownMenu(expanded = focusOpen, onDismissRequest = { focusOpen = false }) {
+                    AgentSettings.WORK_FOCUSES.forEach { focus ->
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(focusLabel(focus))
+                                    Text(
+                                        focusHint(focus),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            },
+                            onClick = {
+                                focusOpen = false
+                                onSelectFocus(focus)
+                            },
+                        )
+                    }
+                }
+            }
+            Box {
+                Pill(text = "Skills", compact = compact, onClick = { skillList = onListSkills(); skillsOpen = true })
+                DropdownMenu(expanded = skillsOpen, onDismissRequest = { skillsOpen = false }) {
+                    if (skillList.isEmpty()) {
+                        Text(
+                            "No skills yet. Add one in Settings, or ask the agent to save_skill.",
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(12.dp).widthIn(max = 260.dp),
+                        )
+                    }
+                    skillList.forEach { entry ->
+                        DropdownMenuItem(
+                            text = {
+                                Column(modifier = Modifier.widthIn(max = 280.dp)) {
+                                    Text("${entry.name} · ${entry.scope}")
+                                    Text(
+                                        entry.summary,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            },
+                            onClick = {
+                                skillsOpen = false
+                                onUseSkill(entry)
+                            },
+                        )
                     }
                 }
             }
@@ -484,6 +560,20 @@ private fun AgentToolbar(
             )
         }
     }
+}
+
+private fun focusLabel(focus: String): String = when (focus) {
+    AgentSettings.WORK_BUILD -> "Build"
+    AgentSettings.WORK_REMOTE -> "Remote"
+    AgentSettings.WORK_STUDY -> "Study"
+    else -> "Edit"
+}
+
+private fun focusHint(focus: String): String = when (focus) {
+    AgentSettings.WORK_BUILD -> "Compile, test, and package"
+    AgentSettings.WORK_REMOTE -> "Work on the connected server"
+    AgentSettings.WORK_STUDY -> "Investigate, check, write a report"
+    else -> "Change project files"
 }
 
 @Composable

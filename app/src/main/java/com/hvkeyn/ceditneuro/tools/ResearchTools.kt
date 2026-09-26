@@ -79,6 +79,36 @@ class ResearchFigureTool(private val workspace: Workspace) : Tool {
     }
 }
 
+class ResearchPlotTool(private val workspace: Workspace) : Tool {
+    override val name = "research_plot"
+    override val description =
+        "Draw a line or bar chart from numbers into research/<name>.svg. Send only data; the app draws it. " +
+            "Use numbers a tool already printed."
+    override val parameters = objectSchema(
+        properties = mapOf(
+            "name" to stringProp("File name without a folder. Default is plot."),
+            "title" to stringProp("Chart title."),
+            "kind" to stringProp("line or bar. Default is line."),
+            "labels" to stringProp("X labels separated by ';', for example 'Mon; Tue; Wed'. Optional."),
+            "series" to stringProp("One series per line: 'name: 1, 2, 3'. At most 4 series and 60 values."),
+        ),
+        required = listOf("title", "series"),
+    )
+
+    override suspend fun execute(args: JsonObject): ToolResult {
+        val svg = runCatching {
+            com.hvkeyn.ceditneuro.agent.ResearchPlot.svg(
+                title = args.stringArg("title").orEmpty(),
+                kind = args.stringArg("kind").orEmpty(),
+                labels = args.stringArg("labels").orEmpty().split(';').map { it.trim() }.filter { it.isNotEmpty() },
+                series = com.hvkeyn.ceditneuro.agent.ResearchPlot.parseSeries(args.stringArg("series").orEmpty()),
+            )
+        }.getOrElse { return ToolResult.error(it.message ?: "Could not draw the chart.") }
+        val note = ResearchNotebook.figure(workspace.root, args.stringArg("name").orEmpty().ifBlank { "plot" }, svg)
+        return if (note.error) ToolResult.error(note.text) else ToolResult.ok(note.text + " open_file shows it.")
+    }
+}
+
 internal object TextPdf {
     fun write(file: File, title: String, body: String): Int {
         val paint = Paint().apply {

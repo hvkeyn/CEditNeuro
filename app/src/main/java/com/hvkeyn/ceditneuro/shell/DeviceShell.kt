@@ -26,7 +26,13 @@ class DeviceShell(
     private val toolchainLib: File = File(toolchain, "lib").apply { mkdirs() }
     private val net = AgentNet(proxy)
 
-    fun run(command: String, workDir: File, timeoutSeconds: Int): ShellOutput {
+    fun run(
+        command: String,
+        workDir: File,
+        timeoutSeconds: Int,
+        onProcess: (Process) -> Unit = {},
+        onOutput: ((String) -> Unit)? = null,
+    ): ShellOutput {
         val timeout = timeoutSeconds.coerceIn(5, 900)
         val directory = if (workDir.isDirectory) workDir else home
         if (isPlainFetch(command)) {
@@ -83,10 +89,12 @@ class DeviceShell(
                 }
             }
             .start()
+        onProcess(process)
 
         val stdout = StringBuilder()
         val stderr = StringBuilder()
         val truncated = java.util.concurrent.atomic.AtomicBoolean(false)
+        val lastShown = java.util.concurrent.atomic.AtomicLong(0L)
         val pumps = listOf(process.inputStream to stdout, process.errorStream to stderr).map { (source, target) ->
             Thread {
                 val buffer = ByteArray(4096)
@@ -104,6 +112,14 @@ class DeviceShell(
                                 target.append(chunk.take(room))
                                 truncated.set(true)
                             }
+                        }
+                    }
+                    if (onOutput != null) {
+                        val now = System.currentTimeMillis()
+                        val before = lastShown.get()
+                        if (now - before >= LIVE_INTERVAL_MS && lastShown.compareAndSet(before, now)) {
+                            val snapshot = synchronized(stdout) { renderOutput(stdout, stderr, truncated.get()) }
+                            runCatching { onOutput(snapshot) }
                         }
                     }
                 }
@@ -184,6 +200,7 @@ class DeviceShell(
     companion object {
         private const val SHELL = "/system/bin/sh"
         private const val MAX_OUTPUT_CHARS = 120_000
+        private const val LIVE_INTERVAL_MS = 400L
 
         private fun isPlainFetch(command: String): Boolean {
             val trimmed = command.trim()

@@ -20,6 +20,11 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -314,48 +319,89 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
     state.shareOffer?.let { code ->
         if (!state.linkVisible) return@let
         val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
-        val linked = state.linkActive > 1 || state.linkPeer.contains(" ")
+        val context = LocalContext.current
+        val on = state.linkRole.isNotEmpty()
+        val linked = on && state.linkActive > 1
+        val (statusText, statusColor) = when {
+            !on -> "Off" to MaterialTheme.colorScheme.outline
+            linked -> "Linked · ${state.linkActive} phones" to Color(0xFF4CAF50)
+            state.linkRole == "follow" -> "Joining" to Color(0xFFFFB300)
+            else -> "Waiting on your code" to Color(0xFFFFB300)
+        }
         AlertDialog(
             onDismissRequest = { viewModel.dismissShare() },
             title = { Text(if (linked) "Linked" else "Connection") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Your code. Tap to copy. It does not change when you join.")
-                    Text(
-                        text = code,
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable {
-                            clipboard.setText(androidx.compose.ui.text.AnnotatedString(code))
-                            viewModel.showCopied()
-                        },
-                    )
-                    Text(state.linkNote.ifBlank { "Waiting for the other phone to enter this code." })
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("This phone")
                         Box(
                             modifier = Modifier
-                                .padding(horizontal = 8.dp)
-                                .size(width = 36.dp, height = 4.dp)
-                                .background(if (linked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
+                                .size(10.dp)
+                                .background(statusColor, CircleShape),
                         )
-                        Text(if (state.linkActive > 1) "${state.linkActive} active" else "Waiting")
+                        Text(
+                            text = statusText + if (on && state.linkDirect) " · direct" else if (linked) " · relay" else "",
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
                     }
-                    Text(
-                        if (state.linkActive > 1) "${state.linkActive} phones. ${state.linkSpeed} B/s."
-                        else "Only this phone, waiting. ${state.linkSpeed} B/s.",
-                    )
+                    Text("Your code. Tap to copy. It does not change when you join.", style = MaterialTheme.typography.bodySmall)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = code,
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    clipboard.setText(androidx.compose.ui.text.AnnotatedString(code))
+                                    viewModel.showCopied()
+                                },
+                        )
+                        TextButton(onClick = {
+                            val send = android.content.Intent(android.content.Intent.ACTION_SEND)
+                                .setType("text/plain")
+                                .putExtra(android.content.Intent.EXTRA_TEXT, "CEditNeuro link code: $code")
+                            runCatching {
+                                context.startActivity(android.content.Intent.createChooser(send, "Send code"))
+                            }
+                        }) { Text("Share") }
+                    }
+                    Text(state.linkNote.ifBlank { "Waiting for the other phone to enter this code." }, style = MaterialTheme.typography.bodySmall)
+                    if (linked && state.linkPeer.isNotBlank()) {
+                        Text("Phones: ${state.linkPeer}", style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (on) {
+                        Text(
+                            "Sent ${state.linkSent} · received ${state.linkGot} · ${state.linkSpeed} B/s",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     OutlinedTextField(
                         value = joinCode,
-                        onValueChange = { joinCode = it },
+                        onValueChange = { typed -> joinCode = typed.filter { it.isDigit() }.take(6) },
                         label = { Text("Code from the other phone") },
                         singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword,
+                        ),
                     )
-                    TextButton(onClick = { viewModel.disconnectLink() }) { Text("Disconnect") }
+                    if (on) {
+                        TextButton(onClick = { viewModel.disconnectLink() }) { Text("Disconnect") }
+                    } else {
+                        TextButton(onClick = { viewModel.waitOnOwnCode() }) { Text("Wait on my code") }
+                    }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { viewModel.joinShare(joinCode) }) { Text("Join") }
+                TextButton(
+                    onClick = { viewModel.joinShare(joinCode) },
+                    enabled = joinCode.length == 6,
+                ) { Text("Join") }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.dismissShare() }) { Text("Close") }
@@ -626,6 +672,9 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                                 state = state,
                                 onRun = viewModel::runShellCommand,
                                 onClose = viewModel::toggleShell,
+                                onStop = viewModel::stopShellCommand,
+                                onClear = viewModel::clearShell,
+                                onToggleElevated = viewModel::toggleShellElevated,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(panes.shellHeight ?: 140.dp),
@@ -704,6 +753,9 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                     state = state,
                     onRun = viewModel::runShellCommand,
                     onClose = viewModel::toggleShell,
+                                onStop = viewModel::stopShellCommand,
+                                onClear = viewModel::clearShell,
+                                onToggleElevated = viewModel::toggleShellElevated,
                     modifier = Modifier
                         .fillMaxHeight()
                         .padding(bottom = webPanelHeight)
@@ -818,6 +870,8 @@ private fun AgentChat(
                 it.copy(activeProviderId = providerId, activeModel = modelName)
             }
         },
+        onSelectFocus = { focus -> viewModel.updateSettings { it.copy(workFocus = focus) } },
+        onListSkills = viewModel::listSkills,
         modifier = modifier,
     )
 }

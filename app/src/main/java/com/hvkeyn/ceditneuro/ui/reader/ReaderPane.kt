@@ -13,7 +13,21 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -167,9 +181,21 @@ fun ReaderPane(
     var noteDraft by remember { mutableStateOf("") }
     var bookQuestion by remember { mutableStateOf("") }
     val view = LocalView.current
+    val context = LocalContext.current
+    val aloud = remember { ReadAloud(context.applicationContext) }
+    var speaking by remember { mutableStateOf(false) }
+    val keys = remember { FocusRequester() }
     var brightness by remember { mutableFloatStateOf(0.7f) }
-    DisposableEffect(view) {
-        onDispose { screenBrightness(view, -1f) }
+    DisposableEffect(view, aloud) {
+        view.keepScreenOn = true
+        onDispose {
+            screenBrightness(view, -1f)
+            view.keepScreenOn = false
+            aloud.release()
+        }
+    }
+    LaunchedEffect(mode) {
+        if (mode == "read") runCatching { keys.requestFocus() }
     }
     var page by remember(pageText) { mutableIntStateOf(reader.page) }
     val font = when (reader.fontName) {
@@ -177,7 +203,22 @@ fun ReaderPane(
         "mono" -> FontFamily.Monospace
         else -> FontFamily.Serif
     }
-    BoxWithConstraints(modifier = modifier.fillMaxSize().background(paper.background)) {
+    var turn by remember { mutableIntStateOf(0) }
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxSize()
+            .background(paper.background)
+            .onPreviewKeyEvent { event ->
+                if (mode != "read" || event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                when (event.key) {
+                    Key.VolumeDown, Key.PageDown, Key.DirectionRight -> { turn = 1; true }
+                    Key.VolumeUp, Key.PageUp, Key.DirectionLeft -> { turn = -1; true }
+                    else -> false
+                }
+            }
+            .focusRequester(keys)
+            .focusable(),
+    ) {
         val landscape = maxWidth > maxHeight
         val columns = if (landscape && maxWidth > 640.dp) 2 else 1
         val side = if (landscape) 28.dp else 20.dp
@@ -209,6 +250,21 @@ fun ReaderPane(
             val index = page + column
             spread.ranges.getOrNull(index)?.let { pageText.substring(it.first, it.last + 1).trim('\u0000', '\n', ' ') }.orEmpty()
         }
+        LaunchedEffect(turn) {
+            if (turn != 0) {
+                page = (page + turn * columns).coerceIn(0, count - 1)
+                turn = 0
+            }
+        }
+        LaunchedEffect(speaking, page, count) {
+            if (!speaking) {
+                aloud.stop()
+                return@LaunchedEffect
+            }
+            aloud.speak(shown.joinToString("\n")) {
+                if (page + columns <= count - 1) page += columns else speaking = false
+            }
+        }
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = side, vertical = 8.dp)) {
             Row(modifier = Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 for (column in shown) {
@@ -238,8 +294,23 @@ fun ReaderPane(
                     }
                 }
             }
+            Box(
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .fillMaxWidth()
+                    .height(2.dp)
+                    .background(paper.muted.copy(alpha = 0.25f)),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth((page + 1).toFloat() / count)
+                        .fillMaxHeight()
+                        .background(paper.muted),
+                )
+            }
             Text(
-                text = "${page + 1} / $count  ·  ${reader.chapter.ifBlank { "page" }}  ·  ${((page + 1) * 100 / count)}%",
+                text = "${page + 1} / $count  ·  ${reader.chapter.ifBlank { "page" }}  ·  ${((page + 1) * 100 / count)}%" +
+                    if (speaking) "  ·  reading aloud" else "",
                 color = paper.muted,
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp),
@@ -263,7 +334,24 @@ fun ReaderPane(
                     if (selectedLabel == it) selectedLabel = null
                 },
         )
-        if (mode == "read") Row(modifier = Modifier.fillMaxSize()) {
+        if (mode == "read") Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(count, columns) {
+                    var dragged = 0f
+                    detectHorizontalDragGestures(
+                        onDragStart = { dragged = 0f },
+                        onDragEnd = {
+                            val threshold = 48.dp.toPx()
+                            if (dragged < -threshold) page = (page + columns).coerceAtMost(count - 1)
+                            else if (dragged > threshold) page = (page - columns).coerceAtLeast(0)
+                        },
+                    ) { change, amount ->
+                        change.consume()
+                        dragged += amount
+                    }
+                },
+        ) {
             Box(modifier = Modifier.weight(1f).fillMaxSize().clickable {
                 page = (page - columns).coerceAtLeast(0)
             })
@@ -288,6 +376,13 @@ fun ReaderPane(
                     )
                     IconButton(onClick = { toc = true }) { Icon(Icons.AutoMirrored.Filled.List, "Contents", tint = paper.ink) }
                     IconButton(onClick = { finding = true }) { Icon(Icons.Default.Search, "Find in book", tint = paper.ink) }
+                    IconButton(onClick = { speaking = !speaking }) {
+                        Icon(
+                            if (speaking) Icons.Default.Stop else Icons.AutoMirrored.Filled.VolumeUp,
+                            if (speaking) "Stop reading aloud" else "Read aloud",
+                            tint = paper.ink,
+                        )
+                    }
                     IconButton(onClick = onBookmark) {
                         Icon(
                             if (reader.bookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
@@ -417,6 +512,23 @@ fun ReaderPane(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.weight(1f)) { NoteCard("Saved", note.text, markupColor(0xFF175CD3)) }
                         TextButton(onClick = { onDeleteNote(note) }) { Text("Delete", color = paper.ink) }
+                    }
+                }
+                val elsewhere = reader.notes.filter { it.page != page }.sortedBy { it.page }
+                if (elsewhere.isNotEmpty()) {
+                    Text("Other pages", color = paper.muted, style = MaterialTheme.typography.labelMedium)
+                    elsewhere.forEach { note ->
+                        Text(
+                            text = "p.${note.page + 1} · ${note.text}",
+                            color = paper.ink,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { page = note.page.coerceIn(0, count - 1) }
+                                .padding(vertical = 4.dp),
+                        )
                     }
                 }
                 OutlinedTextField(
