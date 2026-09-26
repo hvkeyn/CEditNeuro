@@ -20,7 +20,11 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.RotateRight
+import androidx.compose.material.icons.filled.ZoomIn
+import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.Palette
@@ -272,7 +276,9 @@ internal fun MarkupDock(
     onRotate: () -> Unit,
     onDelete: () -> Unit,
     onClearPage: () -> Unit,
+    onDone: () -> Unit = {},
 ) {
+    var confirmClear by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -284,26 +290,32 @@ internal fun MarkupDock(
             modifier = Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            DockTool(Icons.Default.Check, "Done") { onDone() }
             listOf(
-                "draw" to Icons.Default.Edit,
-                "select" to Icons.Default.NearMe,
-                "text" to Icons.Default.TextFields,
-                "erase" to Icons.Outlined.CleaningServices,
-            ).forEach { (id, icon) ->
-                IconButton(onClick = { onTool(id) }) {
-                    Icon(icon, id, tint = if (tool == id) Color(0xFFF2C94C) else Color.White)
+                Triple("draw", Icons.Default.Edit, "Draw"),
+                Triple("select", Icons.Default.NearMe, "Select"),
+                Triple("text", Icons.Default.TextFields, "Words"),
+                Triple("erase", Icons.Outlined.CleaningServices, "Erase"),
+            ).forEach { (id, icon, label) ->
+                DockTool(icon, label, active = tool == id) { onTool(id); confirmClear = false }
+            }
+            DockTool(Icons.Default.Palette, "Color", active = panel == "color", tint = Color(penColor)) {
+                onPanel(if (panel == "color") "" else "color")
+            }
+            DockTool(Icons.Outlined.LineWeight, "Width", active = panel == "width") {
+                onPanel(if (panel == "width") "" else "width")
+            }
+            DockTool(if (layerOn) Icons.Default.Visibility else Icons.Default.VisibilityOff, if (layerOn) "Shown" else "Hidden") {
+                onLayer(!layerOn)
+            }
+            DockTool(Icons.Default.Delete, if (confirmClear) "Sure?" else "Clear", active = confirmClear) {
+                if (confirmClear) {
+                    onClearPage()
+                    confirmClear = false
+                } else {
+                    confirmClear = true
                 }
             }
-            IconButton(onClick = { onPanel(if (panel == "color") "" else "color") }) {
-                Icon(Icons.Default.Palette, "Color", tint = Color.White)
-            }
-            IconButton(onClick = { onPanel(if (panel == "width") "" else "width") }) {
-                Icon(Icons.Outlined.LineWeight, "Width", tint = Color.White)
-            }
-            IconButton(onClick = { onLayer(!layerOn) }) {
-                Icon(if (layerOn) Icons.Default.Visibility else Icons.Default.VisibilityOff, "Layer", tint = Color.White)
-            }
-            IconButton(onClick = onClearPage) { Icon(Icons.Default.Delete, "Clear", tint = Color.White) }
         }
         if (panel == "color") {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -321,13 +333,13 @@ internal fun MarkupDock(
         }
         if (textSelected) {
             Row {
-                TextButton(onClick = onSmaller) { Text("Smaller", color = Color.White) }
-                TextButton(onClick = onBigger) { Text("Larger", color = Color.White) }
-                TextButton(onClick = onRotate) { Text("Rotate", color = Color.White) }
-                TextButton(onClick = onDelete) { Text("Delete", color = Color.White) }
+                DockTool(Icons.Default.ZoomOut, "Smaller", onClick = onSmaller)
+                DockTool(Icons.Default.ZoomIn, "Larger", onClick = onBigger)
+                DockTool(Icons.Default.RotateRight, "Rotate", onClick = onRotate)
+                DockTool(Icons.Default.Delete, "Delete", onClick = onDelete)
             }
         } else if (selected) {
-            TextButton(onClick = onDelete) { Text("Delete selection", color = Color.White) }
+            Row { DockTool(Icons.Default.Delete, "Delete selection", onClick = onDelete) }
         }
         if (tool == "text") {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -341,6 +353,27 @@ internal fun MarkupDock(
                 TextButton(onClick = onPlace, enabled = draft.isNotBlank()) { Text("Put", color = Color.White) }
             }
         }
+    }
+}
+
+@Composable
+private fun DockTool(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    active: Boolean = false,
+    tint: Color = Color.White,
+    onClick: () -> Unit,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (active) Color(0x33F2C94C) else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+    ) {
+        Icon(icon, contentDescription = label, tint = if (active && tint == Color.White) Color(0xFFF2C94C) else tint, modifier = Modifier.size(22.dp))
+        Text(label, color = if (active) Color(0xFFF2C94C) else Color.White, fontSize = 10.sp, maxLines = 1)
     }
 }
 

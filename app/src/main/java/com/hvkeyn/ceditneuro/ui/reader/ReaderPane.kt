@@ -19,6 +19,14 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Draw
+import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.LayersClear
+import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
@@ -361,43 +369,66 @@ fun ReaderPane(
             })
         }
         if (chrome) {
-            Surface(color = paper.background.copy(alpha = 0.94f), modifier = Modifier.align(Alignment.TopCenter)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Close reader", tint = paper.ink) }
-                    Text(
-                        text = reader.title,
-                        color = paper.ink,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.widthIn(max = 160.dp),
-                    )
-                    IconButton(onClick = { toc = true }) { Icon(Icons.AutoMirrored.Filled.List, "Contents", tint = paper.ink) }
-                    IconButton(onClick = { finding = true }) { Icon(Icons.Default.Search, "Find in book", tint = paper.ink) }
-                    IconButton(onClick = { speaking = !speaking }) {
-                        Icon(
+            Surface(color = paper.background.copy(alpha = 0.96f), modifier = Modifier.align(Alignment.TopCenter)) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Close reader", tint = paper.ink) }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = reader.title,
+                                color = paper.ink,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            Text(
+                                text = "Page ${page + 1} of $count" + reader.chapter.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty(),
+                                color = paper.muted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        }
+                        IconButton(onClick = onBookmark) {
+                            Icon(
+                                if (reader.bookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                "Bookmark",
+                                tint = paper.ink,
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 2.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        ReaderTool(Icons.AutoMirrored.Filled.List, "Index", paper) { toc = true }
+                        ReaderTool(Icons.Default.Search, "Find", paper) { finding = true }
+                        ReaderTool(
                             if (speaking) Icons.Default.Stop else Icons.AutoMirrored.Filled.VolumeUp,
-                            if (speaking) "Stop reading aloud" else "Read aloud",
-                            tint = paper.ink,
-                        )
+                            if (speaking) "Stop" else "Listen",
+                            paper,
+                            active = speaking,
+                        ) { speaking = !speaking }
+                        ReaderTool(Icons.Default.TextFields, "Text", paper) { settings = true }
+                        ReaderTool(Icons.Default.Draw, "Pen", paper, active = mode == "pen") {
+                            mode = if (mode == "pen") "read" else "pen"
+                        }
+                        ReaderTool(
+                            if (showLayer) Icons.Default.Layers else Icons.Default.LayersClear,
+                            if (showLayer) "Layer" else "Hidden",
+                            paper,
+                            active = showLayer && (reader.ink.any { it.page == page } || reader.labels.any { it.page == page }),
+                        ) { showLayer = !showLayer }
+                        ReaderTool(Icons.Default.EditNote, "Notes", paper, active = mode == "notes", badge = reader.notes.size) {
+                            mode = if (mode == "notes") "read" else "notes"
+                        }
+                        ReaderTool(Icons.Default.Forum, "Ask", paper, active = mode == "book") {
+                            mode = if (mode == "book") "read" else "book"
+                            chrome = false
+                        }
                     }
-                    IconButton(onClick = onBookmark) {
-                        Icon(
-                            if (reader.bookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                            "Bookmark",
-                            tint = paper.ink,
-                        )
-                    }
-                    IconButton(onClick = { settings = true }) { Icon(Icons.Default.Tune, "Text settings", tint = paper.ink) }
-                    TextButton(onClick = { mode = if (mode == "pen") "read" else "pen" }) { Text("Pen", color = paper.ink) }
-                    TextButton(onClick = { showLayer = !showLayer }) { Text(if (showLayer) "Layer" else "Layer off", color = paper.ink) }
-                    TextButton(onClick = { mode = if (mode == "notes") "read" else "notes" }) { Text("Notes", color = paper.ink) }
-                    TextButton(onClick = {
-                        mode = "book"
-                        chrome = false
-                    }) { Text("Book", color = paper.ink) }
                 }
             }
         }
@@ -432,6 +463,7 @@ fun ReaderPane(
                     draft = ""
                 },
                 onClearPage = { onClearPage(page) },
+                onDone = { mode = "read" },
                 onBigger = { selected?.let { onMoveLabel(it.id, it.x, it.y, it.scale * 1.15f, it.rotation) } },
                 onSmaller = { selected?.let { onMoveLabel(it.id, it.x, it.y, it.scale / 1.15f, it.rotation) } },
                 onRotate = { selected?.let { onMoveLabel(it.id, it.x, it.y, it.scale, it.rotation + 15f) } },
@@ -708,6 +740,45 @@ fun ReaderPane(
                 dismissButton = { TextButton(onClick = { notes = false }) { Text("Close") } },
             )
         }
+    }
+}
+
+@Composable
+private fun ReaderTool(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    paper: Paper,
+    active: Boolean = false,
+    badge: Int = 0,
+    onClick: () -> Unit,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .widthIn(min = 40.dp)
+            .background(
+                if (active) paper.ink.copy(alpha = 0.12f) else Color.Transparent,
+                androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 3.dp, vertical = 4.dp),
+    ) {
+        Box {
+            Icon(icon, contentDescription = label, tint = paper.ink, modifier = Modifier.size(22.dp))
+            if (badge > 0) {
+                Text(
+                    text = if (badge > 9) "9+" else badge.toString(),
+                    color = paper.background,
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = 8.dp, y = (-4).dp)
+                        .background(paper.ink, androidx.compose.foundation.shape.CircleShape)
+                        .padding(horizontal = 4.dp),
+                )
+            }
+        }
+        Text(label, color = paper.ink, style = MaterialTheme.typography.labelSmall, maxLines = 1)
     }
 }
 

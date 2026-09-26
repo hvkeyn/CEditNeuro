@@ -872,6 +872,7 @@ private fun AgentChat(
         },
         onSelectFocus = { focus -> viewModel.updateSettings { it.copy(workFocus = focus) } },
         onListSkills = viewModel::listSkills,
+        onToggleSkill = viewModel::toggleSkill,
         modifier = modifier,
     )
 }
@@ -889,6 +890,8 @@ private fun EditorSurface(
         onCloseTab = viewModel::closeFile,
         onContentChanged = viewModel::onEditorTextChanged,
         modifier = modifier,
+        onRun = viewModel::runActiveFile,
+        onStop = viewModel::stopShellCommand,
     )
 }
 
