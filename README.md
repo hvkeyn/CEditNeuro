@@ -41,6 +41,7 @@ layer is wired end to end.
 | Optional SOCKS or HTTP proxy for the user's own servers, FTP, SFTP, and mail | done |
 | Timer notification, notification access, and a mailbox in Settings → Desk | done |
 | System install and uninstall (`install_apk`, `uninstall_apk`); a failed tool call is not repeated with the same arguments | done |
+| Project memory, search of this project's past chat, and skills that can be saved and extended | done |
 | `install_jdk`, `install_android_sdk`, `install_runtime` from the Termux mirror | done |
 | Zed-style per-edit Accept/Reject diffs | not yet — edits apply immediately |
 
