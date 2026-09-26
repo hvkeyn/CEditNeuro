@@ -52,7 +52,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Settings
@@ -425,7 +425,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                 actions = {
                     Row {
                         BarIcon(
-                            icon = Icons.Default.MenuBook,
+                            icon = Icons.AutoMirrored.Filled.MenuBook,
                             description = "Read book or note",
                             active = state.reader != null && state.readerInFront,
                             onClick = {

@@ -172,15 +172,19 @@ fun SettingsDialog(
                     ) {
                         Text("Work", style = MaterialTheme.typography.labelLarge)
                         Text(
-                            text = "Edit keeps file tools. Build also loads installers. Remote also loads the server tools.",
+                            text = "Edit keeps file tools. Build also loads installers. Remote also loads the server tools. Study loads the research log, report, and figure.",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
                             listOf(
                                 AgentSettings.WORK_EDIT to "Edit",
                                 AgentSettings.WORK_BUILD to "Build",
                                 AgentSettings.WORK_REMOTE to "Remote",
+                                AgentSettings.WORK_STUDY to "Study",
                             ).forEach { (id, label) ->
                                 FilterChip(
                                     selected = draft.workFocus == id,
@@ -464,6 +468,7 @@ private fun SettingsSection(
 private fun workLabel(focus: String): String = when (focus) {
     AgentSettings.WORK_BUILD -> "Build"
     AgentSettings.WORK_REMOTE -> "Remote"
+    AgentSettings.WORK_STUDY -> "Study"
     else -> "Edit"
 }
 

@@ -21,6 +21,8 @@ fun buildSystemPrompt(): String = """
     - Skills are procedures you can add and extend. list_skills shows names. read_skill loads one before you follow it. save_skill creates or replaces one. append_skill adds steps. delete_skill removes one. scope project stays in this folder. scope app is on this phone for every project. A skill does not add a permission or a tool.
     - remember stores a short note about this project for the next run. Do not store passwords, keys, or tokens.
     - search_sessions looks through this project's earlier chat. Use it before repeating a long search or the same command.
+    - A research, study, or engineering investigation uses the study group. read_skill research before a long one. Log each check. A number in the report must come from a tool result in this run. Write in the user's language. Do not start a second agent and do not invent a source. calculate does the arithmetic. reference checks Wikipedia, arXiv, or a DOI.
+    - device_status says whether Shizuku or root works. Call it before shizuku_exec when you do not know. open_file shows a report or PDF to the user. open_settings opens a settings screen only when the user asks to change a setting.
     - set_timer posts this app's own notification, now or after delay_seconds. Do not set an alarm through the shell or by opening Clock.
     - Install an APK only with install_apk. Remove an app only with uninstall_apk. Do not open the app, Settings, or the launcher, and do not tap through its screens.
     - A rejected certificate or a 401 login is the result. Do not retry that host or that login. Do not call allorigins or another browser proxy. Request the page URL directly.
@@ -44,9 +46,10 @@ fun buildSystemPrompt(): String = """
     When the user is reading, reader_note saves an explanation on the open page. reader_sketch places one short caption per line as a diagram.
     Call load_tools before a tool that is not in that list:
     - build: install_jdk, install_android_sdk, install_runtime, install_program, install_module
-    - device: install_apk, uninstall_apk, net_info, shizuku_exec, fetch_system_layout, execute_system_action
+    - device: install_apk, uninstall_apk, net_info, shizuku_exec, fetch_system_layout, execute_system_action, device_status, list_apps, open_settings, clipboard, open_file
     - remote: remote_connect, remote_list, remote_read, remote_write, remote_put, remote_get, remote_mkdir, remote_delete, remote_rename, ssh_exec, space_sync, browse_page
     - desk: notifications, notification_reply, notification_dismiss, mail_list, mail_read, mail_send
+    - study: research_log, research_report, research_figure, calculate, reference
     The environment message says when a group is already loaded.
     fetch_system_layout returns tap=X,Y at the center of each row. execute_system_action takes that X and Y.
 """.trimIndent()
@@ -72,7 +75,7 @@ fun buildSetupPrompt(
     val body = """
         Environment:
         project: $projectRoot
-        focus: $workFocus. edit changes project files. build compiles and packages. remote uses the connected server.
+        focus: $workFocus. edit changes project files. build compiles and packages. remote uses the connected server. study investigates, checks, and writes a report.
         $loaded
         access: $accessLine
         $storageLine

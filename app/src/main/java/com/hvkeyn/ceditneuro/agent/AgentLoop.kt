@@ -30,9 +30,16 @@ class AgentLoop(
         const val MAX_EMPTY_CONTINUES = 1
         const val MAX_NET_RETRIES = 2
         const val MAX_AUTO_BATCHES = 15
+        private val READ_ONLY = setOf(
+            "list_dir", "read_file", "grep", "glob", "git_status", "git_diff",
+            "list_skills", "read_skill", "search_sessions", "device_status", "list_apps", "calculate", "reference",
+        )
     }
 
     private val failedCalls = HashSet<String>()
+
+    /** Read-only calls since the last change. Any other tool may have changed what they would return. */
+    private val recentReads = HashSet<String>()
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -236,11 +243,19 @@ class AgentLoop(
                 "Tool arguments must be a JSON object, got: ${rawArguments.take(200)}",
             ).also { failedCalls += signature }
 
+        val readOnly = call.function.name in READ_ONLY
+        if (readOnly && signature in recentReads) {
+            return ToolResult.ok(
+                "Nothing changed since the same ${call.function.name} call earlier in this run. " +
+                    "Use that result instead of calling it again.",
+            )
+        }
         val result = runCatching { tool.execute(args) }
             .getOrElse { error ->
                 ToolResult.error("Tool '${call.function.name}' failed: ${error.message ?: error::class.java.simpleName}")
             }
         if (result.isError) failedCalls += signature
+        if (!readOnly) recentReads.clear() else if (!result.isError) recentReads += signature
         return result
     }
 }

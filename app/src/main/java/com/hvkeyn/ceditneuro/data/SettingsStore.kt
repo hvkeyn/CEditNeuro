@@ -68,7 +68,8 @@ data class AgentSettings(
         const val WORK_EDIT = "edit"
         const val WORK_BUILD = "build"
         const val WORK_REMOTE = "remote"
-        val WORK_FOCUSES = listOf(WORK_EDIT, WORK_BUILD, WORK_REMOTE)
+        const val WORK_STUDY = "study"
+        val WORK_FOCUSES = listOf(WORK_EDIT, WORK_BUILD, WORK_REMOTE, WORK_STUDY)
     }
 }
 

@@ -22,7 +22,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
@@ -98,6 +99,32 @@ private fun paper(theme: String): Paper = when (theme) {
 
 private data class Spread(val ranges: List<IntRange>, val chapters: List<String>)
 
+private const val FIND_LIMIT = 60
+
+/** Page index and a short snippet for each match, found on the phone without the model. */
+internal fun findPages(text: String, ranges: List<IntRange>, query: String): List<Pair<Int, String>> {
+    val needle = query.trim()
+    if (needle.length < 2 || ranges.isEmpty()) return emptyList()
+    val hits = ArrayList<Pair<Int, String>>()
+    var from = 0
+    var rangeIndex = 0
+    while (hits.size < FIND_LIMIT) {
+        val at = text.indexOf(needle, from, ignoreCase = true)
+        if (at < 0) break
+        while (rangeIndex < ranges.lastIndex && at > ranges[rangeIndex].last) rangeIndex++
+        val start = (at - 40).coerceAtLeast(0)
+        val end = (at + needle.length + 60).coerceAtMost(text.length)
+        val snippet = text.substring(start, end)
+            .replace('\u0000', ' ')
+            .replace(Regex("\u0001[^\u0001]*\u0001"), " ")
+            .replace('\n', ' ')
+            .trim()
+        hits += rangeIndex to snippet
+        from = at + needle.length
+    }
+    return hits
+}
+
 @Composable
 fun ReaderPane(
     reader: ReaderView,
@@ -125,6 +152,8 @@ fun ReaderPane(
     var chrome by remember { mutableStateOf(false) }
     var settings by remember { mutableStateOf(false) }
     var toc by remember { mutableStateOf(false) }
+    var finding by remember { mutableStateOf(false) }
+    var findQuery by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf(false) }
     var draft by remember { mutableStateOf("") }
     var mode by remember { mutableStateOf("read") }
@@ -257,7 +286,8 @@ fun ReaderPane(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.widthIn(max = 160.dp),
                     )
-                    IconButton(onClick = { toc = true }) { Icon(Icons.Default.List, "Contents", tint = paper.ink) }
+                    IconButton(onClick = { toc = true }) { Icon(Icons.AutoMirrored.Filled.List, "Contents", tint = paper.ink) }
+                    IconButton(onClick = { finding = true }) { Icon(Icons.Default.Search, "Find in book", tint = paper.ink) }
                     IconButton(onClick = onBookmark) {
                         Icon(
                             if (reader.bookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
@@ -461,6 +491,46 @@ fun ReaderPane(
                     }
                 },
                 confirmButton = { TextButton(onClick = { settings = false }) { Text("Done") } },
+            )
+        }
+        if (finding) {
+            val hits = remember(findQuery, pageText, spread) { findPages(pageText, spread.ranges, findQuery) }
+            AlertDialog(
+                onDismissRequest = { finding = false },
+                title = { Text("Find in book") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = findQuery,
+                            onValueChange = { findQuery = it },
+                            singleLine = true,
+                            label = { Text("Word or phrase") },
+                        )
+                        Text(
+                            when {
+                                findQuery.trim().length < 2 -> "Type at least 2 letters."
+                                hits.isEmpty() -> "Not found."
+                                hits.size >= FIND_LIMIT -> "First $FIND_LIMIT matches."
+                                else -> "${hits.size} matches."
+                            },
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                        Column(modifier = Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+                            hits.forEach { hit ->
+                                Text(
+                                    text = "p.${hit.first + 1} · ${hit.second}",
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { finding = false; page = hit.first.coerceIn(0, count - 1) }
+                                        .padding(vertical = 6.dp),
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { finding = false }) { Text("Close") } },
             )
         }
         if (toc) {

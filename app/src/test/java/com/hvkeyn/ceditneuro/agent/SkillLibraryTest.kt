@@ -6,6 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 import java.nio.file.Files
 
 class SkillLibraryTest {
@@ -60,5 +61,21 @@ class SkillLibraryTest {
             "No earlier message in this project contains that text.",
             SessionSearch.query(session, "other-project-only"),
         )
+    }
+
+    @Test
+    fun researchLogRejectsAnInventedSecretAndKeepsTheReport() {
+        val root = java.nio.file.Files.createTempDirectory("research").toFile()
+        val logged = ResearchNotebook.log(root, "evidence", "Opened sample.txt. The count was 3.")
+        assertFalse(logged.error)
+        assertTrue(ResearchNotebook.log(root, "check", "token sk-abcdef1234567890").error)
+        val report = ResearchNotebook.report(root, "Sample", "Checked sample.txt. Count 3.")
+        assertFalse(report.error)
+        assertTrue(File(root, "research/report.md").readText().contains("Count 3."))
+        val figure = ResearchNotebook.figure(root, "scheme", "<svg><script>bad</script></svg>")
+        assertTrue(figure.error)
+        assertFalse(ResearchNotebook.figure(root, "scheme", "<svg><text>3</text></svg>").error)
+        assertTrue(File(root, "research/scheme.svg").isFile)
+        root.deleteRecursively()
     }
 }

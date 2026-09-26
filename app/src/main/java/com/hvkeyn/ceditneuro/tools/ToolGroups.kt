@@ -48,6 +48,11 @@ object ToolGroups {
             "shizuku_exec",
             "fetch_system_layout",
             "execute_system_action",
+            "device_status",
+            "list_apps",
+            "open_settings",
+            "clipboard",
+            "open_file",
         ),
         "remote" to listOf(
             "remote_connect",
@@ -67,11 +72,18 @@ object ToolGroups {
             "notifications",
             "notification_reply",
             "notification_dismiss",
-            "mail_list",
-            "mail_read",
-            "mail_send",
-        ),
-    )
+        "mail_list",
+        "mail_read",
+        "mail_send",
+    ),
+    "study" to listOf(
+        "research_log",
+        "research_report",
+        "research_figure",
+        "calculate",
+        "reference",
+    ),
+)
 
     fun groupOf(toolName: String): String? =
         groups.entries.firstOrNull { toolName in it.value }?.key
@@ -87,6 +99,7 @@ object ToolGroups {
     fun forFocus(workFocus: String): Set<String> = when (workFocus) {
         "build" -> setOf("build")
         "remote" -> setOf("remote")
+        "study" -> setOf("study")
         else -> emptySet()
     }
 }
