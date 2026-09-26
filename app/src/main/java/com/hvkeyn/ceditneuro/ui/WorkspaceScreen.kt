@@ -873,6 +873,7 @@ private fun AgentChat(
         onSelectFocus = { focus -> viewModel.updateSettings { it.copy(workFocus = focus) } },
         onListSkills = viewModel::listSkills,
         onToggleSkill = viewModel::toggleSkill,
+        onOpenLink = viewModel::openChatLink,
         modifier = modifier,
     )
 }
