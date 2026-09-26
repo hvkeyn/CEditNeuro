@@ -42,6 +42,11 @@ layer is wired end to end.
 | Timer notification, notification access, and a mailbox in Settings → Desk | done |
 | System install and uninstall (`install_apk`, `uninstall_apk`); a failed tool call is not repeated with the same arguments | done |
 | Project memory, search of this project's past chat, and skills that can be saved and extended | done |
+| Study focus: a research log, a checked report with PDF, and one SVG figure, loaded only for that work | done |
+| Study checks: exact `calculate`, and `reference` for Wikipedia, arXiv, and DOI lookups | done |
+| Phone tools: `device_status` (battery, storage, Shizuku or root), `list_apps`, `open_settings`, `clipboard`, `open_file` | done |
+| Find in book, local and without the model | done |
+| A read-only call is not repeated in a run until something changes | done |
 | `install_jdk`, `install_android_sdk`, `install_runtime` from the Termux mirror | done |
 | Zed-style per-edit Accept/Reject diffs | not yet — edits apply immediately |
 

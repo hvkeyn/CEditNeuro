@@ -45,7 +45,7 @@ class BeaconClient(
         running.set(true)
         val punch = DatagramSocket()
         udp = punch
-        Thread {
+        daemon("beacon-udp") {
             val buffer = ByteArray(1400)
             while (running.get() && gen == generation.get()) {
                 try {
@@ -66,8 +66,8 @@ class BeaconClient(
                 } catch (_: Exception) {
                 }
             }
-        }.also { it.isDaemon = true; it.name = "beacon-udp" }.start()
-        Thread {
+        }
+        daemon("beacon") {
             while (running.get() && gen == generation.get()) {
                 try {
                     val link = Socket()
@@ -81,17 +81,17 @@ class BeaconClient(
                     writer.flush()
                     runCatching { onReady() }
                     punch.send(datagram("PING $code $device", InetAddress.getByName(host), PORT))
-                    val pump = Thread {
+                    val pump = daemon("beacon-pump") {
                         while (running.get() && !link.isClosed) {
-                            val line = outgoing.poll() ?: run {
+                            val line = outgoing.poll()
+                            if (line == null) {
                                 Thread.sleep(200)
-                                null
-                            } ?: continue
+                                continue
+                            }
                             writer.write(line + "\n")
                             writer.flush()
                         }
                     }
-                    pump.start()
                     while (running.get()) {
                         val line = reader.readLine() ?: break
                         if (line.startsWith("N ")) {
@@ -116,7 +116,7 @@ class BeaconClient(
                     socket = null
                 }
             }
-        }.also { it.isDaemon = true; it.name = "beacon" }.start()
+        }
     }
 
     fun send(text: String) {
@@ -143,7 +143,7 @@ class BeaconClient(
         val address = InetAddress.getByName(host)
         repeat(6) {
             runCatching { punch.send(datagram("PUNCH $code", address, port)) }
-            Thread.sleep(250)
+            runCatching { Thread.sleep(250) }
         }
     }
 
@@ -159,6 +159,21 @@ class BeaconClient(
             outgoing.poll()
             outgoing.offer(clean)
         }
+    }
+
+    /** A link thread must not kill the app when the socket closes or the user keeps working. */
+    private fun daemon(name: String, block: () -> Unit): Thread {
+        val thread = Thread {
+            try {
+                block()
+            } catch (_: InterruptedException) {
+            }
+        }
+        thread.isDaemon = true
+        thread.name = name
+        thread.setUncaughtExceptionHandler { _, _ -> }
+        thread.start()
+        return thread
     }
 
     fun leave() {

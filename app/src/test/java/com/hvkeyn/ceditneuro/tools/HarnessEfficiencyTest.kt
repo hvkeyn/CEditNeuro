@@ -21,8 +21,10 @@ class HarnessEfficiencyTest {
         val edit = ToolGroups.visibleNames(ToolGroups.forFocus("edit"))
         assertTrue("read_file" in edit)
         assertFalse("install_jdk" in edit)
+        assertFalse("research_log" in edit)
         val session = ToolSession(emptySet())
         assertTrue(session.load("build").contains("install_jdk"))
+        assertTrue(session.load("study").contains("research_log"))
         assertTrue(session.holdUntilLoaded("fetch_system_layout")!!.contains("device"))
         assertEquals(null, session.holdUntilLoaded("fetch_system_layout"))
     }
@@ -35,6 +37,9 @@ class HarnessEfficiencyTest {
         assertTrue(prompt.contains("load_tools"))
         assertTrue(prompt.contains("list_skills"))
         assertTrue(prompt.contains("search_sessions"))
+        assertTrue(prompt.contains("study"))
+        assertTrue(prompt.contains("Do not start a second agent"))
+        assertFalse(prompt.contains("worktree"))
         assertFalse(prompt.contains("sk-"))
     }
 }

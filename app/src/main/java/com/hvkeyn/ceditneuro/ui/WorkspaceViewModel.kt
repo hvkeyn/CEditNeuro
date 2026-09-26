@@ -17,6 +17,7 @@ import com.hvkeyn.ceditneuro.agent.AgentLoop
 import com.hvkeyn.ceditneuro.agent.ChatMessage
 import com.hvkeyn.ceditneuro.agent.ToolTranscript
 import com.hvkeyn.ceditneuro.agent.ProjectMemory
+import com.hvkeyn.ceditneuro.agent.ResearchSkill
 import com.hvkeyn.ceditneuro.agent.SkillEntry
 import com.hvkeyn.ceditneuro.agent.SkillLibrary
 import com.hvkeyn.ceditneuro.agent.SkillNote
@@ -62,6 +63,9 @@ import com.hvkeyn.ceditneuro.tools.ListSkillsTool
 import com.hvkeyn.ceditneuro.tools.LoadToolsTool
 import com.hvkeyn.ceditneuro.tools.ReadSkillTool
 import com.hvkeyn.ceditneuro.tools.RememberTool
+import com.hvkeyn.ceditneuro.tools.ResearchFigureTool
+import com.hvkeyn.ceditneuro.tools.ResearchLogTool
+import com.hvkeyn.ceditneuro.tools.ResearchReportTool
 import com.hvkeyn.ceditneuro.tools.SaveSkillTool
 import com.hvkeyn.ceditneuro.tools.SearchSessionsTool
 import com.hvkeyn.ceditneuro.tools.ReaderNoteTool
@@ -314,6 +318,9 @@ class WorkspaceViewModel(
     init {
         settingsStore.afterChange = { scheduleProfile() }
         library.afterChange = { scheduleProfile() }
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { ResearchSkill.ensure(appSkillsDir()) }
+        }
         viewModelScope.launch {
             UpdateBus.failures.collect { message ->
                 val replace = message.contains("UPDATE_INCOMPATIBLE", ignoreCase = true) ||
@@ -2173,6 +2180,16 @@ class WorkspaceViewModel(
             "delete_skill" -> "Deleting a skill"
             "remember" -> "Saving a project note"
             "search_sessions" -> "Searching past chat"
+            "research_log" -> "Logging a check"
+            "research_report" -> "Writing the report"
+            "research_figure" -> "Drawing a figure"
+            "calculate" -> "Calculating"
+            "reference" -> "Checking a reference"
+            "device_status" -> "Checking the phone"
+            "list_apps" -> "Listing apps"
+            "open_settings" -> "Opening settings"
+            "clipboard" -> "Using the clipboard"
+            "open_file" -> "Showing a file"
             else -> name.replace('_', ' ').replaceFirstChar { it.uppercase() }
         }
         return when {
@@ -2205,6 +2222,7 @@ class WorkspaceViewModel(
         val work = when (settings.workFocus) {
             AgentSettings.WORK_BUILD -> "Build"
             AgentSettings.WORK_REMOTE -> "Remote"
+            AgentSettings.WORK_STUDY -> "Study"
             else -> "Edit"
         }
         val network = if (settings.networkEnabled) "Network on" else "Network off"
@@ -2655,6 +2673,16 @@ class WorkspaceViewModel(
             AppendSkillTool(skills),
             DeleteSkillTool(skills),
             RememberTool(ws.root),
+            ResearchLogTool(ws),
+            ResearchReportTool(ws),
+            ResearchFigureTool(ws),
+            com.hvkeyn.ceditneuro.tools.CalculateTool(),
+            com.hvkeyn.ceditneuro.tools.ReferenceTool(agentNet) { settingsStore.current.networkEnabled },
+            com.hvkeyn.ceditneuro.tools.DeviceStatusTool(appContext),
+            com.hvkeyn.ceditneuro.tools.ListAppsTool(appContext),
+            com.hvkeyn.ceditneuro.tools.OpenSettingsTool(appContext),
+            com.hvkeyn.ceditneuro.tools.ClipboardTool(appContext),
+            com.hvkeyn.ceditneuro.tools.OpenFileTool(appContext, ws),
             SearchSessionsTool {
                 val saved = library.load(ws.root.canonicalPath)
                 val shown = if (current === project) _state.value else project.ui
