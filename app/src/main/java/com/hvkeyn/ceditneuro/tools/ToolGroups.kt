@@ -26,6 +26,7 @@ object ToolGroups {
         "reader_sketch",
         "list_skills",
         "read_skill",
+        "use_skill",
         "save_skill",
         "append_skill",
         "delete_skill",

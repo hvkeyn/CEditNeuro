@@ -1,6 +1,6 @@
 # Progress
 
-Released: v0.45.0 (skills, memory, session search), v0.47.0 (link crash fix, Study focus, phone tools, find in book), v0.48.0, v0.49.0, v0.50.0 (DeepSeek HTTP 400 on a reasoning-only turn, and repeated failed commands, URLs, and logins; see activeContext.md). Unit tests include `RunAndPreviewTest` and `ToolTranscriptTest`.
+Released: v0.45.0 through v0.50.0, v0.51.0 (a saved skill switches on and is followed; see activeContext.md). Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, and `SkillLibraryTest`.
 
 Known gaps:
 - The file tree does not refresh by itself when files appear on disk; reselecting the project reloads it.

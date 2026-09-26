@@ -13,6 +13,12 @@ data class SkillNote(
     val error: Boolean = false,
 )
 
+/** Keeps at most [max] skills on. The newest stays. Switching off removes that one key. */
+internal fun nextActiveSkills(current: List<String>, key: String, enable: Boolean, max: Int = 3): List<String> {
+    val without = current.filterNot { it == key }
+    return if (!enable) without else (without + key).takeLast(max.coerceAtLeast(1))
+}
+
 /**
  * Markdown procedures the agent and the user can add and extend.
  * Project skills live in the open folder. Phone skills are available in every project.

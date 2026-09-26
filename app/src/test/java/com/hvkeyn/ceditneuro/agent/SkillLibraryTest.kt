@@ -11,6 +11,15 @@ import java.nio.file.Files
 
 class SkillLibraryTest {
     @Test
+    fun switchingOnKeepsThreeAndDropsTheOldest() {
+        assertEquals(listOf("app:one"), nextActiveSkills(emptyList(), "app:one", enable = true))
+        val full = nextActiveSkills(listOf("app:a", "app:b", "app:c"), "app:photo-ocr", enable = true)
+        assertEquals(listOf("app:b", "app:c", "app:photo-ocr"), full)
+        assertEquals(listOf("app:b", "app:c"), nextActiveSkills(full, "app:photo-ocr", enable = false))
+        assertEquals(full, nextActiveSkills(full, "app:photo-ocr", enable = true))
+    }
+
+    @Test
     fun saveReadAppendAndDelete() {
         val root = Files.createTempDirectory("skills-project").toFile()
         val phone = Files.createTempDirectory("skills-phone").toFile()
