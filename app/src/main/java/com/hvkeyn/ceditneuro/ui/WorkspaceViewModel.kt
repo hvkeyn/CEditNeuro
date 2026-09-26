@@ -66,7 +66,9 @@ import com.hvkeyn.ceditneuro.tools.RememberTool
 import com.hvkeyn.ceditneuro.tools.ResearchFigureTool
 import com.hvkeyn.ceditneuro.tools.ResearchLogTool
 import com.hvkeyn.ceditneuro.tools.ResearchReportTool
+import com.hvkeyn.ceditneuro.agent.nextActiveSkills
 import com.hvkeyn.ceditneuro.tools.SaveSkillTool
+import com.hvkeyn.ceditneuro.tools.UseSkillTool
 import com.hvkeyn.ceditneuro.tools.SearchSessionsTool
 import com.hvkeyn.ceditneuro.tools.ReaderNoteTool
 import com.hvkeyn.ceditneuro.tools.ReaderSketchTool
@@ -2321,6 +2323,7 @@ class WorkspaceViewModel(
             "browse_page" -> "Opening a page"
             "list_skills" -> "Listing skills"
             "read_skill" -> "Reading a skill"
+            "use_skill" -> "Switching on a skill"
             "save_skill" -> "Saving a skill"
             "append_skill" -> "Extending a skill"
             "delete_skill" -> "Deleting a skill"
@@ -2694,6 +2697,33 @@ class WorkspaceViewModel(
 
     fun deleteSkill(name: String, scope: String): SkillNote = skillLibrary(current).delete(name, scope)
 
+    private fun switchSkill(project: LiveProject, name: String, scope: String, enable: Boolean): String {
+        val safe = SkillLibrary.normalizeName(name) ?: return "Skill name must be letters, digits, and hyphens."
+        val where = when (scope.trim().lowercase()) {
+            "project" -> "project"
+            "app", "phone" -> "app"
+            else -> return "scope is project or app."
+        }
+        val key = "$where:$safe"
+        var message = ""
+        editProject(project) { state ->
+            val previous = state.activeSkills
+            val next = nextActiveSkills(previous, key, enable)
+            message = when {
+                !enable -> "Switched off $safe ($where)."
+                key in previous && next == previous -> "Already on: $safe ($where). Follow it."
+                else -> {
+                    val dropped = previous.filter { it !in next }.joinToString { it.substringAfter(':') }
+                    if (dropped.isEmpty()) "Switched on $safe ($where). Follow it for this chat."
+                    else "Switched on $safe ($where). Follow it for this chat. Switched off $dropped to keep 3."
+                }
+            }
+            state.copy(activeSkills = next)
+        }
+        persistNow(project)
+        return message
+    }
+
     fun toggleSkill(entry: SkillEntry) {
         val project = current ?: return
         val key = "${entry.scope}:${entry.name}"
@@ -2834,12 +2864,19 @@ class WorkspaceViewModel(
             SpaceSyncTool(ws, ::activeRemote, remoteClient, android.os.Build.MODEL.replace(Regex("[^A-Za-z0-9]"), "")),
         )
         val skills = skillLibrary(project)
+        val activeKeys = {
+            val shown = if (current === project) _state.value else project.ui
+            shown.activeSkills.toSet()
+        }
+        val switchOn = { name: String, scope: String -> switchSkill(project, name, scope, enable = true) }
+        val switchOff = { name: String, scope: String -> switchSkill(project, name, scope, enable = false) }
         tools += listOf(
-            ListSkillsTool(skills),
+            ListSkillsTool(skills, activeKeys),
             ReadSkillTool(skills),
-            SaveSkillTool(skills),
-            AppendSkillTool(skills),
-            DeleteSkillTool(skills),
+            UseSkillTool(skills, switchOn),
+            SaveSkillTool(skills, switchOn),
+            AppendSkillTool(skills, switchOn),
+            DeleteSkillTool(skills, switchOff),
             RememberTool(ws.root),
             ResearchLogTool(ws),
             ResearchReportTool(ws),

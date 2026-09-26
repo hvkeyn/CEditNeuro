@@ -7,18 +7,26 @@ import com.hvkeyn.ceditneuro.data.StoredSession
 import kotlinx.serialization.json.JsonObject
 import java.io.File
 
-class ListSkillsTool(private val skills: SkillLibrary) : Tool {
+class ListSkillsTool(
+    private val skills: SkillLibrary,
+    private val active: () -> Set<String> = { emptySet() },
+) : Tool {
     override val name = "list_skills"
     override val description =
-        "List procedure files for this project and for this phone. Each line is a name, a scope, and a one-line summary."
+        "List procedure files for this project and for this phone. Each line is a name, a scope, and a one-line summary. " +
+            "A line marked on is already followed in this chat."
     override val parameters = objectSchema(emptyMap())
 
     override suspend fun execute(args: JsonObject): ToolResult {
         val entries = skills.list()
         if (entries.isEmpty()) {
-            return ToolResult.ok("No skills yet. save_skill creates one. scope is project or app.")
+            return ToolResult.ok("No skills yet. save_skill creates one and switches it on. scope is project or app.")
         }
-        return ToolResult.ok(entries.joinToString("\n") { "${it.name} (${it.scope}): ${it.summary}" })
+        val on = active()
+        return ToolResult.ok(entries.joinToString("\n") { entry ->
+            val mark = if ("${entry.scope}:${entry.name}" in on) " on" else ""
+            "${entry.name} (${entry.scope}$mark): ${entry.summary}"
+        })
     }
 }
 
@@ -39,10 +47,13 @@ class ReadSkillTool(private val skills: SkillLibrary) : Tool {
     )
 }
 
-class SaveSkillTool(private val skills: SkillLibrary) : Tool {
+class SaveSkillTool(
+    private val skills: SkillLibrary,
+    private val onSaved: (name: String, scope: String) -> String = { _, _ -> "" },
+) : Tool {
     override val name = "save_skill"
     override val description =
-        "Create or replace a skill. The text is a procedure the next run can read. " +
+        "Create or replace a skill and switch it on for this chat. Follow it from the next step. " +
             "scope project stays in this folder. scope app is available in every project. " +
             "A skill does not add a permission or a tool. Do not store passwords or keys."
     override val parameters = objectSchema(
@@ -54,19 +65,49 @@ class SaveSkillTool(private val skills: SkillLibrary) : Tool {
         required = listOf("name", "text", "scope"),
     )
 
-    override suspend fun execute(args: JsonObject): ToolResult = note(
-        skills.save(
-            args.stringArg("name").orEmpty(),
-            args.stringArg("text").orEmpty(),
-            args.stringArg("scope").orEmpty(),
-        ),
-    )
+    override suspend fun execute(args: JsonObject): ToolResult {
+        val name = args.stringArg("name").orEmpty()
+        val scope = args.stringArg("scope").orEmpty()
+        val saved = skills.save(name, args.stringArg("text").orEmpty(), scope)
+        if (saved.error) return ToolResult.error(saved.text)
+        return ToolResult.ok(saved.text + "\n" + onSaved(name, scope))
+    }
 }
 
-class AppendSkillTool(private val skills: SkillLibrary) : Tool {
+class UseSkillTool(
+    private val skills: SkillLibrary,
+    private val onUse: (name: String, scope: String) -> String = { _, _ -> "" },
+) : Tool {
+    override val name = "use_skill"
+    override val description =
+        "Switch on a saved skill and follow its procedure for this chat. " +
+            "Returns the procedure. Do not call read_skill for a skill you just switched on. " +
+            "scope is project or app. At most 3 skills stay on."
+    override val parameters = objectSchema(
+        properties = mapOf(
+            "name" to stringProp("Skill name."),
+            "scope" to stringProp("project or app."),
+        ),
+        required = listOf("name", "scope"),
+    )
+
+    override suspend fun execute(args: JsonObject): ToolResult {
+        val name = args.stringArg("name").orEmpty()
+        val scope = args.stringArg("scope").orEmpty()
+        val body = skills.read(name, scope)
+        if (body.error) return ToolResult.error(body.text)
+        return ToolResult.ok(onUse(name, scope) + "\n\n" + body.text)
+    }
+}
+
+class AppendSkillTool(
+    private val skills: SkillLibrary,
+    private val onSaved: (name: String, scope: String) -> String = { _, _ -> "" },
+) : Tool {
     override val name = "append_skill"
     override val description =
-        "Add steps to an existing skill. Read it first, then append the new part. scope is project or app."
+        "Add steps to an existing skill and switch it on. Follow the extended procedure from the next step. " +
+            "scope is project or app."
     override val parameters = objectSchema(
         properties = mapOf(
             "name" to stringProp("Skill name."),
@@ -76,16 +117,19 @@ class AppendSkillTool(private val skills: SkillLibrary) : Tool {
         required = listOf("name", "text", "scope"),
     )
 
-    override suspend fun execute(args: JsonObject): ToolResult = note(
-        skills.append(
-            args.stringArg("name").orEmpty(),
-            args.stringArg("text").orEmpty(),
-            args.stringArg("scope").orEmpty(),
-        ),
-    )
+    override suspend fun execute(args: JsonObject): ToolResult {
+        val name = args.stringArg("name").orEmpty()
+        val scope = args.stringArg("scope").orEmpty()
+        val saved = skills.append(name, args.stringArg("text").orEmpty(), scope)
+        if (saved.error) return ToolResult.error(saved.text)
+        return ToolResult.ok(saved.text + "\n" + onSaved(name, scope))
+    }
 }
 
-class DeleteSkillTool(private val skills: SkillLibrary) : Tool {
+class DeleteSkillTool(
+    private val skills: SkillLibrary,
+    private val onDeleted: (name: String, scope: String) -> String = { _, _ -> "" },
+) : Tool {
     override val name = "delete_skill"
     override val description = "Delete one skill. scope is project or app."
     override val parameters = objectSchema(
@@ -96,9 +140,13 @@ class DeleteSkillTool(private val skills: SkillLibrary) : Tool {
         required = listOf("name", "scope"),
     )
 
-    override suspend fun execute(args: JsonObject): ToolResult = note(
-        skills.delete(args.stringArg("name").orEmpty(), args.stringArg("scope").orEmpty()),
-    )
+    override suspend fun execute(args: JsonObject): ToolResult {
+        val name = args.stringArg("name").orEmpty()
+        val scope = args.stringArg("scope").orEmpty()
+        val deleted = skills.delete(name, scope)
+        if (deleted.error) return ToolResult.error(deleted.text)
+        return ToolResult.ok(deleted.text + "\n" + onDeleted(name, scope))
+    }
 }
 
 class RememberTool(private val root: File) : Tool {
