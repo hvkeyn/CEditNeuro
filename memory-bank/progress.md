@@ -1,6 +1,6 @@
 # Progress
 
-Released: v0.45.0 through v0.50.0, v0.51.0 (a saved skill switches on and is followed; see activeContext.md). Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, and `SkillLibraryTest`.
+Released: v0.45.0 through v0.52.0 (offline send block, chat links, SVG in chat and reader; see activeContext.md). Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, `SkillLibraryTest`, and `ChatLinkTest`.
 
 Known gaps:
 - The file tree does not refresh by itself when files appear on disk; reselecting the project reloads it.

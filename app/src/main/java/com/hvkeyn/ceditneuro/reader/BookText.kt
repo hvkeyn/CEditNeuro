@@ -40,12 +40,12 @@ object BookText {
         }.getOrDefault(false)
     }
 
-    fun parse(name: String, bytes: ByteArray): ParsedBook {
+    fun parse(name: String, bytes: ByteArray, baseDir: java.io.File? = null): ParsedBook {
         if (bytes.size > MAX_BYTES) error("This file is larger than 8 MB.")
         val book = when {
             isZip(bytes) -> parseContainer(bytes, name, 0)
             extension(name) == "html" || extension(name) == "htm" -> htmlBook(name, String(bytes, charset(bytes)))
-            extension(name) == "md" || extension(name) == "markdown" -> markdownBook(name, String(bytes, charset(bytes)))
+            extension(name) == "md" || extension(name) == "markdown" -> markdownBook(name, String(bytes, charset(bytes)), baseDir)
             extension(name) == "fb2" -> parseFb2(bytes, name)
             else -> plainBook(name, String(bytes, charset(bytes)))
         }
@@ -109,8 +109,35 @@ object BookText {
         return ParsedBook(title, listOf(BookChapter(title, text.trim())))
     }
 
-    private fun markdownBook(name: String, text: String): ParsedBook {
-        val title = text.lineSequence().firstOrNull { it.startsWith("# ") }?.removePrefix("# ")?.trim()
+    /** A page is words, a picture, or both. Figure ids match keys in [ParsedBook.images]. */
+    fun pagePieces(text: String): List<PagePiece> {
+        val out = ArrayList<PagePiece>()
+        var last = 0
+        for (match in FIGURE.findAll(text)) {
+            val words = text.substring(last, match.range.first).trim()
+            if (words.isNotEmpty()) out += PagePiece.Words(words)
+            out += PagePiece.Figure(match.groupValues[1])
+            last = match.range.last + 1
+        }
+        val tail = text.substring(last).trim()
+        if (tail.isNotEmpty()) out += PagePiece.Words(tail)
+        if (out.isEmpty()) out += PagePiece.Words(text)
+        return out
+    }
+
+    fun isSvgBytes(bytes: ByteArray): Boolean {
+        val head = String(bytes.copyOfRange(0, minOf(bytes.size, 400)), Charsets.UTF_8)
+            .trimStart('\uFEFF', ' ', '\n', '\r', '\t')
+        if (head.startsWith("<svg", ignoreCase = true)) return true
+        if (!head.startsWith("<?xml", ignoreCase = true)) return false
+        val more = String(bytes.copyOfRange(0, minOf(bytes.size, 2_000)), Charsets.UTF_8)
+        return more.contains("<svg", ignoreCase = true)
+    }
+
+    private fun markdownBook(name: String, text: String, baseDir: java.io.File?): ParsedBook {
+        val images = LinkedHashMap<String, ByteArray>()
+        val prepared = pullFigures(text, baseDir, images)
+        val title = prepared.lineSequence().firstOrNull { it.startsWith("# ") }?.removePrefix("# ")?.trim()
             ?: name.substringBeforeLast('.')
         val chapters = ArrayList<BookChapter>()
         val body = StringBuilder()
@@ -120,7 +147,7 @@ object BookText {
             body.clear()
             if (value.isNotEmpty()) chapters.add(BookChapter(current, value))
         }
-        for (line in text.lineSequence()) {
+        for (line in prepared.lineSequence()) {
             if (line.startsWith("# ")) {
                 flush()
                 current = line.trimStart('#').trim().ifBlank { current }
@@ -129,8 +156,48 @@ object BookText {
             }
         }
         flush()
-        if (chapters.isEmpty()) chapters.add(BookChapter(title, text.trim()))
-        return ParsedBook(title, chapters)
+        if (chapters.isEmpty()) chapters.add(BookChapter(title, prepared.trim()))
+        return ParsedBook(title, chapters, images)
+    }
+
+    private fun pullFigures(text: String, baseDir: java.io.File?, images: MutableMap<String, ByteArray>): String {
+        var next = 0
+        fun store(bytes: ByteArray): String {
+            if (bytes.size !in 1..MAX_IMAGE) return ""
+            val id = "fig-${next++}"
+            images[id] = bytes
+            return "\n\n\u0001$id\u0001\n\n"
+        }
+        var body = Regex("(?is)```[ \\t]*svg[ \\t]*\\r?\\n(.*?)```").replace(text) { match ->
+            val svg = match.groupValues[1].trim()
+            if (svg.contains("<svg", ignoreCase = true)) store(svg.toByteArray(Charsets.UTF_8)).ifEmpty { match.value }
+            else match.value
+        }
+        body = Regex("(?is)<svg\\b.*?</svg>").replace(body) { match ->
+            store(match.value.toByteArray(Charsets.UTF_8)).ifEmpty { match.value }
+        }
+        body = Regex("!\\[([^\\]]*)]\\(([^)]+)\\)").replace(body) { match ->
+            val src = match.groupValues[2].trim().trim('<', '>').substringBefore(' ').trim('"')
+            val bytes = readFigure(baseDir, src) ?: return@replace match.value
+            store(bytes).ifEmpty { match.value }
+        }
+        return body
+    }
+
+    private fun readFigure(baseDir: java.io.File?, src: String): ByteArray? {
+        if (baseDir == null) return null
+        val clean = src.substringBefore('?').substringBefore('#')
+        if (clean.startsWith("http://") || clean.startsWith("https://")) return null
+        val ext = clean.substringAfterLast('.', "").lowercase()
+        if (ext !in FIGURE_EXT) return null
+        val relative = clean.removePrefix("file://").removePrefix("./")
+        val file = if (relative.startsWith("/")) java.io.File(relative) else java.io.File(baseDir, relative)
+        val base = runCatching { baseDir.canonicalFile }.getOrNull() ?: return null
+        val target = runCatching { file.canonicalFile }.getOrNull() ?: return null
+        val basePath = base.path
+        if (target.path != basePath && !target.path.startsWith(basePath + java.io.File.separator)) return null
+        if (!target.isFile || target.length() !in 1..MAX_IMAGE) return null
+        return runCatching { target.readBytes() }.getOrNull()
     }
 
     private fun htmlBook(
@@ -243,7 +310,7 @@ object BookText {
                 extension(leaf) == "html" || extension(leaf) == "htm" ->
                     htmlBook(leaf, String(data, charset(data)))
                 extension(leaf) == "md" || extension(leaf) == "markdown" ->
-                    markdownBook(leaf, String(data, charset(data)))
+                    markdownBook(leaf, String(data, charset(data)), null)
                 extension(leaf) in setOf("txt", "note", "notes") ->
                     plainBook(leaf, String(data, charset(data)))
                 else -> null
@@ -383,7 +450,14 @@ object BookText {
 
     private fun extension(name: String) = name.substringAfterLast('.', "").lowercase()
 
+    private val FIGURE = Regex("\u0001([^\u0001]+)\u0001")
+    private val FIGURE_EXT = setOf("svg", "png", "jpg", "jpeg", "webp", "gif", "bmp")
     private const val MAX_BYTES = 8 * 1024 * 1024
     private const val MAX_UNCOMPRESSED = 16 * 1024 * 1024
     private const val MAX_IMAGE = 2 * 1024 * 1024
+}
+
+sealed class PagePiece {
+    data class Words(val text: String) : PagePiece()
+    data class Figure(val id: String) : PagePiece()
 }

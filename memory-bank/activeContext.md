@@ -1,6 +1,8 @@
 # Active context
 
-Current: v0.51.0. save_skill, append_skill, and use_skill switch that skill on for the chat (at most 3). Checked on the phone: photo-ocr was off, the agent switched it on, and it stayed on after the run.
+Current: v0.52.0. With no validated network, or after a DNS failure, the composer shows a no-signal icon and "No connection. The agent cannot work." Send, Continue, and dictated send stay off until the network changes. A link in the agent chat opens the project file: books and notes in the reader, SVG and other previews in the editor, PDF in another app, web links in the browser. SVG fences, raw `<svg>`, and `.svg` paths draw in the chat. A Markdown note keeps an SVG or image figure and the reader draws it.
+
+v0.51.0. save_skill, append_skill, and use_skill switch that skill on for the chat (at most 3). Checked on the phone: photo-ocr was off, the agent switched it on, and it stayed on after the run.
 
 v0.49.0:
 - Editor Run: `.py` and `.sh` get a Run button above the code (`runCommandFor` / `runActiveFile` in WorkspaceViewModel). Output streams into the Shell panel; Stop kills it. Python is installed on first run through `InstallRuntimeTool`.

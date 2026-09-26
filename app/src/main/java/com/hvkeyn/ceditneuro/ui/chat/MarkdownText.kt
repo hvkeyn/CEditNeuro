@@ -1,6 +1,9 @@
 package com.hvkeyn.ceditneuro.ui.chat
 
+import android.annotation.SuppressLint
+import android.webkit.WebView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,9 +21,14 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
@@ -35,6 +43,11 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
+import androidx.compose.ui.viewinterop.AndroidView
+import com.hvkeyn.ceditneuro.reader.BookText
+import com.hvkeyn.ceditneuro.ui.editor.previewPage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Renders the Markdown the agent already writes: headings, lists, inline code,
@@ -46,6 +59,8 @@ fun MarkdownText(
     text: String,
     color: Color,
     modifier: Modifier = Modifier,
+    projectRoot: String? = null,
+    onOpen: (String) -> Unit = {},
 ) {
     val blocks = remember(text) { parseMarkdown(text) }
     val linkColor = MaterialTheme.colorScheme.primary
@@ -55,12 +70,12 @@ fun MarkdownText(
         for (block in blocks) {
             when (block) {
                 is MdBlock.Paragraph -> Text(
-                    text = block.inlines.toAnnotated(color, linkColor, codeColor, codeBackground),
+                    text = block.inlines.toAnnotated(color, linkColor, codeColor, codeBackground, onOpen),
                     style = MaterialTheme.typography.bodyMedium,
                     color = color,
                 )
                 is MdBlock.Heading -> Text(
-                    text = block.inlines.toAnnotated(color, linkColor, codeColor, codeBackground),
+                    text = block.inlines.toAnnotated(color, linkColor, codeColor, codeBackground, onOpen),
                     style = when (block.level) {
                         1 -> MaterialTheme.typography.titleMedium
                         2 -> MaterialTheme.typography.titleSmall
@@ -70,15 +85,20 @@ fun MarkdownText(
                 )
                 is MdBlock.Bullets -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     block.items.forEach { item ->
-                        ListRow("•", item, color, linkColor, codeColor, codeBackground)
+                        ListRow("•", item, color, linkColor, codeColor, codeBackground, onOpen)
                     }
                 }
                 is MdBlock.Numbered -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     block.items.forEachIndexed { index, item ->
-                        ListRow("${index + 1}.", item, color, linkColor, codeColor, codeBackground)
+                        ListRow("${index + 1}.", item, color, linkColor, codeColor, codeBackground, onOpen)
                     }
                 }
-                is MdBlock.Code -> CodeBlock(block.lang, block.text, color)
+                is MdBlock.Code -> if (isSvgMarkup(block.lang, block.text)) {
+                    SvgDrawing(block.text)
+                } else {
+                    CodeBlock(block.lang, block.text, color)
+                }
+                is MdBlock.Scheme -> SchemeDrawing(block.path, projectRoot, linkColor, onOpen)
                 is MdBlock.Quote -> Row(modifier = Modifier.height(IntrinsicSize.Min).fillMaxWidth()) {
                     Box(
                         modifier = Modifier
@@ -88,14 +108,14 @@ fun MarkdownText(
                             .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)),
                     )
                     Text(
-                        text = block.inlines.toAnnotated(color, linkColor, codeColor, codeBackground),
+                        text = block.inlines.toAnnotated(color, linkColor, codeColor, codeBackground, onOpen),
                         style = MaterialTheme.typography.bodyMedium,
                         color = color,
                         modifier = Modifier.padding(start = 8.dp).weight(1f),
                     )
                 }
                 MdBlock.Rule -> HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-                is MdBlock.Table -> TableBlock(block, color, linkColor, codeColor, codeBackground)
+                is MdBlock.Table -> TableBlock(block, color, linkColor, codeColor, codeBackground, onOpen)
             }
         }
     }
@@ -109,6 +129,7 @@ private fun ListRow(
     linkColor: Color,
     codeColor: Color,
     codeBackground: Color,
+    onOpen: (String) -> Unit,
 ) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
         Text(
@@ -118,10 +139,66 @@ private fun ListRow(
             modifier = Modifier.width(if (marker == "•") 16.dp else 24.dp),
         )
         Text(
-            text = item.toAnnotated(color, linkColor, codeColor, codeBackground),
+            text = item.toAnnotated(color, linkColor, codeColor, codeBackground, onOpen),
             style = MaterialTheme.typography.bodyMedium,
             color = color,
             modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+private fun SvgDrawing(markup: String) {
+    val page = remember(markup) { previewPage("svg", markup) }
+    AndroidView(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(240.dp)
+            .clip(RoundedCornerShape(8.dp)),
+        factory = { context ->
+            WebView(context).apply {
+                settings.javaScriptEnabled = false
+                settings.builtInZoomControls = true
+                settings.displayZoomControls = false
+                settings.useWideViewPort = true
+                settings.loadWithOverviewMode = true
+                setBackgroundColor(android.graphics.Color.WHITE)
+            }
+        },
+        update = { view ->
+            if (view.tag != page) {
+                view.tag = page
+                view.loadDataWithBaseURL(null, page, "text/html", "utf-8", null)
+            }
+        },
+    )
+}
+
+@Composable
+private fun SchemeDrawing(
+    path: String,
+    projectRoot: String?,
+    linkColor: Color,
+    onOpen: (String) -> Unit,
+) {
+    var markup by remember(path, projectRoot) { mutableStateOf<String?>(null) }
+    LaunchedEffect(path, projectRoot) {
+        markup = withContext(Dispatchers.IO) {
+            val file = ChatLinks.file(projectRoot, path) ?: return@withContext null
+            if (file.length() !in 1..400_000) return@withContext null
+            val text = runCatching { file.readText(Charsets.UTF_8) }.getOrNull() ?: return@withContext null
+            text.takeIf { BookText.isSvgBytes(text.toByteArray(Charsets.UTF_8)) }
+        }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        markup?.let { SvgDrawing(it) }
+        Text(
+            text = path.substringAfterLast('/'),
+            color = linkColor,
+            textDecoration = TextDecoration.Underline,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.clickable { onOpen(path) },
         )
     }
 }
@@ -159,16 +236,17 @@ private fun TableBlock(
     linkColor: Color,
     codeColor: Color,
     codeBackground: Color,
+    onOpen: (String) -> Unit,
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState()),
     ) {
-        TableRow(table.header, color, linkColor, codeColor, codeBackground, header = true)
+        TableRow(table.header, color, linkColor, codeColor, codeBackground, onOpen, header = true)
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
         table.rows.forEach { row ->
-            TableRow(row, color, linkColor, codeColor, codeBackground, header = false)
+            TableRow(row, color, linkColor, codeColor, codeBackground, onOpen, header = false)
         }
     }
 }
@@ -180,12 +258,13 @@ private fun TableRow(
     linkColor: Color,
     codeColor: Color,
     codeBackground: Color,
+    onOpen: (String) -> Unit,
     header: Boolean,
 ) {
     Row(modifier = Modifier.padding(vertical = 3.dp)) {
         cells.forEach { cell ->
             Text(
-                text = cell.toAnnotated(color, linkColor, codeColor, codeBackground),
+                text = cell.toAnnotated(color, linkColor, codeColor, codeBackground, onOpen),
                 style = MaterialTheme.typography.bodySmall.copy(
                     fontWeight = if (header) FontWeight.SemiBold else FontWeight.Normal,
                 ),
@@ -201,6 +280,7 @@ private fun List<MdInline>.toAnnotated(
     linkColor: Color,
     codeColor: Color,
     codeBackground: Color,
+    onOpen: (String) -> Unit,
 ): AnnotatedString = buildAnnotatedString {
     fun write(nodes: List<MdInline>, bold: Boolean, italic: Boolean) {
         for (node in nodes) {
@@ -223,9 +303,9 @@ private fun List<MdInline>.toAnnotated(
                 is MdInline.Bold -> write(node.children, bold = true, italic = italic)
                 is MdInline.Italic -> write(node.children, bold = bold, italic = true)
                 is MdInline.Link -> withLink(
-                    LinkAnnotation.Url(
-                        node.url,
-                        TextLinkStyles(
+                    LinkAnnotation.Clickable(
+                        tag = node.url,
+                        styles = TextLinkStyles(
                             style = SpanStyle(
                                 color = linkColor,
                                 textDecoration = TextDecoration.Underline,
@@ -233,6 +313,7 @@ private fun List<MdInline>.toAnnotated(
                                 fontStyle = if (italic) FontStyle.Italic else null,
                             ),
                         ),
+                        linkInteractionListener = { onOpen(node.url) },
                     ),
                 ) { write(node.children, bold, italic) }
             }
@@ -247,6 +328,7 @@ private sealed class MdBlock {
     data class Bullets(val items: List<List<MdInline>>) : MdBlock()
     data class Numbered(val items: List<List<MdInline>>) : MdBlock()
     data class Code(val lang: String, val text: String) : MdBlock()
+    data class Scheme(val path: String) : MdBlock()
     data class Quote(val inlines: List<MdInline>) : MdBlock()
     data object Rule : MdBlock()
     data class Table(val header: List<List<MdInline>>, val rows: List<List<List<MdInline>>>) : MdBlock()
@@ -282,6 +364,20 @@ private fun parseMarkdown(text: String): List<MdBlock> {
             }
             if (i < lines.size) i++
             blocks += MdBlock.Code(lang, body.toString().trimEnd())
+            continue
+        }
+        if (trimmed.startsWith("<svg", ignoreCase = true) ||
+            (trimmed.startsWith("<?xml", ignoreCase = true) && trimmed.contains("<svg", ignoreCase = true))
+        ) {
+            val body = StringBuilder()
+            while (i < lines.size) {
+                if (body.isNotEmpty()) body.append('\n')
+                body.append(lines[i])
+                val closed = lines[i].contains("</svg>", ignoreCase = true)
+                i++
+                if (closed) break
+            }
+            blocks += MdBlock.Code("svg", body.toString().trimEnd())
             continue
         }
         val heading = headingLevel(trimmed)
@@ -358,13 +454,57 @@ private fun parseMarkdown(text: String): List<MdBlock> {
         if (paragraph.isNotEmpty()) blocks += MdBlock.Paragraph(inlines(paragraph.toString()))
         else i++
     }
-    return blocks.ifEmpty { listOf(MdBlock.Paragraph(inlines(text))) }
+    val parsed = blocks.ifEmpty { listOf(MdBlock.Paragraph(inlines(text))) }
+    return attachSchemes(parsed)
+}
+
+private fun attachSchemes(blocks: List<MdBlock>): List<MdBlock> {
+    val out = ArrayList<MdBlock>()
+    for (block in blocks) {
+        out += block
+        val paths = LinkedHashSet<String>()
+        fun walk(nodes: List<MdInline>) {
+            for (node in nodes) {
+                when (node) {
+                    is MdInline.Link -> {
+                        if (ChatLinks.isSvgPath(node.url)) paths += node.url
+                        walk(node.children)
+                    }
+                    is MdInline.Bold -> walk(node.children)
+                    is MdInline.Italic -> walk(node.children)
+                    else -> Unit
+                }
+            }
+        }
+        when (block) {
+            is MdBlock.Paragraph -> walk(block.inlines)
+            is MdBlock.Heading -> walk(block.inlines)
+            is MdBlock.Quote -> walk(block.inlines)
+            is MdBlock.Bullets -> block.items.forEach(::walk)
+            is MdBlock.Numbered -> block.items.forEach(::walk)
+            is MdBlock.Table -> {
+                block.header.forEach(::walk)
+                block.rows.forEach { row -> row.forEach(::walk) }
+            }
+            else -> Unit
+        }
+        paths.forEach { out += MdBlock.Scheme(it) }
+    }
+    return out
+}
+
+internal fun isSvgMarkup(lang: String, text: String): Boolean {
+    val trimmed = text.trim()
+    if (lang.equals("svg", ignoreCase = true)) return trimmed.contains("<svg", ignoreCase = true)
+    return trimmed.startsWith("<svg", ignoreCase = true) ||
+        (trimmed.startsWith("<?xml", ignoreCase = true) && trimmed.contains("<svg", ignoreCase = true))
 }
 
 private fun isBlockStart(lines: List<String>, index: Int): Boolean {
     val trimmed = lines[index].trim()
     if (trimmed.isEmpty()) return true
     if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) return true
+    if (trimmed.startsWith("<svg", ignoreCase = true)) return true
     if (headingLevel(trimmed) != null) return true
     if (trimmed == "---" || trimmed == "***" || trimmed == "___") return true
     if (trimmed.startsWith(">")) return true
@@ -415,7 +555,12 @@ private fun inlines(src: String, start: Int, end: Int): List<MdInline> {
         val code = takeWrap(src, i, end, "`")
         if (code != null && code.content.isNotEmpty()) {
             flush()
-            out += MdInline.Code(code.content)
+            val linked = ChatLinks.target(code.content.trim())
+            out += if (linked != null) {
+                MdInline.Link(listOf(MdInline.Text(code.content.trim())), linked)
+            } else {
+                MdInline.Code(code.content)
+            }
             i = code.next
             continue
         }
@@ -449,6 +594,18 @@ private fun inlines(src: String, start: Int, end: Int): List<MdInline> {
                 flush()
                 out += MdInline.Italic(inlines(src, i + 1, close))
                 i = close + 1
+                continue
+            }
+        }
+        if (i == start || src[i - 1].isWhitespace() || src[i - 1] == '(') {
+            var j = i
+            while (j < end && !src[j].isWhitespace() && src[j] != ')' && src[j] != ']') j++
+            val word = src.substring(i, j).trimEnd('.', ',', ';', ':', '"', '\'')
+            val linked = ChatLinks.target(word)
+            if (linked != null && word.length >= 3 && (word.contains('/') || word.contains('.'))) {
+                flush()
+                out += MdInline.Link(listOf(MdInline.Text(word)), linked)
+                i += word.length
                 continue
             }
         }

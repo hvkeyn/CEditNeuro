@@ -46,6 +46,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.LinearProgressIndicator
@@ -111,6 +112,7 @@ fun ChatPanel(
     onListSkills: () -> List<SkillEntry>,
     modifier: Modifier = Modifier,
     onToggleSkill: (SkillEntry) -> Unit = {},
+    onOpenLink: (String) -> Unit = {},
 ) {
     var input by rememberSaveable { mutableStateOf("") }
     var attachments by remember { mutableStateOf<List<Uri>>(emptyList()) }
@@ -135,8 +137,14 @@ fun ChatPanel(
                 listening = false
                 voiceNote = null
                 input = ""
-                if (!state.agentRunning && state.projectRoot != null) onSend(heard, emptyList())
-                else input = heard
+                if (!state.online) {
+                    input = heard
+                    voiceNote = "No connection. The agent cannot work."
+                } else if (!state.agentRunning && state.projectRoot != null) {
+                    onSend(heard, emptyList())
+                } else {
+                    input = heard
+                }
             },
             onNote = { note ->
                 if (note == null || note != "Listening…") listening = false
@@ -220,7 +228,9 @@ fun ChatPanel(
                         if (state.chat.isEmpty()) {
                             item { ChatHint() }
                         }
-                        items(state.chat, key = { it.id }) { entry -> ChatBubble(entry) }
+                        items(state.chat, key = { it.id }) { entry ->
+                            ChatBubble(entry, state.projectRoot, onOpenLink)
+                        }
                     }
                     if (state.chat.size > 1) {
                         ChatScrubber(
@@ -321,6 +331,26 @@ fun ChatPanel(
                     style = MaterialTheme.typography.labelSmall,
                     maxLines = 2,
                 )
+            }
+            if (!state.online) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Filled.WifiOff,
+                        contentDescription = "No signal",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Text(
+                        text = " No connection. The agent cannot work.",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
             }
             val buttonSize = if (compact) 32.dp else 40.dp
             CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides buttonSize) {
@@ -434,6 +464,17 @@ private fun ComposerActions(
         enabled = state.projectRoot != null,
         onClick = onMic,
     )
+    if (!state.online) {
+        RoundAction(
+            icon = Icons.Filled.WifiOff,
+            description = "No connection",
+            filled = false,
+            size = buttonSize,
+            enabled = false,
+            onClick = {},
+        )
+        return
+    }
     val hasDraft = input.isNotBlank() || attachments.isNotEmpty()
     if (!hasDraft && state.chat.isNotEmpty()) {
         RoundAction(
@@ -830,7 +871,7 @@ private fun ChatHint() {
 }
 
 @Composable
-private fun ChatBubble(entry: ChatEntry) {
+private fun ChatBubble(entry: ChatEntry, projectRoot: String?, onOpen: (String) -> Unit) {
     when (entry.role) {
         ChatRole.Reasoning -> ThinkingBlock(entry)
         ChatRole.User -> MessageBlock(
@@ -847,6 +888,8 @@ private fun ChatBubble(entry: ChatEntry) {
             background = MaterialTheme.colorScheme.surface,
             alignEnd = false,
             markdown = true,
+            projectRoot = projectRoot,
+            onOpen = onOpen,
         )
         ChatRole.Tool -> ToolBlock(entry.toolName ?: "Tool", entry.text, error = false)
         ChatRole.Error -> if (entry.toolName != null) {
@@ -929,6 +972,8 @@ private fun MessageBlock(
     background: Color,
     alignEnd: Boolean,
     markdown: Boolean = false,
+    projectRoot: String? = null,
+    onOpen: (String) -> Unit = {},
 ) {
     val bubble = Modifier
         .padding(top = 2.dp)
@@ -947,6 +992,8 @@ private fun MessageBlock(
                     text = text,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = bubble,
+                    projectRoot = projectRoot,
+                    onOpen = onOpen,
                 )
             } else {
                 Text(

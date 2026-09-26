@@ -82,7 +82,10 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hvkeyn.ceditneuro.data.ReaderNote
+import com.hvkeyn.ceditneuro.reader.BookText
+import com.hvkeyn.ceditneuro.reader.PagePiece
 import com.hvkeyn.ceditneuro.ui.ReaderView
+import com.hvkeyn.ceditneuro.ui.editor.MarkupPreview
 import kotlin.math.min
 
 private data class Paper(val background: Color, val ink: Color, val muted: Color)
@@ -269,37 +272,14 @@ fun ReaderPane(
                 aloud.stop()
                 return@LaunchedEffect
             }
-            aloud.speak(shown.joinToString("\n")) {
+            aloud.speak(shown.joinToString("\n").replace(Regex("\u0001[^\u0001]*\u0001"), " ")) {
                 if (page + columns <= count - 1) page += columns else speaking = false
             }
         }
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = side, vertical = 8.dp)) {
             Row(modifier = Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 for (column in shown) {
-                    val imageId = Regex("^\u0001(.+)\u0001$").find(column)?.groupValues?.get(1)
-                    val bitmap = imageId?.let { id ->
-                        androidx.compose.runtime.remember(id, images[id]) {
-                            images[id]?.let { bytes ->
-                                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                            }
-                        }
-                    }
-                    if (bitmap != null) {
-                        ZoomableImage(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                            Image(
-                                bitmap = bitmap.asImageBitmap(),
-                                contentDescription = imageId,
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        }
-                    } else {
-                        Text(
-                            text = column,
-                            style = style,
-                            modifier = Modifier.weight(1f).fillMaxHeight(),
-                        )
-                    }
+                    ReaderColumn(column, images, style, Modifier.weight(1f).fillMaxHeight())
                 }
             }
             Box(
@@ -837,4 +817,75 @@ private fun paginate(
         chapters.add(chapter)
     }
     return Spread(ranges, chapters)
+}
+
+@Composable
+private fun ReaderColumn(
+    column: String,
+    images: Map<String, ByteArray>,
+    style: TextStyle,
+    modifier: Modifier,
+) {
+    val pieces = remember(column) { BookText.pagePieces(column) }
+    val only = pieces.singleOrNull()
+    if (only is PagePiece.Figure) {
+        FigureBlock(only.id, images, modifier, fill = true)
+        return
+    }
+    if (pieces.all { it is PagePiece.Words }) {
+        Text(text = column, style = style, modifier = modifier)
+        return
+    }
+    Column(modifier.verticalScroll(rememberScrollState())) {
+        for (piece in pieces) {
+            when (piece) {
+                is PagePiece.Words -> Text(
+                    text = piece.text,
+                    style = style,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                )
+                is PagePiece.Figure -> FigureBlock(
+                    piece.id,
+                    images,
+                    Modifier.fillMaxWidth().height(240.dp),
+                    fill = false,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FigureBlock(
+    id: String,
+    images: Map<String, ByteArray>,
+    modifier: Modifier,
+    fill: Boolean,
+) {
+    val bytes = images[id] ?: return
+    if (BookText.isSvgBytes(bytes)) {
+        val text = remember(id, bytes) { bytes.toString(Charsets.UTF_8) }
+        Box(if (fill) modifier else Modifier.fillMaxWidth().height(240.dp)) {
+            MarkupPreview("svg", text, null, Modifier.fillMaxSize())
+        }
+        return
+    }
+    val bitmap = remember(id, bytes) { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) } ?: return
+    if (fill) {
+        ZoomableImage(modifier = modifier) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = id,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    } else {
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = id,
+            contentScale = ContentScale.Fit,
+            modifier = modifier,
+        )
+    }
 }

@@ -1,7 +1,14 @@
 package com.hvkeyn.ceditneuro.ui
 
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.Uri
+import android.webkit.MimeTypeMap
+import androidx.core.content.FileProvider
 import com.hvkeyn.ceditneuro.CEditNeuroApp
 import com.hvkeyn.ceditneuro.agent.AgentNotifications
 import com.hvkeyn.ceditneuro.agent.AgentStatus
@@ -216,6 +223,8 @@ data class WorkspaceUiState(
     val shellElevated: Boolean = false,
     /** Skills switched on for this chat, as "scope:name". Their text goes into every run's setup. */
     val activeSkills: List<String> = emptyList(),
+    /** False when this phone has no validated network, or the last agent call could not resolve a host. */
+    val online: Boolean = true,
     val agentRunning: Boolean = false,
     val agentActivity: AgentActivity? = null,
     val message: String? = null,
@@ -338,8 +347,12 @@ class WorkspaceViewModel(
     private var updateChecked = false
     private var updateJob: Job? = null
     private val activityJson = Json { ignoreUnknownKeys = true }
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var networkWasUp = false
+    private var linkDown = false
 
     init {
+        watchNetwork()
         settingsStore.afterChange = { scheduleProfile() }
         library.afterChange = { scheduleProfile() }
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
@@ -614,6 +627,7 @@ class WorkspaceViewModel(
             execPrompt = previous.execPrompt,
             hostPrompt = previous.hostPrompt,
             otherRuns = runStatuses(project),
+            online = previous.online,
         )
         project.ui = projectSlice(_state.value)
         openPages = emptyList()
@@ -1024,7 +1038,7 @@ class WorkspaceViewModel(
         if (!com.hvkeyn.ceditneuro.reader.BookText.supports(name)) {
             error("Read supports txt, Markdown, HTML, FB2, EPUB, and a zip of those files.")
         }
-        val book = com.hvkeyn.ceditneuro.reader.BookText.parse(name, file.readBytes())
+        val book = com.hvkeyn.ceditneuro.reader.BookText.parse(name, file.readBytes(), file.parentFile)
         val saved = readerStore.read(file.absolutePath)
         val font = saved.fontSp.coerceIn(15, 28)
         sourceText = book.chapters.joinToString("\n") { "\u0000${it.title}\n${it.text}" }
@@ -1042,7 +1056,7 @@ class WorkspaceViewModel(
     private fun reflow(path: String, font: Int, theme: String, fraction: Float) {
         val ws = workspace ?: return
         val file = ws.resolve(path)
-        val book = com.hvkeyn.ceditneuro.reader.BookText.parse(file.name, file.readBytes())
+        val book = com.hvkeyn.ceditneuro.reader.BookText.parse(file.name, file.readBytes(), file.parentFile)
         openPages = com.hvkeyn.ceditneuro.reader.BookText.pages(book, charsFor(font))
         openBookKey = file.absolutePath
         val page = (fraction * openPages.size).toInt().coerceIn(0, openPages.lastIndex.coerceAtLeast(0))
@@ -1651,6 +1665,10 @@ class WorkspaceViewModel(
         fromPeer: Boolean = false,
     ) {
         if (prompt.isBlank() || project.agentJob?.isActive == true) return
+        if (!_state.value.online) {
+            showMessage("No connection. The agent cannot work.")
+            return
+        }
 
         appendChat(project, ChatRole.User, prompt)
         val skillsOn = (if (current === project) _state.value else project.ui).activeSkills
@@ -1711,6 +1729,7 @@ class WorkspaceViewModel(
                     val message = error.message?.lineSequence()?.firstOrNull { it.isNotBlank() }?.take(180)
                         ?: "The agent stopped."
                     appendChat(project, ChatRole.Error, message)
+                    if (com.hvkeyn.ceditneuro.ui.chat.ChatLinks.looksOffline(message)) noteLinkDown()
                     project.runOutcome = message
                 }
             }
@@ -3027,7 +3046,92 @@ class WorkspaceViewModel(
         return runCatching { file.readText(Charsets.UTF_8).trim().take(6_000) }.getOrDefault("")
     }
 
+    /** Opens the book, document, or page a chat link points at. */
+    fun openChatLink(raw: String) {
+        val target = com.hvkeyn.ceditneuro.ui.chat.ChatLinks.target(raw) ?: return
+        if (com.hvkeyn.ceditneuro.ui.chat.ChatLinks.isWeb(target)) {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(target)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            runCatching { appContext.startActivity(intent) }
+                .onFailure { showMessage("No app on this phone can open that link.") }
+            return
+        }
+        val ws = workspace ?: run {
+            showMessage("Open a project folder first.")
+            return
+        }
+        val file = runCatching { ws.resolve(target) }.getOrElse {
+            showMessage("That file is not in this project.")
+            return
+        }
+        if (!file.isFile) {
+            showMessage("That file is not in this project.")
+            return
+        }
+        val path = ws.relativize(file)
+        val name = file.name
+        when {
+            com.hvkeyn.ceditneuro.reader.BookText.supports(name) -> openReader(path)
+            name.endsWith(".pdf", ignoreCase = true) -> showExternal(file)
+            else -> {
+                _state.update { it.copy(chatVisible = false, readerInFront = false) }
+                openFile(path)
+            }
+        }
+    }
+
+    private fun showExternal(file: java.io.File) {
+        val uri = runCatching {
+            FileProvider.getUriForFile(appContext, appContext.packageName + ".files", file)
+        }.getOrElse {
+            showMessage("That file cannot be opened from here.")
+            return
+        }
+        val type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.extension.lowercase()) ?: "*/*"
+        val intent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, type)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { appContext.startActivity(intent) }
+            .onFailure { showMessage("No app on this phone can open that file.") }
+    }
+
+    private fun watchNetwork() {
+        val manager = appContext.getSystemService(ConnectivityManager::class.java) ?: return
+        fun publish() {
+            val up = networkIsUp(manager)
+            if (up != networkWasUp) {
+                networkWasUp = up
+                if (up) linkDown = false
+            }
+            val online = up && !linkDown
+            if (_state.value.online != online) _state.update { it.copy(online = online) }
+        }
+        networkWasUp = networkIsUp(manager)
+        publish()
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) = publish()
+            override fun onLost(network: Network) = publish()
+            override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) = publish()
+        }
+        networkCallback = callback
+        runCatching { manager.registerDefaultNetworkCallback(callback) }
+    }
+
+    private fun noteLinkDown() {
+        linkDown = true
+        if (_state.value.online) _state.update { it.copy(online = false) }
+    }
+
+    private fun networkIsUp(manager: ConnectivityManager): Boolean {
+        val network = manager.activeNetwork ?: return false
+        val caps = manager.getNetworkCapabilities(network) ?: return false
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }
+
     override fun onCleared() {
+        networkCallback?.let { callback ->
+            val manager = appContext.getSystemService(ConnectivityManager::class.java)
+            runCatching { manager?.unregisterNetworkCallback(callback) }
+        }
         current?.let { project -> project.ui = projectSlice(_state.value) }
         projects.values.forEach { project ->
             project.persistJob?.cancel()
