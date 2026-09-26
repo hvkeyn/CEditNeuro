@@ -80,6 +80,7 @@ object ToolGroups {
         "research_log",
         "research_report",
         "research_figure",
+        "research_plot",
         "calculate",
         "reference",
     ),

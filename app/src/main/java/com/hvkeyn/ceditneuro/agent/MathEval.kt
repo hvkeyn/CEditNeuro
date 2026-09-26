@@ -6,7 +6,7 @@ import kotlin.math.PI
 /** A small calculator, so a study number comes from arithmetic instead of the model's guess. */
 object MathEval {
     fun eval(expression: String): Double {
-        val parser = Parser(expression.replace(',', '.'))
+        val parser = Parser(expression)
         val value = parser.expression()
         parser.skip()
         if (!parser.done()) throw IllegalArgumentException("Unexpected '${parser.rest()}'.")
@@ -22,6 +22,15 @@ object MathEval {
 
     private class Parser(val text: String) {
         var at = 0
+
+        /** Inside function arguments a comma separates values; outside, 3,5 is a decimal comma. */
+        var argDepth = 0
+
+        fun decimalMark(index: Int): Boolean {
+            val c = text.getOrNull(index) ?: return false
+            if (c == '.') return true
+            return c == ',' && argDepth == 0 && text.getOrNull(index + 1)?.isDigit() == true
+        }
 
         fun done() = at >= text.length
         fun rest() = text.substring(at).take(20)
@@ -82,7 +91,7 @@ object MathEval {
             }
             val start = at
             if (at < text.length && (text[at].isDigit() || text[at] == '.')) {
-                while (at < text.length && (text[at].isDigit() || text[at] == '.')) at++
+                while (at < text.length && (text[at].isDigit() || decimalMark(at))) at++
                 if (at < text.length && (text[at] == 'e' || text[at] == 'E')) {
                     val mark = at
                     at++
@@ -93,8 +102,9 @@ object MathEval {
                         at = mark
                     }
                 }
-                return text.substring(start, at).toDoubleOrNull()
-                    ?: throw IllegalArgumentException("Bad number '${text.substring(start, at)}'.")
+                val literal = text.substring(start, at).replace(',', '.')
+                return literal.toDoubleOrNull()
+                    ?: throw IllegalArgumentException("Bad number '$literal'.")
             }
             while (at < text.length && (text[at].isLetter() || text[at] == '_')) at++
             val name = text.substring(start, at).lowercase()
@@ -104,8 +114,10 @@ object MathEval {
                 "e" -> return E
             }
             if (!eat('(')) throw IllegalArgumentException("Unknown name '$name'.")
+            argDepth++
             val args = mutableListOf(expression())
             while (eat(',') || eat(';')) args += expression()
+            argDepth--
             if (!eat(')')) throw IllegalArgumentException("Missing ')' after $name.")
             val x = args[0]
             return when (name) {
@@ -129,6 +141,21 @@ object MathEval {
                 "max" -> args.max()
                 "deg" -> Math.toDegrees(x)
                 "rad" -> Math.toRadians(x)
+                "sum" -> args.sum()
+                "mean", "avg" -> args.average()
+                "median" -> args.sorted().let { s ->
+                    if (s.size % 2 == 1) s[s.size / 2] else (s[s.size / 2 - 1] + s[s.size / 2]) / 2
+                }
+                "stdev", "sd" -> {
+                    if (args.size < 2) throw IllegalArgumentException("stdev needs at least 2 values.")
+                    val mean = args.average()
+                    Math.sqrt(args.sumOf { (it - mean) * (it - mean) } / (args.size - 1))
+                }
+                "hypot" -> Math.sqrt(args.sumOf { it * it })
+                "pct" -> {
+                    if (args.size != 2) throw IllegalArgumentException("pct(old, new) needs two values.")
+                    (args[1] - args[0]) / args[0] * 100
+                }
                 else -> throw IllegalArgumentException("Unknown function '$name'.")
             }
         }

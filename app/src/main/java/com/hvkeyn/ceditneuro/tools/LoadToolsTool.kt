@@ -12,7 +12,7 @@ class LoadToolsTool(private val session: ToolSession) : Tool {
             "device_status, list_apps, open_settings, clipboard, open_file. " +
             "remote: remote_connect, remote_list, remote_read, remote_write, remote_put, remote_get, ssh_exec, browse_page. " +
             "desk: notifications, mail_list, mail_read, mail_send. " +
-            "study: research_log, research_report, research_figure, calculate, reference."
+            "study: research_log, research_report, research_figure, research_plot, calculate, reference."
     override val parameters = objectSchema(
         properties = mapOf(
             "group" to stringProp("One of: build, device, remote, desk, study."),

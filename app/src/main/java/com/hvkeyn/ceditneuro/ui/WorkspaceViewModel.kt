@@ -145,6 +145,8 @@ data class ShellLine(
     val command: String,
     val output: String,
     val running: Boolean = false,
+    /** Ran as root or the Shizuku shell user instead of this app. */
+    val elevated: Boolean = false,
 )
 
 data class FileClipboard(
@@ -194,6 +196,7 @@ data class WorkspaceUiState(
     val shellVisible: Boolean = false,
     val shellRunning: Boolean = false,
     val shellLines: List<ShellLine> = emptyList(),
+    val shellElevated: Boolean = false,
     val agentRunning: Boolean = false,
     val agentActivity: AgentActivity? = null,
     val message: String? = null,
@@ -209,6 +212,8 @@ data class WorkspaceUiState(
     val linkClients: Int = 0,
     val linkActive: Int = 0,
     val linkSpeed: Int = 0,
+    /** lead waits on this phone's code, follow joined another code, empty when the link is off. */
+    val linkRole: String = "",
     val webVisible: Boolean = false,
     /** True while the running agent is waiting on the in-app browser. */
     val agentBrowsing: Boolean = false,
@@ -1263,39 +1268,90 @@ class WorkspaceViewModel(
         }
         val trimmed = command.trim()
         if (trimmed.isEmpty() || project.ui.shellRunning) return
+        val elevated = project.ui.shellElevated
         val id = nextId(project)
+        shellStopped = false
         editProject(project) {
             it.copy(
                 shellVisible = true,
                 shellRunning = true,
-                shellLines = it.shellLines + ShellLine(id, trimmed, "", running = true),
+                shellLines = it.shellLines + ShellLine(id, trimmed, "", running = true, elevated = elevated),
             )
         }
         schedulePersist(project)
+        val showLive: (String) -> Unit = { partial ->
+            viewModelScope.launch(Dispatchers.Main) {
+                editProject(project) { shown ->
+                shown.copy(
+                    shellLines = shown.shellLines.map { line ->
+                        if (line.id == id && line.running) line.copy(output = partial) else line
+                    },
+                )
+                }
+            }
+        }
         viewModelScope.launch {
             val rendered = runCatching {
-                if (ProgramRun.needsConsent(trimmed) && !ensureExecAllowed(
+                when {
+                    elevated -> {
+                        val blocked = prepareShizuku()
+                        if (blocked != null) {
+                            "exit=1\nRoot and Shizuku are not available. Turn off Root in the shell bar."
+                        } else {
+                            shizukuShell.exec(trimmed, project.workspace.root.path, 120)
+                        }
+                    }
+                    ProgramRun.needsConsent(trimmed) && !ensureExecAllowed(
                         "The command runs a program outside the system shell.",
-                    )
-                ) {
-                    "exit=1\nRunning installed programs is not allowed. Turn it on in Settings to run compilers."
-                } else {
-                    withContext(Dispatchers.IO) {
-                        deviceShell.run(trimmed, project.workspace.root, timeoutSeconds = 120).render()
+                    ) -> "exit=1\nRunning installed programs is not allowed. Turn it on in Settings to run compilers."
+                    else -> withContext(Dispatchers.IO) {
+                        deviceShell.run(
+                            trimmed,
+                            project.workspace.root,
+                            timeoutSeconds = 900,
+                            onProcess = { shellProcess = it },
+                            onOutput = showLive,
+                        ).render()
                     }
                 }
             }.getOrElse { error -> "exit=1\n${error.message}" }
+            shellProcess = null
+            val final = if (shellStopped) "$rendered\nStopped." else rendered
             editProject(project) { shown ->
                 shown.copy(
                     shellRunning = false,
                     shellLines = shown.shellLines.map { line ->
-                        if (line.id == id) line.copy(output = rendered, running = false) else line
+                        if (line.id == id) line.copy(output = final, running = false) else line
                     },
                 )
             }
             refreshProjectTree(project)
             persistNow(project)
         }
+    }
+
+    @Volatile
+    private var shellProcess: Process? = null
+
+    @Volatile
+    private var shellStopped = false
+
+    fun stopShellCommand() {
+        val process = shellProcess ?: return
+        shellStopped = true
+        runCatching { process.destroyForcibly() }
+    }
+
+    fun clearShell() {
+        val project = current ?: return
+        if (project.ui.shellRunning) return
+        editProject(project) { it.copy(shellLines = emptyList()) }
+        persistNow(project)
+    }
+
+    fun toggleShellElevated() {
+        val project = current ?: return
+        editProject(project) { it.copy(shellElevated = !it.shellElevated) }
     }
 
     fun dismissMessage() {
@@ -1413,22 +1469,41 @@ class WorkspaceViewModel(
     }
 
     fun disconnectLink() {
+        val wasOn = beaconRole.isNotEmpty() && _state.value.linkClients > 1
         com.hvkeyn.ceditneuro.net.LinkService.stop(appContext)
         beacon.leave()
         beaconRole = ""
         seenPeers.clear()
-        current?.let { project ->
-            appendChat(project, ChatRole.Tool, "Link closed. The lead and the other phones are told this phone left.", "link")
+        if (wasOn) {
+            current?.let { project ->
+                appendChat(project, ChatRole.Tool, "Link closed. The lead and the other phones are told this phone left.", "link")
+            }
         }
         _state.update {
             it.copy(
-                linkNote = "Disconnected.",
+                linkNote = "Link is off. Tap Wait to use your code again, or enter another code and Join.",
                 linkActive = 0,
                 linkClients = 0,
                 linkPeer = "",
                 linkDirect = false,
+                linkRole = "",
+                linkSpeed = 0,
             )
         }
+    }
+
+    fun waitOnOwnCode() {
+        val code = _state.value.shareOffer ?: return createShare()
+        seenPeers.clear()
+        _state.update {
+            it.copy(
+                linkNote = "This code stays yours. The other phone enters it and presses Join.",
+                linkPeer = "",
+                linkActive = 0,
+                linkClients = 0,
+            )
+        }
+        openBeacon(code, lead = true)
     }
 
     fun dismissShare() {
@@ -2183,6 +2258,7 @@ class WorkspaceViewModel(
             "research_log" -> "Logging a check"
             "research_report" -> "Writing the report"
             "research_figure" -> "Drawing a figure"
+            "research_plot" -> "Drawing a chart"
             "calculate" -> "Calculating"
             "reference" -> "Checking a reference"
             "device_status" -> "Checking the phone"
@@ -2238,6 +2314,7 @@ class WorkspaceViewModel(
 
     private fun openBeacon(code: String, lead: Boolean) {
         beaconRole = if (lead) "lead" else "follow"
+        _state.update { it.copy(linkRole = beaconRole) }
         com.hvkeyn.ceditneuro.net.LinkService.start(appContext, code, "Waiting for the other phone.")
         val device = android.os.Build.MODEL.replace(Regex("[^A-Za-z0-9]"), "").ifBlank { "phone" }
         beacon.start(code, device, onReady = {
@@ -2676,6 +2753,7 @@ class WorkspaceViewModel(
             ResearchLogTool(ws),
             ResearchReportTool(ws),
             ResearchFigureTool(ws),
+            com.hvkeyn.ceditneuro.tools.ResearchPlotTool(ws),
             com.hvkeyn.ceditneuro.tools.CalculateTool(),
             com.hvkeyn.ceditneuro.tools.ReferenceTool(agentNet) { settingsStore.current.networkEnabled },
             com.hvkeyn.ceditneuro.tools.DeviceStatusTool(appContext),

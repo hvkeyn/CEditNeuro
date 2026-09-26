@@ -47,6 +47,11 @@ layer is wired end to end.
 | Phone tools: `device_status` (battery, storage, Shizuku or root), `list_apps`, `open_settings`, `clipboard`, `open_file` | done |
 | Find in book, local and without the model | done |
 | A read-only call is not repeated in a run until something changes | done |
+| Shell: live output, Stop, command history, Copy, and a Root switch (root or Shizuku shell user) | done |
+| Reader: read aloud with the phone's speech engine, swipe and volume-key paging, notes from every page | done |
+| Link dialog shows Off, Waiting, or Linked, and can wait on your code again | done |
+| Chat bar: work focus and skills in one tap; `research_plot` draws a chart from numbers; `calculate` has sum, mean, median, stdev | done |
+| Starter phone skills `android-debug` and `book-notes`; a deleted starter skill stays deleted | done |
 | `install_jdk`, `install_android_sdk`, `install_runtime` from the Termux mirror | done |
 | Zed-style per-edit Accept/Reject diffs | not yet — edits apply immediately |
 

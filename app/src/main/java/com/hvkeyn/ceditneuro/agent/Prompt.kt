@@ -49,7 +49,7 @@ fun buildSystemPrompt(): String = """
     - device: install_apk, uninstall_apk, net_info, shizuku_exec, fetch_system_layout, execute_system_action, device_status, list_apps, open_settings, clipboard, open_file
     - remote: remote_connect, remote_list, remote_read, remote_write, remote_put, remote_get, remote_mkdir, remote_delete, remote_rename, ssh_exec, space_sync, browse_page
     - desk: notifications, notification_reply, notification_dismiss, mail_list, mail_read, mail_send
-    - study: research_log, research_report, research_figure, calculate, reference
+    - study: research_log, research_report, research_figure, research_plot, calculate, reference
     The environment message says when a group is already loaded.
     fetch_system_layout returns tap=X,Y at the center of each row. execute_system_action takes that X and Y.
 """.trimIndent()
