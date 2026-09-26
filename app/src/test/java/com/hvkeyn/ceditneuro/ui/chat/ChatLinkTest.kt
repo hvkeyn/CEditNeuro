@@ -41,6 +41,31 @@ class ChatLinkTest {
     }
 
     @Test
+    fun bareNameFindsANestedScheme() {
+        val root = File(System.getProperty("java.io.tmpdir"), "cedit-nest-" + System.nanoTime())
+        val folder = File(root, "notes")
+        folder.mkdirs()
+        File(folder, "scheme.svg").writeText("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"10\" height=\"6\"></svg>")
+        val found = ChatLinks.file(root.path, "scheme.svg")
+        assertEquals(File(folder, "scheme.svg").canonicalFile, found!!.canonicalFile)
+        root.deleteRecursively()
+    }
+
+    @Test
+    fun backtickNameBecomesAFigureInTheBook() {
+        val root = File(System.getProperty("java.io.tmpdir"), "cedit-tick-" + System.nanoTime())
+        root.mkdirs()
+        File(root, "scheme.svg").writeText("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"10\"></svg>")
+        val book = BookText.parse("notes.md", "Walk the scheme `scheme.svg` next.".toByteArray(), root)
+        assertEquals(1, book.images.size)
+        val text = book.chapters.joinToString { it.text }
+        assertTrue(text.contains("Walk the scheme"))
+        assertTrue(text.contains("next"))
+        assertTrue(BookText.pagePieces(text).any { it is PagePiece.Figure })
+        root.deleteRecursively()
+    }
+
+    @Test
     fun markdownKeepsAnSvgFigure() {
         val root = File(System.getProperty("java.io.tmpdir"), "cedit-book-" + System.nanoTime())
         root.mkdirs()

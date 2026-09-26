@@ -2,6 +2,7 @@ package com.hvkeyn.ceditneuro.ui.editor
 
 import android.annotation.SuppressLint
 import android.graphics.BitmapFactory
+import android.util.Base64
 import android.webkit.WebView
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -38,10 +39,18 @@ fun previewKind(path: String): String? = when (path.substringAfterLast('.', "").
     else -> null
 }
 
-/** Wraps markup so a scheme fits the pane width and keeps its colors on a white page. */
+/** Height divided by width, so a scheme can use the full pane width without cropping. */
+internal fun svgAspect(markup: String): Float {
+    val width = Regex("""\bwidth\s*=\s*"([\d.]+)""").find(markup)?.groupValues?.get(1)?.toFloatOrNull()
+    val height = Regex("""\bheight\s*=\s*"([\d.]+)""").find(markup)?.groupValues?.get(1)?.toFloatOrNull()
+    if (width == null || height == null || width < 1f) return 0.62f
+    return (height / width).coerceIn(0.28f, 1.7f)
+}
+
+/** Wraps markup so a scheme fills the frame and keeps its colors on a white page. */
 internal fun previewPage(kind: String, text: String): String = when (kind) {
     "svg" -> "<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">" +
-        "<style>html,body{margin:0;background:#fff}svg{display:block;max-width:100%;height:auto;margin:auto}</style>" +
+        "<style>html,body{margin:0;background:#fff}svg{display:block;width:100%;height:auto}</style>" +
         "</head><body>$text</body></html>"
     else -> text
 }
@@ -107,15 +116,21 @@ fun MarkupPreview(kind: String, text: String, baseDir: File?, modifier: Modifier
                 settings.builtInZoomControls = true
                 settings.displayZoomControls = false
                 settings.useWideViewPort = true
-                settings.loadWithOverviewMode = true
+                settings.loadWithOverviewMode = false
                 setBackgroundColor(android.graphics.Color.WHITE)
             }
         },
         update = { view ->
             if (view.tag != page) {
                 view.tag = page
-                val base = baseDir?.let { "file://" + it.absolutePath + "/" }
-                view.loadDataWithBaseURL(base, page, "text/html", "utf-8", null)
+                if (kind == "svg") {
+                    // Base64 keeps url(#marker) arrows intact. A plain load treats '#' as a fragment.
+                    val encoded = Base64.encodeToString(page.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+                    view.loadData(encoded, "text/html", "base64")
+                } else {
+                    val base = baseDir?.let { "file://" + it.absolutePath + "/" }
+                    view.loadDataWithBaseURL(base, page, "text/html", "utf-8", null)
+                }
             }
         },
     )

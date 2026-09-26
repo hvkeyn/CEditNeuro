@@ -36,7 +36,8 @@ class RunAndPreviewTest {
         assertNull(previewKind("main.kt"))
         val page = previewPage("svg", "<svg></svg>")
         assertTrue(page.contains("<svg></svg>"))
-        assertTrue(page.contains("max-width:100%"))
+        assertTrue(page.contains("width:100%"))
+        assertTrue(page.contains("height:auto"))
     }
 
     @Test

@@ -986,7 +986,7 @@ private fun MessageBlock(
         horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start,
     ) {
         Text(text = label, style = MaterialTheme.typography.labelSmall, color = labelColor)
-        Copyable(text) {
+        Copyable(text, selectable = !markdown) {
             if (markdown) {
                 MarkdownText(
                     text = text,
@@ -1008,12 +1008,12 @@ private fun MessageBlock(
 }
 
 @Composable
-private fun Copyable(text: String, content: @Composable () -> Unit) {
+private fun Copyable(text: String, selectable: Boolean = true, content: @Composable () -> Unit) {
     Column {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             CopyLabel(text)
         }
-        SelectionContainer { content() }
+        if (selectable) SelectionContainer { content() } else content()
     }
 }
 

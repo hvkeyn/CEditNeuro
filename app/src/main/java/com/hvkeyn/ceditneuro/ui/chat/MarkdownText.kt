@@ -1,9 +1,9 @@
 package com.hvkeyn.ceditneuro.ui.chat
 
-import android.annotation.SuppressLint
-import android.webkit.WebView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -43,9 +44,9 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
-import androidx.compose.ui.viewinterop.AndroidView
 import com.hvkeyn.ceditneuro.reader.BookText
-import com.hvkeyn.ceditneuro.ui.editor.previewPage
+import com.hvkeyn.ceditneuro.ui.editor.MarkupPreview
+import com.hvkeyn.ceditneuro.ui.editor.svgAspect
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -68,7 +69,30 @@ fun MarkdownText(
     val codeBackground = MaterialTheme.colorScheme.background
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         for (block in blocks) {
-            when (block) {
+            val drawing = block is MdBlock.Scheme ||
+                (block is MdBlock.Code && isSvgMarkup(block.lang, block.text))
+            if (drawing) {
+                DrawBlock(block, color, linkColor, codeColor, codeBackground, projectRoot, onOpen)
+            } else {
+                SelectionContainer {
+                    DrawBlock(block, color, linkColor, codeColor, codeBackground, projectRoot, onOpen)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DrawBlock(
+    block: MdBlock,
+    color: Color,
+    linkColor: Color,
+    codeColor: Color,
+    codeBackground: Color,
+    projectRoot: String?,
+    onOpen: (String) -> Unit,
+) {
+    when (block) {
                 is MdBlock.Paragraph -> Text(
                     text = block.inlines.toAnnotated(color, linkColor, codeColor, codeBackground, onOpen),
                     style = MaterialTheme.typography.bodyMedium,
@@ -117,8 +141,6 @@ fun MarkdownText(
                 MdBlock.Rule -> HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 is MdBlock.Table -> TableBlock(block, color, linkColor, codeColor, codeBackground, onOpen)
             }
-        }
-    }
 }
 
 @Composable
@@ -147,32 +169,22 @@ private fun ListRow(
     }
 }
 
-@SuppressLint("SetJavaScriptEnabled")
 @Composable
 private fun SvgDrawing(markup: String) {
-    val page = remember(markup) { previewPage("svg", markup) }
-    AndroidView(
+    val aspect = remember(markup) { svgAspect(markup) }
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
-            .height(240.dp)
             .clip(RoundedCornerShape(8.dp)),
-        factory = { context ->
-            WebView(context).apply {
-                settings.javaScriptEnabled = false
-                settings.builtInZoomControls = true
-                settings.displayZoomControls = false
-                settings.useWideViewPort = true
-                settings.loadWithOverviewMode = true
-                setBackgroundColor(android.graphics.Color.WHITE)
-            }
-        },
-        update = { view ->
-            if (view.tag != page) {
-                view.tag = page
-                view.loadDataWithBaseURL(null, page, "text/html", "utf-8", null)
-            }
-        },
-    )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height((maxWidth * aspect).coerceIn(160.dp, 720.dp)),
+        ) {
+            MarkupPreview(kind = "svg", text = markup, baseDir = null, modifier = Modifier.fillMaxSize())
+        }
+    }
 }
 
 @Composable

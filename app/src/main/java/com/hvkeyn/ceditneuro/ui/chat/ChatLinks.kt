@@ -1,6 +1,7 @@
 package com.hvkeyn.ceditneuro.ui.chat
 
 import java.io.File
+import java.util.ArrayDeque
 
 /**
  * What a tap in the agent chat should open: a project file, a book, or a web page.
@@ -37,15 +38,43 @@ object ChatLinks {
     fun isSvgPath(target: String): Boolean =
         !isWeb(target) && target.substringBefore('?').substringBefore('#').endsWith(".svg", ignoreCase = true)
 
-    /** A file the chat can draw or open. Web pages stay in the browser. */
+    /**
+     * A file the chat can draw or open. A bare name such as `scheme.svg` is found
+     * anywhere under the project, because notes name the file without its folder.
+     */
     fun file(projectRoot: String?, raw: String): File? {
         val path = target(raw) ?: return null
         if (isWeb(path)) return null
-        val file = if (path.startsWith("/")) File(path) else {
-            val root = projectRoot?.takeIf { it.isNotBlank() } ?: return null
+        val root = projectRoot?.takeIf { it.isNotBlank() }?.let { File(it) }
+        val direct = if (path.startsWith("/")) File(path) else {
+            if (root == null) return null
             File(root, path)
         }
-        return file.takeIf { it.isFile }
+        if (direct.isFile) return direct
+        if (root == null || path.startsWith("/")) return null
+        return findNamed(root, File(path).name)
+    }
+
+    private fun findNamed(root: File, name: String): File? {
+        if (name.isBlank() || !root.isDirectory) return null
+        val queue = ArrayDeque<Pair<File, Int>>()
+        queue.add(root to 0)
+        var seen = 0
+        while (queue.isNotEmpty() && seen < 4_000) {
+            val (dir, depth) = queue.removeFirst()
+            val children = dir.listFiles() ?: continue
+            for (child in children) {
+                seen++
+                if (child.isFile && child.name.equals(name, ignoreCase = true)) return child
+            }
+            if (depth >= 8) continue
+            for (child in children) {
+                if (child.isDirectory && child.name != ".git" && child.name != "build") {
+                    queue.add(child to depth + 1)
+                }
+            }
+        }
+        return null
     }
 
     /** The agent host could not be reached, so another send would fail the same way. */

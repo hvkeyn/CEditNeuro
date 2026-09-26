@@ -3059,11 +3059,9 @@ class WorkspaceViewModel(
             showMessage("Open a project folder first.")
             return
         }
-        val file = runCatching { ws.resolve(target) }.getOrElse {
-            showMessage("That file is not in this project.")
-            return
-        }
-        if (!file.isFile) {
+        val file = com.hvkeyn.ceditneuro.ui.chat.ChatLinks.file(ws.root.absolutePath, target)
+            ?: runCatching { ws.resolve(target) }.getOrNull()?.takeIf { it.isFile }
+        if (file == null || !file.isFile) {
             showMessage("That file is not in this project.")
             return
         }

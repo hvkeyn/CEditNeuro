@@ -181,7 +181,26 @@ object BookText {
             val bytes = readFigure(baseDir, src) ?: return@replace match.value
             store(bytes).ifEmpty { match.value }
         }
+        body = mapOutsideFences(body) { part ->
+            Regex("`([^`\\s]+\\.(?i:svg|png|jpg|jpeg|webp|gif|bmp))`").replace(part) { match ->
+                val bytes = readFigure(baseDir, match.groupValues[1]) ?: return@replace match.value
+                store(bytes).ifEmpty { match.value }
+            }
+        }
         return body
+    }
+
+    private fun mapOutsideFences(text: String, block: (String) -> String): String {
+        val fences = Regex("(?s)```.*?```")
+        val out = StringBuilder()
+        var last = 0
+        for (match in fences.findAll(text)) {
+            out.append(block(text.substring(last, match.range.first)))
+            out.append(match.value)
+            last = match.range.last + 1
+        }
+        out.append(block(text.substring(last)))
+        return out.toString()
     }
 
     private fun readFigure(baseDir: java.io.File?, src: String): ByteArray? {
@@ -191,13 +210,32 @@ object BookText {
         val ext = clean.substringAfterLast('.', "").lowercase()
         if (ext !in FIGURE_EXT) return null
         val relative = clean.removePrefix("file://").removePrefix("./")
-        val file = if (relative.startsWith("/")) java.io.File(relative) else java.io.File(baseDir, relative)
+        val file = locateFigure(baseDir, relative) ?: return null
+        if (!file.isFile || file.length() !in 1..MAX_IMAGE) return null
+        return runCatching { file.readBytes() }.getOrNull()
+    }
+
+    /** The note's folder, the folder above it, or one subfolder. Bare names live beside the report. */
+    private fun locateFigure(baseDir: java.io.File, relative: String): java.io.File? {
+        val direct = if (relative.startsWith("/")) java.io.File(relative) else java.io.File(baseDir, relative)
+        val candidates = ArrayList<java.io.File>()
+        candidates.add(direct)
+        if (!relative.startsWith("/") && !relative.contains('/')) {
+            baseDir.parentFile?.let { candidates.add(java.io.File(it, relative)) }
+            baseDir.listFiles()?.forEach { child ->
+                if (child.isDirectory && !child.name.startsWith(".")) candidates.add(java.io.File(child, relative))
+            }
+        }
         val base = runCatching { baseDir.canonicalFile }.getOrNull() ?: return null
-        val target = runCatching { file.canonicalFile }.getOrNull() ?: return null
-        val basePath = base.path
-        if (target.path != basePath && !target.path.startsWith(basePath + java.io.File.separator)) return null
-        if (!target.isFile || target.length() !in 1..MAX_IMAGE) return null
-        return runCatching { target.readBytes() }.getOrNull()
+        val roots = listOfNotNull(base, base.parentFile)
+        for (candidate in candidates) {
+            val target = runCatching { candidate.canonicalFile }.getOrNull() ?: continue
+            val allowed = roots.any { root ->
+                target.path == root.path || target.path.startsWith(root.path + java.io.File.separator)
+            }
+            if (allowed && target.isFile) return target
+        }
+        return null
     }
 
     private fun htmlBook(
