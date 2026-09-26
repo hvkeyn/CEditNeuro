@@ -1,13 +1,19 @@
 package com.hvkeyn.ceditneuro.agent
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+
 /**
- * DeepSeek rejects a request when an assistant message carries `tool_calls` and the
- * following messages do not answer every `tool_call_id`. That hole shows up after a stop
- * mid-tool, a crashed run, or a history trim that slices a tool group, and then every
- * later message fails with HTTP 400.
+ * DeepSeek rejects a request in two shapes that both come back as HTTP 400.
+ * An assistant message with `tool_calls` must be followed by a result for every id.
+ * An assistant message with neither `content` nor `tool_calls` is also rejected, which
+ * is what a reasoning-only turn becomes. [seal] closes both holes so the next request
+ * can continue.
  *
- * [seal] closes those holes. Completed tool results stay. Missing ones become a short
- * interrupted result so the next request is valid and the model can continue.
+ * [failedCalls] and [shellOutcomes] remember a command, URL, or login that already
+ * failed. The loop refuses that same call instead of sending it again.
  */
 object ToolTranscript {
     private const val INTERRUPTED = "Interrupted before this tool returned a result."
@@ -73,9 +79,9 @@ object ToolTranscript {
                 index++
                 continue
             }
-            if (message.role == "assistant" && calls != null) {
-                val stripped = message.copy(toolCalls = null)
-                if (stripped.content != null || stripped.reasoningContent != null) result += stripped
+            if (message.role == "assistant") {
+                val repaired = repairAssistant(message.copy(toolCalls = calls?.takeIf { it.isNotEmpty() }))
+                if (repaired != null) result += repaired
             } else {
                 result += message
             }
@@ -83,6 +89,94 @@ object ToolTranscript {
         }
         return result
     }
+
+    /**
+     * Keys of tool calls whose latest result failed. A later success for the same
+     * command or URL drops the key, so a fixed run is allowed through.
+     */
+    fun failedCalls(messages: List<ChatMessage>): Set<String> {
+        val byId = HashMap<String, Set<String>>()
+        val state = LinkedHashMap<String, Boolean>()
+        for (message in messages) {
+            if (message.role == "assistant") {
+                message.toolCalls.orEmpty().forEach { call ->
+                    byId[call.id] = callKeys(call.function.name, call.function.arguments)
+                }
+            } else if (message.role == "tool") {
+                val keys = byId[message.toolCallId] ?: continue
+                val failed = isFailedToolResult(message.content.orEmpty())
+                keys.forEach { state[it] = failed }
+            }
+        }
+        return state.filterValues { it }.keys
+    }
+
+    /** Last outcome of each shell command, true when that last run failed. */
+    fun shellOutcomes(commands: List<Pair<String, String>>): Map<String, Boolean> {
+        val state = LinkedHashMap<String, Boolean>()
+        commands.forEach { (command, output) ->
+            val text = command.trim()
+            if (text.isEmpty()) return@forEach
+            state["run_command\n$text"] = isFailedToolResult(output)
+        }
+        return state
+    }
+
+    fun callKeys(name: String, arguments: String): Set<String> {
+        val exact = name + "\n" + arguments.trim()
+        val field = when (name) {
+            "run_command", "shizuku_exec" -> "command"
+            "http_request" -> "url"
+            else -> null
+        }
+        val value = field?.let { argumentValue(arguments, it) } ?: return setOf(exact)
+        val coarse = if (name == "http_request") urlIdentity(value) else value.trim()
+        if (coarse.isEmpty()) return setOf(exact)
+        return setOf(exact, "$name\n$coarse")
+    }
+
+    internal fun isFailedToolResult(text: String): Boolean {
+        val line = text.trim().lowercase()
+        if (line.isEmpty()) return false
+        return when {
+            line.startsWith("exit=") && !line.startsWith("exit=0") -> true
+            line.startsWith("exit=0") && ("do not repeat this login" in line || "do not retry this host" in line) -> true
+            line.startsWith("timed out") || line == "timeout" || line.startsWith("timeout\n") -> true
+            line.startsWith("read timed out") || line.startsWith("java.net.sockettimeoutexception") -> true
+            line.startsWith("chain validation") || line.startsWith("javax.net.ssl") -> true
+            line.startsWith("this url already timed out") || line.startsWith("this exact ") ||
+                line.startsWith("the certificate or proxy") -> true
+            "certificate chain was rejected" in line || "was already rejected" in line -> true
+            else -> false
+        }
+    }
+
+    private fun repairAssistant(message: ChatMessage): ChatMessage? {
+        if (!message.toolCalls.isNullOrEmpty()) return message
+        if (!message.content.isNullOrBlank()) {
+            return if (message.toolCalls == null) message else message.copy(toolCalls = null)
+        }
+        val fallback = message.reasoningContent
+            ?.lineSequence()
+            ?.map { it.trim() }
+            ?.lastOrNull { it.isNotEmpty() }
+            ?.take(180)
+            ?: return null
+        return message.copy(content = fallback, toolCalls = null)
+    }
+
+    private fun argumentValue(arguments: String, field: String): String? {
+        val objectValue = runCatching { json.parseToJsonElement(arguments.ifBlank { "{}" }) }.getOrNull() as? JsonObject
+            ?: return null
+        return (objectValue[field] as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }
+    }
+
+    private fun urlIdentity(url: String): String {
+        val noQuery = url.trim().substringBefore('?').trim()
+        return noQuery.trimEnd('/')
+    }
+
+    private val json = Json { ignoreUnknownKeys = true }
 
     private fun normalizeCalls(calls: List<ToolCall>): List<ToolCall> {
         val seen = HashSet<String>()

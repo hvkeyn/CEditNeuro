@@ -46,7 +46,15 @@ class AgentLoop(
         explicitNulls = false
     }
 
-    fun run(history: List<ChatMessage>, userRequest: String): Flow<AgentEvent> = flow {
+    fun run(
+        history: List<ChatMessage>,
+        userRequest: String,
+        shellOutcomes: Map<String, Boolean> = emptyMap(),
+    ): Flow<AgentEvent> = flow {
+        failedCalls += ToolTranscript.failedCalls(history)
+        shellOutcomes.forEach { (key, failed) ->
+            if (failed) failedCalls += key else failedCalls -= key
+        }
         val messages = mutableListOf<ChatMessage>()
         messages += ChatMessage.system(systemPrompt)
         if (setupPrompt.isNotBlank()) messages += ChatMessage.system(setupPrompt)
@@ -232,7 +240,8 @@ class AgentLoop(
 
         val rawArguments = call.function.arguments.ifBlank { "{}" }
         val signature = call.function.name + "\n" + rawArguments.trim()
-        if (signature in failedCalls) {
+        val keys = ToolTranscript.callKeys(call.function.name, rawArguments)
+        if (keys.any { it in failedCalls }) {
             return ToolResult.error(
                 "This exact ${call.function.name} call already failed. " +
                     "Change the path, the arguments, or the tool. Do not repeat it.",
@@ -241,7 +250,7 @@ class AgentLoop(
         val args = runCatching { json.parseToJsonElement(rawArguments) }.getOrNull() as? JsonObject
             ?: return ToolResult.error(
                 "Tool arguments must be a JSON object, got: ${rawArguments.take(200)}",
-            ).also { failedCalls += signature }
+            ).also { failedCalls += keys }
 
         val readOnly = call.function.name in READ_ONLY
         if (readOnly && signature in recentReads) {
@@ -254,7 +263,7 @@ class AgentLoop(
             .getOrElse { error ->
                 ToolResult.error("Tool '${call.function.name}' failed: ${error.message ?: error::class.java.simpleName}")
             }
-        if (result.isError) failedCalls += signature
+        if (result.isError) failedCalls += keys
         if (!readOnly) recentReads.clear() else if (!result.isError) recentReads += signature
         return result
     }

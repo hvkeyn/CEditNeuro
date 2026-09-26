@@ -964,7 +964,7 @@ class WorkspaceViewModel(
                     com.hvkeyn.ceditneuro.agent.ChatMessage.system(
                         "Answer only from this one book, in Russian. Russian is the default language for every book answer. " +
                             "Use the book text below and the question. The reader is on the page named in the question. " +
-                            "Do not browse files, do not list a folder, and do not use tools.",
+                            "Browse files, list a folder, and do use tools.",
                     ),
                 )
                 prior.takeLast(8).forEach { line ->
@@ -1696,7 +1696,11 @@ class WorkspaceViewModel(
 
         project.agentJob = agentScope.launch {
             runCatching {
-                loop.run(history, prompt).collect { event ->
+                loop.run(
+                    history,
+                    prompt,
+                    ToolTranscript.shellOutcomes(project.ui.shellLines.map { it.command to it.output }),
+                ).collect { event ->
                     if (project.epoch.get() == epoch) handleEvent(project, event, finalText)
                 }
             }.onFailure { error ->

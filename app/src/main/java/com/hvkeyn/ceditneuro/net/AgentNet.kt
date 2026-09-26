@@ -33,13 +33,34 @@ class AgentNet(
         if (host in rejectedHosts) {
             throw IOException("The certificate or proxy for $host was already rejected. Do not retry this host.")
         }
+        val key = urlKey(url)
+        if (key != null && key in timedOutUrls) {
+            throw IOException("This URL already timed out. Do not retry it.")
+        }
     }
 
+    private val timedOutUrls = HashSet<String>()
+
     private fun rememberHost(url: String, error: IOException) {
-        val text = error.message.orEmpty().lowercase()
-        val rejected = "chain validation" in text || "certpathvalidator" in text || "http 522" in text
-        if (!rejected) return
-        url.toHttpUrlOrNull()?.host?.lowercase()?.let { rejectedHosts += it }
+        val text = buildString {
+            var current: Throwable? = error
+            var hops = 0
+            while (current != null && hops < 6) {
+                append(' ')
+                append(current.message.orEmpty())
+                current = current.cause
+                hops++
+            }
+        }
+        when (blockReason(text)) {
+            "certificate" -> url.toHttpUrlOrNull()?.host?.lowercase()?.let { rejectedHosts += it }
+            "timeout" -> urlKey(url)?.let { timedOutUrls += it }
+        }
+    }
+
+    private fun urlKey(url: String): String? {
+        val parsed = url.toHttpUrlOrNull() ?: return null
+        return parsed.scheme + "://" + parsed.host.lowercase() + parsed.encodedPath.trimEnd('/')
     }
 
     private fun client(): OkHttpClient {
@@ -169,6 +190,19 @@ class AgentNet(
                 throw IOException("Only http and https URLs are allowed.")
             }
             return url
+        }
+
+        internal fun blockReason(detail: String): String? {
+            val line = detail.lowercase()
+            return when {
+                "chain validation" in line || "certpathvalidator" in line || "http 522" in line ||
+                    ("certificate" in line && ("reject" in line || "untrusted" in line || "trust anchor" in line)) ->
+                    "certificate"
+                "timed out" in line || "sockettimeout" in line || line.trim() == "timeout" ||
+                    line.trim().endsWith(": timeout") || " timeout" in line ->
+                    "timeout"
+                else -> null
+            }
         }
 
         fun parseHeaders(raw: String?): Map<String, String> {

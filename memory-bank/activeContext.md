@@ -1,6 +1,6 @@
 # Active context
 
-Current: v0.49.0 (on top of v0.48.0, ff5d6c9).
+Current: v0.50.0. Continue on the phone no longer dies with HTTP 400. The same run then issued a tool call, so the following request was accepted too. A command, URL, or login that already failed is refused before it is sent again.
 
 v0.49.0:
 - Editor Run: `.py` and `.sh` get a Run button above the code (`runCommandFor` / `runActiveFile` in WorkspaceViewModel). Output streams into the Shell panel; Stop kills it. Python is installed on first run through `InstallRuntimeTool`.
