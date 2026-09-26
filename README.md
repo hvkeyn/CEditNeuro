@@ -51,6 +51,10 @@ layer is wired end to end.
 | Reader: read aloud with the phone's speech engine, swipe and volume-key paging, notes from every page | done |
 | Link dialog shows Off, Waiting, or Linked, and can wait on your code again | done |
 | Chat bar: work focus and skills in one tap; `research_plot` draws a chart from numbers; `calculate` has sum, mean, median, stdev | done |
+| An open `.py` or `.sh` file runs from the editor; output streams into the shell and Stop ends it | done |
+| PNG, JPG, WebP, GIF, BMP, SVG, and HTML open as a preview, with a switch back to the text | done |
+| A ticked skill stays on for that chat (up to three) and the agent follows it on every run | done |
+| Reader tools are labelled icons: contents, find, listen, text, pen, layer, notes, and the book chat | done |
 | Starter phone skills `android-debug` and `book-notes`; a deleted starter skill stays deleted | done |
 | `install_jdk`, `install_android_sdk`, `install_runtime` from the Termux mirror | done |
 | Zed-style per-edit Accept/Reject diffs | not yet — edits apply immediately |
@@ -120,6 +124,8 @@ it into a repository or a public release.
 toybox (`ls`, `mkdir`, `grep`, `find`, and the other applets on the device). Nothing else
 has to be installed.
 
+An open `.py` or `.sh` file has **Run** above the editor. The script runs from its own folder, and the shell panel shows each line as it is written. **Stop** ends that run. The first Python run installs the interpreter into this app.
+
 This is not the Termux distribution. Termux packages expect the prefix
 `/data/data/com.termux/files/usr`, so `pkg` and `apt` are not part of the shell. Git status
 and diff still go through JGit. The agent can still install a JDK, the Android SDK tools,
@@ -143,6 +149,8 @@ When Shizuku is already running, or the phone is rooted, `fetch_system_layout` r
 the foreground UI XML and `execute_system_action` taps one point taken from that layout.
 
 ## Reading
+
+PNG, JPG, WebP, GIF, and BMP open as a picture you can pinch. SVG and HTML open as a page; **Code** switches back to the text. JavaScript stays off in that preview.
 
 Long-press a file and choose **Read**, or open it and tap the book icon. txt, Markdown, HTML, FB2, and EPUB are shown as text, not raw markup. Pictures inside FB2, EPUB, and HTML are shown on their own page. Pinch a picture to look closer. **Pen** draws on the page and places keyboard text you can move, rotate, and resize. **Notes** opens that page's comments under the text. **Contents** jumps by chapter, by a saved moment, or along the book. **Book** opens a chat that stays with this file. It reads the book text and does not use the project chat or the file catalog. Question text follows the day, sepia, or night paper. A catalog FB2 is often a zip, and a zip of those files opens as one book. Headings, lists, wiki links, and tables become readable lines. Pages are fitted to the screen and laid out again when you rotate or change the type. Tap the center, then the sliders icon, for size, serif or sans, spacing, and day, sepia, or night paper. Bookmarks and notes stay on this phone.
 

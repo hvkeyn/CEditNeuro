@@ -127,4 +127,6 @@ data class StoredSession(
     val conversation: List<ChatMessage> = emptyList(),
     val shell: List<StoredShell> = emptyList(),
     val nextId: Long = 0,
+    /** Skills the user switched on for this project's chat, as "scope:name". */
+    val activeSkills: List<String> = emptyList(),
 )

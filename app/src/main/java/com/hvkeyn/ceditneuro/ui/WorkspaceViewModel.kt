@@ -140,6 +140,21 @@ data class ChatEntry(
     val streaming: Boolean = false,
 )
 
+/** Shell command that runs a script file, or null when the type does not run on its own. */
+internal fun runCommandFor(path: String, absolute: String): String? {
+    val quoted = "'" + absolute.replace("'", "'\\''") + "'"
+    val folder = "'" + absolute.substringBeforeLast('/').replace("'", "'\\''") + "'"
+    return when (path.substringAfterLast('.', "").lowercase()) {
+        "py" -> "cd $folder && python3 -u $quoted"
+        "sh" -> "cd $folder && sh $quoted"
+        else -> null
+    }
+}
+
+internal fun isRunnable(path: String): Boolean = runCommandFor(path, path) != null
+
+private const val MAX_ACTIVE_SKILLS = 3
+
 data class ShellLine(
     val id: Long,
     val command: String,
@@ -197,6 +212,8 @@ data class WorkspaceUiState(
     val shellRunning: Boolean = false,
     val shellLines: List<ShellLine> = emptyList(),
     val shellElevated: Boolean = false,
+    /** Skills switched on for this chat, as "scope:name". Their text goes into every run's setup. */
+    val activeSkills: List<String> = emptyList(),
     val agentRunning: Boolean = false,
     val agentActivity: AgentActivity? = null,
     val message: String? = null,
@@ -572,6 +589,7 @@ class WorkspaceViewModel(
                 shellLines = session.shell.map { line ->
                     ShellLine(id = line.id, command = line.command, output = line.output)
                 },
+                activeSkills = session.activeSkills,
             ),
         )
     }
@@ -688,6 +706,10 @@ class WorkspaceViewModel(
         val ws = workspace ?: return
         if (_state.value.openFiles.any { it.path == path }) {
             _state.update { it.copy(activePath = path) }
+            return
+        }
+        if (com.hvkeyn.ceditneuro.ui.editor.previewKind(path) == "image") {
+            _state.update { it.copy(openFiles = it.openFiles + OpenFile(path, ""), activePath = path) }
             return
         }
         val content = runCatching { ws.read(path) }.getOrElse { error ->
@@ -1342,6 +1364,42 @@ class WorkspaceViewModel(
         runCatching { process.destroyForcibly() }
     }
 
+    /** Saves the open script and runs it in the shell panel, where output streams and Stop works. */
+    fun runActiveFile() {
+        val path = _state.value.activePath ?: return
+        val ws = workspace ?: return
+        if (current?.ui?.shellRunning == true) {
+            showMessage("A command is still running. Stop it first.")
+            return
+        }
+        if (path in _state.value.dirtyPaths && !saveFile(path)) return
+        val command = runCommandFor(path, File(ws.root, path).absolutePath) ?: run {
+            showMessage("Only .py and .sh files run from here.")
+            return
+        }
+        _state.update { it.copy(shellVisible = true, chatVisible = false, readerInFront = false) }
+        val python = path.endsWith(".py", ignoreCase = true)
+        if (python && !File(deviceShell.toolchain, "runtime-python").isFile) {
+            viewModelScope.launch {
+                showMessage("Installing Python for this app. The script starts when it is ready.")
+                val installer = InstallRuntimeTool(
+                    toolchain = deviceShell.toolchain,
+                    net = agentNet,
+                    networkAllowed = { settingsStore.current.networkEnabled },
+                    ensureExec = this@WorkspaceViewModel::ensureExecAllowed,
+                )
+                val result = installer.execute(
+                    kotlinx.serialization.json.buildJsonObject {
+                        put("name", kotlinx.serialization.json.JsonPrimitive("python"))
+                    },
+                )
+                if (result.isError) showMessage(result.content) else runShellCommand(command)
+            }
+            return
+        }
+        runShellCommand(command)
+    }
+
     fun clearShell() {
         val project = current ?: return
         if (project.ui.shellRunning) return
@@ -1593,6 +1651,15 @@ class WorkspaceViewModel(
         if (prompt.isBlank() || project.agentJob?.isActive == true) return
 
         appendChat(project, ChatRole.User, prompt)
+        val skillsOn = (if (current === project) _state.value else project.ui).activeSkills
+        if (skillsOn.isNotEmpty()) {
+            appendChat(
+                project,
+                ChatRole.Tool,
+                "Skills on for this run: " + skillsOn.joinToString { it.substringAfter(':') },
+                "skills",
+            )
+        }
         val history = project.conversation.toList()
         project.runContext = null
         project.conversation += ChatMessage.user(prompt, images)
@@ -2623,6 +2690,26 @@ class WorkspaceViewModel(
 
     fun deleteSkill(name: String, scope: String): SkillNote = skillLibrary(current).delete(name, scope)
 
+    fun toggleSkill(entry: SkillEntry) {
+        val project = current ?: return
+        val key = "${entry.scope}:${entry.name}"
+        editProject(project) {
+            val on = key in it.activeSkills
+            it.copy(activeSkills = if (on) it.activeSkills - key else (it.activeSkills + key).takeLast(MAX_ACTIVE_SKILLS))
+        }
+        persistNow(project)
+    }
+
+    private fun activeSkillTexts(project: LiveProject, library: SkillLibrary): List<Pair<String, String>> {
+        val shown = if (current === project) _state.value else project.ui
+        return shown.activeSkills.mapNotNull { key ->
+            val scope = key.substringBefore(':')
+            val name = key.substringAfter(':')
+            val note = library.read(name, scope)
+            if (note.error) null else name to note.text
+        }
+    }
+
     private fun skillLibrary(project: LiveProject?): SkillLibrary =
         SkillLibrary(project?.workspace?.root, appSkillsDir())
 
@@ -2813,6 +2900,7 @@ class WorkspaceViewModel(
                 goal = goal,
                 memory = ProjectMemory.read(ws.root),
                 skillCatalog = skills.catalog(),
+                activeSkills = activeSkillTexts(project, skills),
             ),
         )
     }
@@ -2859,6 +2947,7 @@ class WorkspaceViewModel(
                 StoredShell(id = line.id, command = line.command, output = line.output)
             },
             nextId = project.idGenerator.get(),
+            activeSkills = shown.activeSkills,
         )
     }
 

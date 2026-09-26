@@ -36,6 +36,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CheckBox
+import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -106,6 +110,7 @@ fun ChatPanel(
     onSelectFocus: (String) -> Unit,
     onListSkills: () -> List<SkillEntry>,
     modifier: Modifier = Modifier,
+    onToggleSkill: (SkillEntry) -> Unit = {},
 ) {
     var input by rememberSaveable { mutableStateOf("") }
     var attachments by remember { mutableStateOf<List<Uri>>(emptyList()) }
@@ -187,10 +192,8 @@ fun ChatPanel(
                 onSendReport = { text -> onSend(text, emptyList()) },
                 onSelectFocus = onSelectFocus,
                 onListSkills = onListSkills,
-                onUseSkill = { entry ->
-                    val ask = "Read and follow the ${entry.name} skill (${entry.scope}). "
-                    input = if (input.isBlank()) ask else ask + input
-                },
+                onUseSkill = onToggleSkill,
+                activeSkills = state.activeSkills,
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
@@ -270,6 +273,47 @@ fun ChatPanel(
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
+            if (state.activeSkills.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(start = 8.dp, end = 8.dp, top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    state.activeSkills.forEach { key ->
+                        val name = key.substringAfter(':')
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(12.dp))
+                                .clickable { onToggleSkill(SkillEntry(name, key.substringBefore(':'), "")) }
+                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                        ) {
+                            Box(
+                                Modifier
+                                    .size(7.dp)
+                                    .background(
+                                        if (state.agentRunning) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary,
+                                        CircleShape,
+                                    ),
+                            )
+                            Text(
+                                text = " $name" + if (state.agentRunning) " · working" else " · on",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            )
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Switch off $name",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(start = 4.dp).size(12.dp),
+                            )
+                        }
+                    }
+                }
+            }
             if (attachments.isNotEmpty()) {
                 Text(
                     text = attachments.joinToString { it.lastPathSegment?.substringAfterLast('/') ?: "file" },
@@ -423,6 +467,7 @@ private fun AgentToolbar(
     onSelectFocus: (String) -> Unit,
     onListSkills: () -> List<SkillEntry>,
     onUseSkill: (SkillEntry) -> Unit,
+    activeSkills: List<String>,
 ) {
     var modelOpen by rememberSaveable { mutableStateOf(false) }
     var focusOpen by remember { mutableStateOf(false) }
@@ -484,17 +529,30 @@ private fun AgentToolbar(
                 }
             }
             Box {
-                Pill(text = "Skills", compact = compact, onClick = { skillList = onListSkills(); skillsOpen = true })
+                Pill(
+                    text = if (activeSkills.isEmpty()) "Skills" else "Skills ${activeSkills.size}",
+                    selected = activeSkills.isNotEmpty(),
+                    compact = compact,
+                    onClick = { skillList = onListSkills(); skillsOpen = true },
+                )
                 DropdownMenu(expanded = skillsOpen, onDismissRequest = { skillsOpen = false }) {
-                    if (skillList.isEmpty()) {
-                        Text(
-                            "No skills yet. Add one in Settings, or ask the agent to save_skill.",
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(12.dp).widthIn(max = 260.dp),
-                        )
-                    }
+                    Text(
+                        if (skillList.isEmpty()) "No skills yet. Add one in Settings, or ask the agent to save_skill."
+                        else "Tick a skill to switch it on. The agent follows it in every run of this chat.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp).widthIn(max = 280.dp),
+                    )
                     skillList.forEach { entry ->
+                        val on = "${entry.scope}:${entry.name}" in activeSkills
                         DropdownMenuItem(
+                            leadingIcon = {
+                                Icon(
+                                    if (on) Icons.Filled.CheckBox else Icons.Filled.CheckBoxOutlineBlank,
+                                    contentDescription = if (on) "On" else "Off",
+                                    tint = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            },
                             text = {
                                 Column(modifier = Modifier.widthIn(max = 280.dp)) {
                                     Text("${entry.name} · ${entry.scope}")
@@ -507,10 +565,7 @@ private fun AgentToolbar(
                                     )
                                 }
                             },
-                            onClick = {
-                                skillsOpen = false
-                                onUseSkill(entry)
-                            },
+                            onClick = { onUseSkill(entry) },
                         )
                     }
                 }

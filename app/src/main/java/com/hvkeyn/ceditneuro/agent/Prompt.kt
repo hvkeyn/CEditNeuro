@@ -66,6 +66,7 @@ fun buildSetupPrompt(
     goal: String = "",
     memory: String = "",
     skillCatalog: String = "",
+    activeSkills: List<Pair<String, String>> = emptyList(),
 ): String {
     val loaded = if (loadedGroups.isEmpty()) {
         "No extra tool group is loaded yet."
@@ -93,6 +94,14 @@ fun buildSetupPrompt(
         if (skills.isNotEmpty()) {
             append("\n\nSkills available. Call read_skill before following one:\n").append(skills)
         }
+        if (activeSkills.isNotEmpty()) {
+            append("\n\nThe user switched on these skills for this chat. Follow them in this run; do not call read_skill for them:")
+            activeSkills.forEach { (name, text) ->
+                append("\n\n### Skill: ").append(name).append('\n').append(text.trim().take(ACTIVE_SKILL_CHARS))
+            }
+        }
     }
     return body + extra
 }
+
+const val ACTIVE_SKILL_CHARS = 4_000

@@ -17,15 +17,22 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
@@ -55,27 +62,94 @@ fun EditorPane(
     onCloseTab: (String) -> Unit,
     onContentChanged: (String, String) -> Unit,
     modifier: Modifier = Modifier,
+    onRun: () -> Unit = {},
+    onStop: () -> Unit = {},
 ) {
     val activePath = state.activePath
     if (activePath == null || state.openFiles.isEmpty()) {
         EmptyEditor(modifier)
         return
     }
+    val kind = previewKind(activePath)
+    val runnable = com.hvkeyn.ceditneuro.ui.isRunnable(activePath)
+    var previewing by remember(activePath) { mutableStateOf(kind != null) }
+    val file = state.projectRoot?.let { File(it, activePath) }
 
     Column(modifier) {
         if (state.openFiles.isNotEmpty()) {
             EditorTabs(state = state, onSelect = onSelectTab, onClose = onCloseTab)
         }
-        CodeEditorHost(
-            activePath = activePath,
-            projectRoot = state.projectRoot,
-            contentProvider = contentProvider,
-            reloadCounter = state.reloadCounter,
-            onContentChanged = onContentChanged,
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-        )
+        if (runnable || kind == "svg" || kind == "html") {
+            FileActions(
+                runnable = runnable,
+                running = state.shellRunning,
+                canPreview = kind == "svg" || kind == "html",
+                previewing = previewing,
+                onRun = onRun,
+                onStop = onStop,
+                onTogglePreview = { previewing = !previewing },
+            )
+        }
+        val body = Modifier
+            .fillMaxWidth()
+            .weight(1f)
+        when {
+            kind == "image" && file != null -> ImagePreview(file, body)
+            kind != null && previewing -> MarkupPreview(kind, contentProvider(activePath), file?.parentFile, body)
+            else -> CodeEditorHost(
+                activePath = activePath,
+                projectRoot = state.projectRoot,
+                contentProvider = contentProvider,
+                reloadCounter = state.reloadCounter,
+                onContentChanged = onContentChanged,
+                modifier = body,
+            )
+        }
+    }
+}
+
+@Composable
+private fun FileActions(
+    runnable: Boolean,
+    running: Boolean,
+    canPreview: Boolean,
+    previewing: Boolean,
+    onRun: () -> Unit,
+    onStop: () -> Unit,
+    onTogglePreview: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (runnable) {
+            if (running) {
+                TextButton(onClick = onStop) {
+                    Icon(Icons.Default.Stop, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                    Text(" Stop", color = MaterialTheme.colorScheme.error)
+                }
+                Text("Running · output in Shell", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                TextButton(onClick = onRun) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Text(" Run")
+                }
+            }
+        }
+        if (canPreview) {
+            TextButton(onClick = onTogglePreview) {
+                Icon(
+                    if (previewing) Icons.Default.Code else Icons.Default.Visibility,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text(if (previewing) " Code" else " Preview")
+            }
+        }
     }
 }
 
