@@ -1,6 +1,8 @@
 # Active context
 
-Current: v0.58.0. The agent turns on the health skill for a lab sheet or a scan report, saves each printed number with `health_log`, and `health_panel` marks it against the range on that sheet. `use_skill` with `on` false turns the skill off without deleting it. The record stays in `.ceditneuro/health` and is not copied to the other phone. This does not diagnose and does not run an imaging model.
+Current: v0.59.0. The health skill also has `health_trend` (min, max, mean, and whether the last number is higher or lower) and `health_index` (every saved test and its latest value). `topic` is the specialty printed on the sheet. A phone that already had the health skill gains these steps; a deleted skill stays deleted. The record stays in `.ceditneuro/health` and is not copied to the other phone. This does not diagnose and does not turn several tests into a new disease name.
+
+v0.58.0. The agent turns on the health skill for a lab sheet or a scan report, saves each printed number with `health_log`, and `health_panel` marks it against the range on that sheet. `use_skill` with `on` false turns the skill off without deleting it.
 
 v0.57.0. The agent can build a signed WebView app from a website or a project HTML folder (`web_to_app` in the device group, skill `web-to-app`) and install it with `install_apk`. The shell is the `webviewshell` module. Package id and home-screen name are fixed-length slots. The signing key stays in the app's private files. This does not clone another app, spoof TLS, or hide the device.
 

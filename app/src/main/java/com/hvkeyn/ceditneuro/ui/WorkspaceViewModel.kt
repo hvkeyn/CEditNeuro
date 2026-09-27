@@ -2346,6 +2346,8 @@ class WorkspaceViewModel(
             "use_skill" -> "Switching a skill"
             "health_log" -> "Saving a reading"
             "health_panel" -> "Checking readings"
+            "health_trend" -> "Checking a trend"
+            "health_index" -> "Listing saved tests"
             "save_skill" -> "Saving a skill"
             "append_skill" -> "Extending a skill"
             "delete_skill" -> "Deleting a skill"
@@ -2900,6 +2902,8 @@ class WorkspaceViewModel(
             ResearchLogTool(ws),
             com.hvkeyn.ceditneuro.tools.HealthLogTool(ws),
             com.hvkeyn.ceditneuro.tools.HealthPanelTool(ws),
+            com.hvkeyn.ceditneuro.tools.HealthTrendTool(ws),
+            com.hvkeyn.ceditneuro.tools.HealthIndexTool(ws),
             ResearchReportTool(ws),
             ResearchFigureTool(ws),
             com.hvkeyn.ceditneuro.tools.ResearchPlotTool(ws),

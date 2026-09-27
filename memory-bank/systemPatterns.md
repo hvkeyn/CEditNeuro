@@ -5,6 +5,6 @@
 - `web_to_app` (device group) packs the `webviewshell` APK: it replaces the fixed-length package id and home-screen name, writes the page into assets, and signs with `apksig` and a key kept in the app's files. The agent then calls `install_apk`. The shell does not clone another app or change TLS.
 - `agent/AgentLoop.kt`: failed-call dedup and read-only repeat skip (`READ_ONLY`).
 - Skills: `agent/SkillLibrary.kt`, project scope `.ceditneuro/skills`, phone scope in app files. Built-ins in `agent/ResearchSkill.kt` (`ResearchSkill`, `StarterSkills` with a `.starter-written` marker so deleted starters stay deleted). `use_skill` with `on` false switches a skill off without deleting the file.
-- Health: skill `health`, tools `health_log` and `health_panel` in the `health` group. Rows live in `.ceditneuro/health/readings.tsv`, which space sync skips. A row is below or above only against the range saved with it. The tools do not name a disease.
+- Health: skill `health`, tools `health_log`, `health_panel`, `health_trend`, and `health_index` in the `health` group. Rows live in `.ceditneuro/health/readings.tsv`, which space sync skips. A row is below or above only against the range saved with it. Trend math is min, max, mean, and last-versus-first. An existing `health.md` gains those steps; a deleted file stays deleted. The tools do not name a disease.
 - `SecretText` rejects keys in anything the agent writes.
 - Shell: `shell/DeviceShell.run(onProcess, onOutput)` gives live output and a process handle for Stop.
