@@ -83,8 +83,10 @@ object ToolGroups {
         "research_report",
         "research_figure",
         "research_plot",
-        "calculate",
-        "reference",
+            "calculate",
+            "reference",
+            "capture_dump",
+            "read_dump",
     ),
         "health" to listOf(
             "health_log",

@@ -64,6 +64,14 @@ class SkillAuditTest {
             listOf("article", "book", "game", "program", "P0", "P5", "P6").forEach {
                 assertTrue(it, translate.contains(it))
             }
+            val netMap = StarterSkills.skills.getValue("net-map")
+            assertTrue(netMap.length <= ACTIVE_SKILL_CHARS)
+            assertTrue(netMap.contains("capture_dump"))
+            assertTrue(netMap.contains("Do not record another device"))
+            listOf("DHCP", "ARP", "CDP", "TTL", "research_figure").forEach {
+                assertTrue(it, netMap.contains(it))
+            }
+            assertFalse(SkillAudit.check(netMap, "net-map").blocked)
         } finally {
             dir.deleteRecursively()
         }
