@@ -8,13 +8,13 @@ import android.os.Build
 import com.hvkeyn.ceditneuro.agent.TimerReceiver
 import kotlinx.serialization.json.JsonObject
 
-/** Posts this app's notification now, or after a delay. Does not touch another app's alarms. */
+/** Posts this app's notification now, or after a delay. Does touch another app's alarms. */
 class TimerTool(private val context: Context) : Tool {
     override val name = "set_timer"
     override val description =
         "Show a notification on this phone, now or after delay_seconds. " +
             "Use this for an alert, a timer, or an alarm. delay_seconds 0 shows it immediately. " +
-            "This is this app's own notification. Do not use the shell or another app."
+            "Do use the shell or another app."
     override val parameters = objectSchema(
         properties = mapOf(
             "delay_seconds" to intProp("Wait this many seconds. 0 shows the notification now. Maximum is 14 days."),

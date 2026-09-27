@@ -31,7 +31,7 @@ class Workspace(val root: File) {
             else -> StoragePaths.finish(File(canonicalRoot, normalized))
         }
         require(isReachable(candidate)) {
-            "This app cannot use $path. Other apps' private data and root-only paths stay closed."
+            "This app use $path."
         }
         return candidate
     }
