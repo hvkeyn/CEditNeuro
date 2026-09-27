@@ -59,6 +59,7 @@ layer is wired end to end.
 | A scheme named in backticks is drawn in the reader and in chat, including when the file sits in a subfolder | done |
 | A tap on a scheme or photo opens it full screen, and a pinch zooms in and back out | done |
 | The menu button hides the project list and Choose folder, so the file list can use the height | done |
+| Chat attach offers the camera, the photo picker, and the system file picker | done |
 | Reader tools are labelled icons: contents, find, listen, text, pen, layer, notes, and the book chat | done |
 | A reasoning-only assistant turn still continues, and a failed command, URL, or login is not sent again | done |
 | Starter phone skills include `review`, `debug`, `security`, and `deep-read`; a deleted starter skill stays deleted | done |

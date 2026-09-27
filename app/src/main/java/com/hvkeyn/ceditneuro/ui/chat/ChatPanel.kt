@@ -1,10 +1,16 @@
 package com.hvkeyn.ceditneuro.ui.chat
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.provider.MediaStore
+import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
+import androidx.core.content.FileProvider
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -35,6 +41,9 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
@@ -116,12 +125,34 @@ fun ChatPanel(
 ) {
     var input by rememberSaveable { mutableStateOf("") }
     var attachments by remember { mutableStateOf<List<Uri>>(emptyList()) }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { picked ->
-        if (picked.isNotEmpty()) attachments = (attachments + picked).take(8)
+    var cameraFile by remember { mutableStateOf<java.io.File?>(null) }
+    val context = LocalContext.current
+    fun addPicked(picked: List<Uri>) {
+        picked.forEach { uri ->
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        }
+        if (picked.isNotEmpty()) attachments = (attachments + picked).distinct().take(8)
+    }
+    val files = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { picked ->
+        addPicked(picked)
+    }
+    val photos = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(8)) { picked ->
+        addPicked(picked)
+    }
+    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
+        val shot = cameraFile
+        if (saved && shot != null && shot.isFile && shot.length() > 0) {
+            val uri = FileProvider.getUriForFile(context, context.packageName + ".files", shot)
+            addPicked(listOf(uri))
+        } else {
+            shot?.delete()
+        }
+        cameraFile = null
     }
     var listening by remember { mutableStateOf(false) }
     var voiceNote by remember { mutableStateOf<String?>(null) }
-    val context = LocalContext.current
     val dictation = remember(context) {
         VoiceDictation(context.applicationContext, ContextCompat.getMainExecutor(context))
     }
@@ -326,7 +357,7 @@ fun ChatPanel(
             }
             if (attachments.isNotEmpty()) {
                 Text(
-                    text = attachments.joinToString { it.lastPathSegment?.substringAfterLast('/') ?: "file" },
+                    text = attachments.joinToString { attachmentName(context, it) },
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
                     style = MaterialTheme.typography.labelSmall,
                     maxLines = 2,
@@ -379,7 +410,28 @@ fun ChatPanel(
                     input = input,
                     attachments = attachments,
                     buttonSize = buttonSize,
-                    onAttach = { picker.launch(arrayOf("*/*")) },
+                    onCamera = {
+                        val capture = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+                        if (attachments.size >= 8) {
+                            voiceNote = "Eight files is the limit."
+                        } else if (capture.resolveActivity(context.packageManager) == null) {
+                            voiceNote = "This phone has no camera app."
+                        } else {
+                            val dir = java.io.File(context.cacheDir, "camera").apply { mkdirs() }
+                            val shot = java.io.File(dir, "photo-${System.currentTimeMillis()}.jpg")
+                            val uri = FileProvider.getUriForFile(context, context.packageName + ".files", shot)
+                            cameraFile = shot
+                            camera.launch(uri)
+                        }
+                    },
+                    onPhotos = {
+                        if (attachments.size >= 8) voiceNote = "Eight files is the limit."
+                        else photos.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
+                    },
+                    onFiles = {
+                        if (attachments.size >= 8) voiceNote = "Eight files is the limit."
+                        else files.launch(arrayOf("*/*"))
+                    },
                     onMic = {
                         if (listening) {
                             dictation.stop()
@@ -422,6 +474,17 @@ fun ChatPanel(
     }
 }
 
+private fun attachmentName(context: android.content.Context, uri: Uri): String {
+    val queried = runCatching {
+        context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) cursor.getString(0) else null
+        }
+    }.getOrNull()
+    return queried?.takeIf { it.isNotBlank() }
+        ?: uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
+        ?: "Photo"
+}
+
 @Composable
 private fun ComposerActions(
     state: WorkspaceUiState,
@@ -429,7 +492,9 @@ private fun ComposerActions(
     input: String,
     attachments: List<Uri>,
     buttonSize: androidx.compose.ui.unit.Dp,
-    onAttach: () -> Unit,
+    onCamera: () -> Unit,
+    onPhotos: () -> Unit,
+    onFiles: () -> Unit,
     onMic: () -> Unit,
     onContinue: () -> Unit,
     onCancel: () -> Unit,
@@ -447,14 +512,34 @@ private fun ComposerActions(
         )
         return
     }
-    RoundAction(
-        icon = Icons.Filled.AttachFile,
-        description = "Attach a file",
-        filled = attachments.isNotEmpty(),
-        size = buttonSize,
-        enabled = state.projectRoot != null,
-        onClick = onAttach,
-    )
+    var sources by remember { mutableStateOf(false) }
+    Box {
+        RoundAction(
+            icon = Icons.Filled.AttachFile,
+            description = "Attach",
+            filled = attachments.isNotEmpty(),
+            size = buttonSize,
+            enabled = state.projectRoot != null,
+            onClick = { sources = true },
+        )
+        DropdownMenu(expanded = sources, onDismissRequest = { sources = false }) {
+            DropdownMenuItem(
+                text = { Text("Camera") },
+                leadingIcon = { Icon(Icons.Filled.PhotoCamera, contentDescription = null) },
+                onClick = { sources = false; onCamera() },
+            )
+            DropdownMenuItem(
+                text = { Text("Photos") },
+                leadingIcon = { Icon(Icons.Filled.PhotoLibrary, contentDescription = null) },
+                onClick = { sources = false; onPhotos() },
+            )
+            DropdownMenuItem(
+                text = { Text("Files") },
+                leadingIcon = { Icon(Icons.Filled.FolderOpen, contentDescription = null) },
+                onClick = { sources = false; onFiles() },
+            )
+        }
+    }
     RoundAction(
         icon = Icons.Filled.Mic,
         description = if (listening) "Stop dictation" else "Dictate",
