@@ -1,6 +1,6 @@
 # Progress
 
-Released: v0.45.0 through v0.67.0 (TCP works through the recorder, replies are in the pcap, `net_audit` audits the phone's own Wi-Fi; see activeContext.md). Unit tests include `PacketDumpTest` and `SkillWiringTest`. Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, `SkillLibraryTest`, `ChatLinkTest`, `WebAppPackTest`, `HealthRecordTest`, `SkillAuditTest`, `DesignCatalogTest`, and `ReaderPlaceTest`.
+Released: v0.45.0 through v0.68.0 (`systematic-debugging` and `debug_case` keep a failure in order until the same check passes; see activeContext.md). Unit tests include `PacketDumpTest` and `SkillWiringTest`. Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, `SkillLibraryTest`, `ChatLinkTest`, `WebAppPackTest`, `HealthRecordTest`, `SkillAuditTest`, `DesignCatalogTest`, and `ReaderPlaceTest`.
 
 Known gaps:
 - Phone was checked on v0.67.0: HTTP works during a recording, and `net_audit` with and without sweep. The recorder does not retransmit or honor the client's window, so a large download during a recording may stall. The agent chat was not run against the model.

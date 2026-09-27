@@ -57,8 +57,11 @@ class SkillWiringTest {
         val dir = Files.createTempDirectory("skills-wiring").toFile()
         java.io.File(dir, "frontend-design.md").writeText("# Design\n2. call design_system with that name.\n")
         java.io.File(dir, "net-map.md").writeText("# Map\nDo not record another device.\n")
+        java.io.File(dir, "debug.md").writeText("# Find one fault\nThe fix is the smallest edit that makes the check pass.\n")
         ResearchSkill.ensure(dir)
         assertTrue(java.io.File(dir, "frontend-design.md").readText().contains("group has no tools"))
         assertEquals(StarterSkills.skills.getValue("net-map"), java.io.File(dir, "net-map.md").readText())
+        assertTrue(java.io.File(dir, "debug.md").readText().contains("systematic-debugging"))
+        assertTrue(java.io.File(dir, "systematic-debugging.md").readText().contains("debug_case"))
     }
 }
