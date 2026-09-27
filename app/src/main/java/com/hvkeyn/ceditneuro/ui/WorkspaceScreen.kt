@@ -22,6 +22,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -42,6 +43,7 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -65,7 +67,6 @@ import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -110,6 +111,7 @@ import androidx.compose.runtime.collectAsState
 import com.hvkeyn.ceditneuro.data.AgentSettings
 import com.hvkeyn.ceditneuro.update.AppUpdater
 import com.hvkeyn.ceditneuro.ui.chat.ChatPanel
+import com.hvkeyn.ceditneuro.ui.theme.NeuroSelected
 import com.hvkeyn.ceditneuro.ui.reader.ReaderPane
 import com.hvkeyn.ceditneuro.ui.editor.EditorPane
 import com.hvkeyn.ceditneuro.ui.settings.SettingsDialog
@@ -132,6 +134,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
     var showSettings by rememberSaveable { mutableStateOf(false) }
     val versionName = remember { AppUpdater.localVersion(context) }
     var projectPanelOpen by rememberSaveable { mutableStateOf(true) }
+    var projectsListOpen by rememberSaveable { mutableStateOf(true) }
     var projectsMenu by remember { mutableStateOf(false) }
     var joinCode by remember { mutableStateOf("") }
     var savedFlash by remember { mutableIntStateOf(0) }
@@ -416,7 +419,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
         snackbarHost = { SnackbarHost(snackbarHostState) },
         contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
-            val barButton = if (shortLandscape) 32.dp else 36.dp
+            val barButton = if (shortLandscape) 40.dp else 44.dp
             CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides barButton) {
             TopAppBar(
                 windowInsets = WindowInsets.safeDrawing.only(
@@ -428,10 +431,18 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                 navigationIcon = {
                     Box {
                         IconButton(
-                            onClick = { projectsMenu = true },
-                            modifier = Modifier.size(barButton),
+                            onClick = { projectsListOpen = !projectsListOpen },
+                            modifier = Modifier
+                                .size(barButton)
+                                .background(
+                                    if (projectsListOpen) NeuroSelected else androidx.compose.ui.graphics.Color.Transparent,
+                                    RoundedCornerShape(12.dp),
+                                ),
                         ) {
-                            Icon(Icons.Default.Menu, contentDescription = "Projects")
+                            Icon(
+                                Icons.Default.Menu,
+                                contentDescription = if (projectsListOpen) "Hide projects" else "Show projects",
+                            )
                         }
                         ProjectTitleMenu(
                             expanded = projectsMenu,
@@ -457,6 +468,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                             text = state.projectName ?: "CEditNeuro",
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.clickable { projectsMenu = true },
                         )
                         if (state.linkActive > 1) {
@@ -614,6 +626,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                 if (showTree) {
                     FileTreePane(
                         state = state,
+                        projectsOpen = projectsListOpen,
                         projectsMaxHeight = panes.projectsMaxHeight,
                         compactHeight = compactHeight,
                         onToggleDir = viewModel::toggleDirectory,
@@ -905,12 +918,20 @@ private fun BarIcon(
     active: Boolean = false,
     badge: Int = 0,
 ) {
-    IconButton(onClick = onClick, modifier = Modifier.size(size)) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier
+            .size(size)
+            .background(
+                if (active) NeuroSelected else androidx.compose.ui.graphics.Color.Transparent,
+                RoundedCornerShape(12.dp),
+            ),
+    ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 imageVector = icon,
                 contentDescription = description,
-                modifier = Modifier.size(if (size < 36.dp) 18.dp else 20.dp),
+                modifier = Modifier.size(24.dp),
                 tint = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
             )
             if (badge > 1) {
@@ -1021,6 +1042,7 @@ private fun FileTreePane(
     onDelete: (String) -> Unit,
     onRead: (String) -> Unit,
     onClearClipboard: () -> Unit,
+    projectsOpen: Boolean,
     projectsMaxHeight: Dp,
     compactHeight: Boolean,
     modifier: Modifier = Modifier,
@@ -1029,75 +1051,71 @@ private fun FileTreePane(
         modifier = modifier
             .background(MaterialTheme.colorScheme.surface),
     ) {
-        Column(
-            modifier = Modifier.padding(
-                start = 12.dp,
-                end = 12.dp,
-                top = if (compactHeight) 4.dp else 16.dp,
-                bottom = if (compactHeight) 2.dp else 8.dp,
-            ),
-        ) {
-            Text(
-                text = "Projects",
-                style = if (compactHeight) {
-                    MaterialTheme.typography.titleSmall
-                } else {
-                    MaterialTheme.typography.titleMedium
-                },
-            )
-            if (!compactHeight) {
+        if (projectsOpen) {
+            Column(
+                modifier = Modifier.padding(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = if (compactHeight) 8.dp else 16.dp,
+                    bottom = if (compactHeight) 4.dp else 8.dp,
+                ),
+            ) {
                 Text(
-                    text = "Chat and shell stay with each folder.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = "Projects",
+                    style = if (compactHeight) {
+                        MaterialTheme.typography.titleSmall
+                    } else {
+                        MaterialTheme.typography.titleMedium
+                    },
                 )
-            }
-        }
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = projectsMaxHeight),
-        ) {
-            if (state.recentProjects.isEmpty()) {
-                item {
+                if (!compactHeight) {
                     Text(
-                        text = "No saved projects yet.",
-                        style = MaterialTheme.typography.bodySmall,
+                        text = "Chat and shell stay with each folder.",
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     )
                 }
             }
-            items(state.recentProjects, key = { it }) { path ->
-                ProjectRow(
-                    path = path,
-                    selected = path == state.projectRoot,
-                    compact = compactHeight,
-                    onOpen = { onOpenProject(path) },
-                    onForget = { onForgetProject(path) },
-                )
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = projectsMaxHeight),
+            ) {
+                if (state.recentProjects.isEmpty()) {
+                    item {
+                        Text(
+                            text = "No saved projects yet.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+                items(state.recentProjects, key = { it }) { path ->
+                    ProjectRow(
+                        path = path,
+                        selected = path == state.projectRoot,
+                        compact = compactHeight,
+                        onOpen = { onOpenProject(path) },
+                        onForget = { onForgetProject(path) },
+                    )
+                }
             }
+            Button(
+                onClick = onChooseFolder,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 8.dp, bottom = 12.dp)
+                    .height(48.dp),
+            ) {
+                Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Choose folder", style = MaterialTheme.typography.labelLarge)
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
         }
-        Button(
-            onClick = onChooseFolder,
-            contentPadding = if (compactHeight) {
-                PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-            } else {
-                ButtonDefaults.ContentPadding
-            },
-            modifier = Modifier
-                .padding(
-                    start = 12.dp,
-                    end = 12.dp,
-                    top = if (compactHeight) 2.dp else 8.dp,
-                    bottom = if (compactHeight) 4.dp else 12.dp,
-                )
-                .height(if (compactHeight) 32.dp else 40.dp),
-        ) {
-            Text("Choose folder", style = MaterialTheme.typography.labelLarge)
-        }
-
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
         state.fileClipboard?.let { clip ->
             Row(
@@ -1165,16 +1183,15 @@ private fun ProjectRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = if (compact) 40.dp else 56.dp)
             .clickable(onClick = onOpen)
-            .background(
-                if (selected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
-            )
-            .padding(start = 12.dp, end = 0.dp, top = if (compact) 2.dp else 4.dp, bottom = if (compact) 2.dp else 4.dp),
+            .background(if (selected) NeuroSelected else androidx.compose.ui.graphics.Color.Transparent)
+            .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = File(path).name.ifBlank { path },
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyLarge,
                 color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -1290,15 +1307,14 @@ private fun FileRow(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = if (compact) 40.dp else 48.dp)
             .combinedClickable(onClick = onClick, onLongClick = { menu = true })
-            .background(
-                if (active) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
-            )
+            .background(if (active) NeuroSelected else androidx.compose.ui.graphics.Color.Transparent)
             .padding(
-                start = (8 + depth * 14).dp,
-                end = 8.dp,
-                top = if (compact) 3.dp else 8.dp,
-                bottom = if (compact) 3.dp else 8.dp,
+                start = (16 + depth * 16).dp,
+                end = 16.dp,
+                top = if (compact) 8.dp else 12.dp,
+                bottom = if (compact) 8.dp else 12.dp,
             ),
     ) {
         if (entry.isDirectory) {
@@ -1309,13 +1325,13 @@ private fun FileRow(
                     Icons.AutoMirrored.Filled.KeyboardArrowRight
                 },
                 contentDescription = null,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(20.dp),
             )
         } else {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.InsertDriveFile,
                 contentDescription = null,
-                modifier = Modifier.size(14.dp),
+                modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -1323,14 +1339,14 @@ private fun FileRow(
             Icon(
                 imageVector = Icons.Default.Folder,
                 contentDescription = null,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.colorScheme.primary,
             )
         }
         Text(
             text = entry.name + if (dirty) " •" else "",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface,
+            style = if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
+            color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )

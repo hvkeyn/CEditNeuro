@@ -375,10 +375,10 @@ private fun DockTool(
             .clip(RoundedCornerShape(10.dp))
             .background(if (active) Color(0x33F2C94C) else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
-        Icon(icon, contentDescription = label, tint = if (active && tint == Color.White) Color(0xFFF2C94C) else tint, modifier = Modifier.size(22.dp))
-        Text(label, color = if (active) Color(0xFFF2C94C) else Color.White, fontSize = 10.sp, maxLines = 1)
+        Icon(icon, contentDescription = label, tint = if (active && tint == Color.White) Color(0xFFF2C94C) else tint, modifier = Modifier.size(24.dp))
+        Text(label, color = if (active) Color(0xFFF2C94C) else Color.White, fontSize = 12.sp, maxLines = 1)
     }
 }
 
@@ -386,7 +386,7 @@ private fun DockTool(
 private fun Swatch(argb: Int, selected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(28.dp)
+            .size(40.dp)
             .clip(CircleShape)
             .background(Color(argb))
             .border(if (selected) 3.dp else 1.dp, if (selected) Color.White else Color(0x66FFFFFF), CircleShape)
