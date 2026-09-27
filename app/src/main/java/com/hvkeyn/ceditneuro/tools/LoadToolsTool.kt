@@ -12,7 +12,7 @@ class LoadToolsTool(private val session: ToolSession) : Tool {
             "device_status, list_apps, open_settings, clipboard, open_file. " +
             "remote: remote_connect, remote_list, remote_read, remote_write, remote_put, remote_get, ssh_exec, browse_page. " +
             "desk: notifications, mail_list, mail_read, mail_send. " +
-            "study: research_log, research_report, research_figure, research_plot, calculate, reference. " +
+            "study: research_log, research_report, research_figure, research_plot, calculate, reference, capture_dump, read_dump. " +
             "health: health_log, health_panel, health_trend, health_index. " +
             "skills: find_skills, review_skill. " +
             "design: design_system."

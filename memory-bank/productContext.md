@@ -11,3 +11,4 @@
 - Skills: when a task needs a skill this phone does not have, the agent searches by plain words, checks the file, and saves only a short adapted procedure. A dangerous prompt, a backdoor, malware, or a key is not saved.
 - Design: for a product screen the agent looks up a public design system, plans colors and type, and writes one HTML page in the project.
 - Translation: `ru-translate` turns an article, a book, a game, or a program into Russian beside the original. The source stays. The agent does not stop until the state file says pass, and the Russian has to read as a person wrote it.
+- Network map: `capture_dump` records this phone's public IPv4 into a pcap and stops by itself. `read_dump` names hosts and ports. `net-map` draws only what those fields support. Private ranges stay outside the recording. A ping can fail until the recording stops, because ICMP is not forwarded.
