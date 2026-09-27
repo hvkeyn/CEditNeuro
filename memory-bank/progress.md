@@ -1,9 +1,9 @@
 # Progress
 
-Released: v0.45.0 through v0.58.0 (health skill logs a lab sheet and marks each number against the printed range; see activeContext.md). Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, `SkillLibraryTest`, `ChatLinkTest`, `WebAppPackTest`, and `HealthRecordTest`.
+Released: v0.45.0 through v0.59.0 (health trend and index; see activeContext.md). Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, `SkillLibraryTest`, `ChatLinkTest`, `WebAppPackTest`, and `HealthRecordTest`.
 
 Known gaps:
-- `web_to_app` is covered by `WebAppPackTest` (signed APK, Cyrillic label). It has not been installed on the phone yet.
+- Phone was checked on v0.58.0. v0.59.0 is not installed there yet. A wrapped site APK has not been installed as its own app.
 - The file tree does not refresh by itself when files appear on disk; reselecting the project reloads it.
 - `reference` not exercised against the live network on the phone.
 - Only one shell process handle is kept; Stop acts on the last started user command.

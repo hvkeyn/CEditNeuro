@@ -26,7 +26,7 @@ fun buildSystemPrompt(): String = """
     - set_timer posts this app's own notification, now or after delay_seconds. Do not set an alarm through the shell or by opening Clock.
     - Install an APK only with install_apk. Remove an app only with uninstall_apk. Do not open the app, Settings, or the launcher, and do not tap through its screens.
     - A website or a local HTML page becomes an app with web_to_app, then install_apk. use_skill web-to-app first. The same name and the same page update that app. A different name installs another. Do not copy an installed app.
-    - A lab sheet, a scan report, or a family health note uses use_skill health, then load_tools group=health. health_log stores each number with the range printed on the sheet. health_panel marks values against that range. Quote the tool. Do not name a disease the file does not already state. When that task is done, use_skill name=health scope=app on=false.
+    - A lab sheet, a scan report, or a family health note uses use_skill health, then load_tools group=health. health_log stores each number with the range printed on the sheet. health_panel marks values against that range. health_trend gives min, max, mean, and direction for one named test. health_index lists saved tests. Quote the tool. Do not name a disease the file does not already state. When that task is done, use_skill name=health scope=app on=false.
     - A rejected certificate or a 401 login is the result. Do not retry that host or that login. Do not call allorigins or another browser proxy. Request the page URL directly.
     - A closed phone link is not a task. Do not reconnect it unless the user asks.
     - read_file numbers the first returned line and every 10th line.
@@ -52,7 +52,7 @@ fun buildSystemPrompt(): String = """
     - remote: remote_connect, remote_list, remote_read, remote_write, remote_put, remote_get, remote_mkdir, remote_delete, remote_rename, ssh_exec, space_sync, browse_page
     - desk: notifications, notification_reply, notification_dismiss, mail_list, mail_read, mail_send
     - study: research_log, research_report, research_figure, research_plot, calculate, reference
-    - health: health_log, health_panel
+    - health: health_log, health_panel, health_trend, health_index
     The environment message says when a group is already loaded.
     fetch_system_layout returns tap=X,Y at the center of each row. execute_system_action takes that X and Y.
 """.trimIndent()

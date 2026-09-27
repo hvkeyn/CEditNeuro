@@ -26,4 +26,50 @@ class HealthRecordTest {
             root.deleteRecursively()
         }
     }
+
+    @Test
+    fun trendReportsDirectionAndIndexListsTheLatest() {
+        val root = kotlin.io.path.createTempDirectory("health-trend").toFile()
+        try {
+            HealthRecord.add(root, "Мама", "glucose", "5.0", "2024-01-01", "mmol/L", "3.9", "6.1", "a.txt", "blood")
+            HealthRecord.add(root, "Мама", "glucose", "5.4", "2024-06-01", "mmol/L", "3.9", "6.1", "b.txt", "blood")
+            HealthRecord.add(root, "Мама", "glucose", "6.2", "2024-12-01", "mmol/L", "3.9", "6.1", "c.txt", "blood")
+            val trend = HealthRecord.trend(root, "Мама", "glucose")
+            assertFalse(trend.error)
+            assertTrue(trend.text.contains("min 5."))
+            assertTrue(trend.text.contains("max 6.2."))
+            assertTrue(trend.text.contains("mean 5.5333."))
+            assertTrue(trend.text.contains("The last number is higher than the first."))
+            assertTrue(trend.text.contains("6.2 mmol/L above"))
+            assertFalse(trend.text.contains("diabetes"))
+            val outside = HealthRecord.trend(root, "Мама", "glucose", outsideOnly = true)
+            assertTrue(outside.text.contains("1 reading"))
+            assertTrue(outside.text.contains("6.2"))
+            assertFalse(outside.text.contains("5.0"))
+            val index = HealthRecord.index(root, "Мама", "blood")
+            assertTrue(index.text.contains("glucose: 3, last 2024-12-01 6.2 above, topic blood"))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun oldHealthSkillGainsTrendStepsAndADeletedFileStaysGone() {
+        val dir = kotlin.io.path.createTempDirectory("health-skill").toFile()
+        try {
+            java.io.File(dir, "health.md").writeText("old health skill\n")
+            java.io.File(dir, ".starter-written").writeText("health\n")
+            StarterSkills.ensure(dir)
+            val text = java.io.File(dir, "health.md").readText()
+            assertTrue(text.startsWith("old health skill"))
+            assertTrue(text.contains("health_trend"))
+            StarterSkills.ensure(dir)
+            assertEquals(text, java.io.File(dir, "health.md").readText())
+            java.io.File(dir, "health.md").delete()
+            StarterSkills.ensure(dir)
+            assertFalse(java.io.File(dir, "health.md").exists())
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
 }

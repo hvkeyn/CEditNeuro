@@ -145,12 +145,13 @@ object StarterSkills {
 
             1. Call load_tools group=health.
             2. Read only the file the user named. Do not invent a number, a range, or a date.
-            3. Save each result with health_log: person, date, name, value, unit, low, high, and source as the file path. Leave low and high empty when the sheet does not print a range.
+            3. Save each result with health_log: person, date, name, value, unit, low, high, topic, and source as the file path. topic is the specialty printed on the sheet. Leave low, high, and topic empty when the sheet does not print them.
             4. Call health_panel for that person. Quote only the rows the tool printed.
-            5. A value marked below or above is outside the range printed on the sheet. Say that, and say a doctor should see it. Do not name a disease from a number. Do not say the person has cancer.
-            6. If the file is a scan report, quote the impression already written there. Do not add findings that are not in the text.
-            7. The record stays in this project and is not copied to the other phone. Do not upload it.
-            8. When the health task is finished, call use_skill name=health scope=app on=false.
+            5. For one named test over time, call health_trend. Quote its min, max, mean, and whether the last number is higher or lower than the first. health_index lists every saved test. Do not fill gaps.
+            6. A value marked below or above is outside the range printed on the sheet. Say that, and say a doctor should see it. Do not name a disease from a number. Do not say the person has cancer. Quote a diagnosis only when that sentence is already in the file. Do not combine tests into a new disease name.
+            7. If the file is a scan report, quote the impression already written there. Do not add findings that are not in the text.
+            8. The record stays in this project and is not copied to the other phone. Do not upload it.
+            9. When the health task is finished, call use_skill name=health scope=app on=false.
         """.trimIndent() + "\n",
     )
 
@@ -168,5 +169,21 @@ object StarterSkills {
             changed = true
         }
         if (changed) marker.writeText(written.sorted().joinToString("\n") + "\n", Charsets.UTF_8)
+        extendHealth(appDir)
+    }
+
+    /** Phones that already saved the first health skill gain the trend steps. A deleted file stays deleted. */
+    private fun extendHealth(appDir: File) {
+        val file = File(appDir, "health.md")
+        if (!file.isFile) return
+        val current = file.readText(Charsets.UTF_8)
+        if (current.contains("health_trend")) return
+        file.writeText(
+            current.trimEnd() + "\n\n" +
+                "For one named test over time, call health_trend. Quote its min, max, mean, and whether the last number is higher or lower than the first. health_index lists every saved test.\n" +
+                "Pass topic to health_log when the sheet names a specialty.\n" +
+                "Quote a diagnosis only when that sentence is already in the file. Do not combine tests into a new disease name.\n",
+            Charsets.UTF_8,
+        )
     }
 }

@@ -89,6 +89,8 @@ object ToolGroups {
         "health" to listOf(
             "health_log",
             "health_panel",
+            "health_trend",
+            "health_index",
         ),
 )
 
