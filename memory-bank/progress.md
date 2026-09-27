@@ -1,6 +1,6 @@
 # Progress
 
-Released: v0.45.0 through v0.57.0 (`web_to_app` builds a signed WebView APK from a URL or local HTML; see activeContext.md). Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, `SkillLibraryTest`, `ChatLinkTest`, and `WebAppPackTest`.
+Released: v0.45.0 through v0.58.0 (health skill logs a lab sheet and marks each number against the printed range; see activeContext.md). Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, `SkillLibraryTest`, `ChatLinkTest`, `WebAppPackTest`, and `HealthRecordTest`.
 
 Known gaps:
 - `web_to_app` is covered by `WebAppPackTest` (signed APK, Cyrillic label). It has not been installed on the phone yet.

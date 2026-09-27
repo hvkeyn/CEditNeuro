@@ -76,18 +76,20 @@ class SaveSkillTool(
 
 class UseSkillTool(
     private val skills: SkillLibrary,
-    private val onUse: (name: String, scope: String) -> String = { _, _ -> "" },
+    private val onUse: (name: String, scope: String, enable: Boolean) -> String = { _, _, _ -> "" },
 ) : Tool {
     override val name = "use_skill"
     override val description =
-        "Switch on a saved skill and follow its procedure for this chat. " +
+        "Switch a saved skill on or off for this chat and follow it while it is on. " +
             "Call this for every skill that fits the task. Any number can stay on. " +
-            "Returns the procedure. Do not call it again for a skill that is already on. " +
+            "on true returns the procedure. Do not call it again for a skill that is already on. " +
+            "on false switches that skill off without deleting it. Use that when the task no longer fits. " +
             "scope is project or app."
     override val parameters = objectSchema(
         properties = mapOf(
             "name" to stringProp("Skill name."),
             "scope" to stringProp("project or app."),
+            "on" to boolProp("True switches the skill on. False switches it off without deleting it. Default is true."),
         ),
         required = listOf("name", "scope"),
     )
@@ -95,9 +97,14 @@ class UseSkillTool(
     override suspend fun execute(args: JsonObject): ToolResult {
         val name = args.stringArg("name").orEmpty()
         val scope = args.stringArg("scope").orEmpty()
+        val enable = args.boolArg("on") ?: true
+        if (!enable) {
+            val message = onUse(name, scope, false)
+            return if (message.startsWith("Switched")) ToolResult.ok(message) else ToolResult.error(message)
+        }
         val body = skills.read(name, scope)
         if (body.error) return ToolResult.error(body.text)
-        return ToolResult.ok(onUse(name, scope) + "\n\n" + body.text)
+        return ToolResult.ok(onUse(name, scope, true) + "\n\n" + body.text)
     }
 }
 

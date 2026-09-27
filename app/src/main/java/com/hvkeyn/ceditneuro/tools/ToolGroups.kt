@@ -86,6 +86,10 @@ object ToolGroups {
         "calculate",
         "reference",
     ),
+        "health" to listOf(
+            "health_log",
+            "health_panel",
+        ),
 )
 
     fun groupOf(toolName: String): String? =
