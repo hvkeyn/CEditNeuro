@@ -102,6 +102,9 @@ object ToolGroups {
         "design" to listOf(
             "design_system",
         ),
+        "debug" to listOf(
+            "debug_case",
+        ),
     )
 
     fun groupOf(toolName: String): String? =
