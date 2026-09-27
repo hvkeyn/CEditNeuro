@@ -1,6 +1,8 @@
 # Active context
 
-Current: v0.59.0. The health skill also has `health_trend` (min, max, mean, and whether the last number is higher or lower) and `health_index` (every saved test and its latest value). `topic` is the specialty printed on the sheet. A phone that already had the health skill gains these steps; a deleted skill stays deleted. The record stays in `.ceditneuro/health` and is not copied to the other phone. This does not diagnose and does not turn several tests into a new disease name.
+Current: v0.60.0. The agent searches the public skills directory with `find_skills` (plain words, no install). `review_skill` checks the file for a dangerous prompt, a hidden command, malware, a broken file, and a key. A blocked file is not saved and is not switched on. A clean file is saved only as a short adapted procedure for this app's tools. The starter skill is `find-skills`. Checked on the phone: the skill is in the menu and switches on and off.
+
+v0.59.0. The health skill also has `health_trend` (min, max, mean, and whether the last number is higher or lower) and `health_index` (every saved test and its latest value). `topic` is the specialty printed on the sheet. A phone that already had the health skill gains these steps; a deleted skill stays deleted. The record stays in `.ceditneuro/health` and is not copied to the other phone. This does not diagnose and does not turn several tests into a new disease name.
 
 v0.58.0. The agent turns on the health skill for a lab sheet or a scan report, saves each printed number with `health_log`, and `health_panel` marks it against the range on that sheet. `use_skill` with `on` false turns the skill off without deleting it.
 

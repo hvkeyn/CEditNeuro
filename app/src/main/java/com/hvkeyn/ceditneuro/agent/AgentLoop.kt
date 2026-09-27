@@ -33,6 +33,7 @@ class AgentLoop(
         private val READ_ONLY = setOf(
             "list_dir", "read_file", "grep", "glob", "git_status", "git_diff",
             "list_skills", "read_skill", "search_sessions", "device_status", "list_apps", "calculate", "reference",
+            "find_skills", "review_skill",
         )
     }
 
