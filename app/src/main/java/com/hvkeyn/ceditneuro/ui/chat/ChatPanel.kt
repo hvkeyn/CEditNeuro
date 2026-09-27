@@ -299,7 +299,7 @@ fun ChatPanel(
                             modifier = Modifier
                                 .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(12.dp))
                                 .clickable { onToggleSkill(SkillEntry(name, key.substringBefore(':'), "")) }
-                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
                         ) {
                             Box(
                                 Modifier
@@ -318,7 +318,7 @@ fun ChatPanel(
                                 Icons.Default.Close,
                                 contentDescription = "Switch off $name",
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(start = 4.dp).size(12.dp),
+                                modifier = Modifier.padding(start = 8.dp).size(16.dp),
                             )
                         }
                     }
@@ -352,14 +352,14 @@ fun ChatPanel(
                     )
                 }
             }
-            val buttonSize = if (compact) 32.dp else 40.dp
+            val buttonSize = if (compact) 40.dp else 48.dp
             CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides buttonSize) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 6.dp, vertical = if (compact) 2.dp else 4.dp),
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 OutlinedTextField(
                     value = input,
@@ -693,7 +693,8 @@ private fun Pill(
             .background(background, RoundedCornerShape(8.dp))
             .border(1.dp, border, RoundedCornerShape(8.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = if (compact) 2.dp else 4.dp),
+            .defaultMinSize(minHeight = if (compact) 40.dp else 48.dp)
+            .padding(horizontal = 12.dp, vertical = if (compact) 8.dp else 12.dp),
     )
 }
 

@@ -58,6 +58,7 @@ layer is wired end to end.
 | No signal blocks a new agent run. A chat link opens that book or file. SVG schemes draw in the chat and in the reader | done |
 | A scheme named in backticks is drawn in the reader and in chat, including when the file sits in a subfolder | done |
 | A tap on a scheme or photo opens it full screen, and a pinch zooms in and back out | done |
+| The menu button hides the project list and Choose folder, so the file list can use the height | done |
 | Reader tools are labelled icons: contents, find, listen, text, pen, layer, notes, and the book chat | done |
 | A reasoning-only assistant turn still continues, and a failed command, URL, or login is not sent again | done |
 | Starter phone skills include `review`, `debug`, `security`, and `deep-read`; a deleted starter skill stays deleted | done |
