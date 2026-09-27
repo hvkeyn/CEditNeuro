@@ -87,7 +87,7 @@ object Attachments {
         return if (text.length > TEXT_CAP) text.take(TEXT_CAP) + "\n... truncated, read the file for the rest" else text
     }
 
-    private fun isImage(file: File) = file.extension.lowercase() in setOf("jpg", "jpeg", "png", "webp", "gif")
+    private fun isImage(file: File) = file.extension.lowercase() in setOf("jpg", "jpeg", "png", "webp", "gif", "heic", "heif")
 
     private fun imageDataUrl(file: File): String? = runCatching {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
