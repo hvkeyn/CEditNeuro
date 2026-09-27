@@ -144,7 +144,7 @@ object StarterSkills {
             Use this when the user wants a landing page, a cabinet, a form, or another product screen.
 
             1. Call load_tools group=design. Restate who the page is for and the one job of the screen.
-            2. If they name a design system, or ask how a known company builds screens, call design_system with that name. Quote only the swatches the tool printed. For type, spacing, and corners, http_request the page URL and quote only what that page printed. Do not invent a hex and call it official. Do not copy a company's product.
+            2. If they name a design system, or ask how a known company builds screens, call design_system with that name. Quote only the swatches the tool printed. If load_tools says the group has no tools, http_request that system's public page instead. For type, spacing, and corners, http_request the page URL and quote only what that page printed. Do not invent a hex and call it official. Do not copy a company's product.
             3. For an Apple-like feel, hold to purpose, agency, responsibility, familiarity, flexibility, simplicity, craft, and delight. A press answers at once. Motion follows the finger and can be stopped. Honor reduced motion. Do not add a library this phone cannot run.
             4. Before code, write a short plan in the chat: four to six color roles, two type roles, one layout sentence, and one signature element that belongs to this brief. If that plan would fit any other product, change it.
             5. write_file one HTML page in the project, with a plain style block in the file. Use system fonts. No package install and no remote script. The editor preview shows html and htm.
@@ -246,6 +246,20 @@ object StarterSkills {
         extendHealth(appDir)
         extendTranslate(appDir)
         extendNetMap(appDir)
+        extendDesign(appDir)
+    }
+
+    /** Phones that saved the first design skill learn what to do when design_system is not built in. */
+    private fun extendDesign(appDir: File) {
+        val file = File(appDir, "frontend-design.md")
+        if (!file.isFile) return
+        val current = file.readText(Charsets.UTF_8)
+        if (current.contains("group has no tools")) return
+        if (!current.contains("call design_system")) return
+        file.writeText(
+            current.trimEnd() + "\n\nIf load_tools says the group has no tools, http_request that system's public page instead.\n",
+            Charsets.UTF_8,
+        )
     }
 
     /** Phones that already saved the first health skill gain the trend steps. A deleted file stays deleted. */

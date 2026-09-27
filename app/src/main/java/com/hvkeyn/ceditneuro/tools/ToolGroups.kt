@@ -126,14 +126,24 @@ object ToolGroups {
 class ToolSession(initial: Set<String>) {
     private val loaded = initial.toMutableSet()
 
+    /** Names built into this app. A group member missing here is not offered to the model. */
+    @Volatile
+    var present: Set<String>? = null
+
     fun visible(registry: ToolRegistry): List<Tool> {
         val names = ToolGroups.visibleNames(loaded)
         return registry.all.filter { it.name in names }
     }
 
     fun load(group: String): String {
-        val members = ToolGroups.groups[group]
+        val listed = ToolGroups.groups[group]
             ?: return "Unknown group '$group'. Groups: ${ToolGroups.groups.keys.joinToString(", ")}."
+        val known = present
+        val members = if (known == null) listed else listed.filter { it in known }
+        if (members.isEmpty()) {
+            loaded += group
+            return "Group $group has no tools in this app. Do the task with the core tools."
+        }
         if (!loaded.add(group)) return "Group $group is already loaded: ${members.joinToString(", ")}."
         return "Loaded $group: ${members.joinToString(", ")}. They can be called on the next step."
     }

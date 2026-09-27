@@ -6,7 +6,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import com.hvkeyn.ceditneuro.net.PacketCaptureService
+import androidx.lifecycle.lifecycleScope
+import com.hvkeyn.ceditneuro.net.PacketCaptureHub
+import kotlinx.coroutines.launch
 import com.hvkeyn.ceditneuro.ui.WorkspaceScreen
 import com.hvkeyn.ceditneuro.ui.theme.CEditNeuroTheme
 
@@ -26,12 +28,7 @@ class MainActivity : ComponentActivity() {
             status?.writeText("accepted")
             return@registerForActivityResult
         }
-        try {
-            PacketCaptureService.start(this, pending.first, pending.second)
-            status?.writeText("started")
-        } catch (thrown: Throwable) {
-            status?.writeText(thrown.javaClass.simpleName + ": " + thrown.message.orEmpty().take(200))
-        }
+        launchCapture(pending.first, pending.second)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -77,10 +74,17 @@ class MainActivity : ComponentActivity() {
                 status.writeText("accepted")
                 return
             }
-            PacketCaptureService.start(this, path, seconds)
-            status.writeText("started")
+            launchCapture(path, seconds)
         } catch (thrown: Throwable) {
             status.writeText(thrown.javaClass.simpleName + ": " + thrown.message.orEmpty().take(200))
+        }
+    }
+
+    private fun launchCapture(path: String, seconds: Int) {
+        statusFile()?.writeText("started")
+        lifecycleScope.launch {
+            val text = PacketCaptureHub.record(applicationContext, path, seconds)
+            statusFile()?.writeText(if (PacketCaptureHub.isError(text)) "error: " + text.take(200) else "done")
         }
     }
 

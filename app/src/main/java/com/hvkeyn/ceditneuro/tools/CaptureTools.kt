@@ -5,11 +5,11 @@ import android.content.Intent
 import android.net.VpnService
 import com.hvkeyn.ceditneuro.MainActivity
 import com.hvkeyn.ceditneuro.net.PacketCaptureHub
-import com.hvkeyn.ceditneuro.net.PacketCaptureService
 import com.hvkeyn.ceditneuro.net.PacketDump
 import com.hvkeyn.ceditneuro.workspace.Workspace
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
-import java.io.File
 
 class CaptureDumpTool(private val context: Context, private val workspace: Workspace) : Tool {
     override val name = "capture_dump"
@@ -41,19 +41,9 @@ class CaptureDumpTool(private val context: Context, private val workspace: Works
             if (opened.isFailure) return ToolResult.error("The VPN prompt could not be opened.")
             return ToolResult.error("The system VPN prompt is open. Accept it, then call capture_dump again.")
         }
-        if (!PacketCaptureHub.begin()) return ToolResult.error("A recording is already running.")
-        file.parentFile?.mkdirs()
-        val started = runCatching { PacketCaptureService.start(context, file.absolutePath, seconds) }
-        if (started.isFailure) {
-            PacketCaptureHub.finish("The recording did not start.")
-            return ToolResult.error("The recording did not start.")
-        }
-        val text = PacketCaptureHub.await(seconds)
-        return if (text.startsWith("The ") || text.startsWith("No ") || text.startsWith("A ")) {
-            ToolResult.error(text)
-        } else {
-            ToolResult.ok(text)
-        }
+        withContext(Dispatchers.IO) { file.parentFile?.mkdirs() }
+        val text = PacketCaptureHub.record(context, file.absolutePath, seconds)
+        return if (PacketCaptureHub.isError(text)) ToolResult.error(text) else ToolResult.ok(text)
     }
 }
 
@@ -71,7 +61,12 @@ class ReadDumpTool(private val workspace: Workspace) : Tool {
         val file = runCatching { workspace.resolve(path) }.getOrElse {
             return ToolResult.error(it.message ?: "That path is closed.")
         }
-        if (!file.isFile) return ToolResult.error("No dump at that path.")
-        return ToolResult.ok(PacketDump.summarize(file) + "\nfile=" + file.absolutePath + " bytes=" + file.length())
+        return withContext(Dispatchers.IO) {
+            if (!file.isFile) return@withContext ToolResult.error("No dump at that path.")
+            val text = runCatching { PacketDump.summarize(file) }.getOrElse {
+                return@withContext ToolResult.error("That file is not a pcap this app can read.")
+            }
+            ToolResult.ok(text + "\nfile=" + file.absolutePath + " bytes=" + file.length())
+        }
     }
 }

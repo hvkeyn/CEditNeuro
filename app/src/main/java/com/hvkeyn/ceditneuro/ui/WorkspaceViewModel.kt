@@ -2959,6 +2959,7 @@ class WorkspaceViewModel(
                 " Call remote_connect again if the user gives a different server."
         }
 
+        toolSession.present = tools.map { it.name }.toSet()
         return AgentLoop(
             backend = DeepSeekBackend { settingsStore.current },
             toolRegistry = ToolRegistry(tools),

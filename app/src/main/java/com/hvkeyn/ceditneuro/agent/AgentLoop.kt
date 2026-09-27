@@ -3,7 +3,9 @@ package com.hvkeyn.ceditneuro.agent
 import com.hvkeyn.ceditneuro.tools.ToolRegistry
 import com.hvkeyn.ceditneuro.tools.ToolResult
 import com.hvkeyn.ceditneuro.tools.ToolSession
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
@@ -34,6 +36,13 @@ class AgentLoop(
             "list_dir", "read_file", "grep", "glob", "git_status", "git_diff",
             "list_skills", "read_skill", "search_sessions", "device_status", "list_apps", "calculate", "reference",
             "find_skills", "review_skill", "design_system", "read_dump",
+        )
+
+        /** File-only tools that do not switch threads themselves. The loop runs on the main thread. */
+        private val OFF_MAIN = setOf(
+            "research_log", "research_report", "research_figure", "research_plot",
+            "health_log", "health_panel", "health_trend", "health_index",
+            "remember", "list_skills", "read_skill",
         )
     }
 
@@ -260,7 +269,9 @@ class AgentLoop(
                     "Use that result instead of calling it again.",
             )
         }
-        val result = runCatching { tool.execute(args) }
+        val result = runCatching {
+            if (call.function.name in OFF_MAIN) withContext(Dispatchers.IO) { tool.execute(args) } else tool.execute(args)
+        }
             .getOrElse { error ->
                 ToolResult.error("Tool '${call.function.name}' failed: ${error.message ?: error::class.java.simpleName}")
             }
