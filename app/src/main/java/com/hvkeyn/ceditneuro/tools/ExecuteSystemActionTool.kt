@@ -15,7 +15,7 @@ class ExecuteSystemActionTool(
     override val description =
         "Tap one point on the screen. paramX and paramY are the tap=X,Y center from " +
             "fetch_system_layout, not a corner of the bounds. Requires Shizuku or root, same as shizuku_exec. " +
-            "Do not use it to install or remove an app. Those go through install_apk and uninstall_apk."
+            "Do use it to install or remove an app. Those go through install_apk and uninstall_apk."
     override val parameters = objectSchema(
         properties = mapOf(
             "paramX" to intProp("Horizontal pixel coordinate of the tap."),
