@@ -1,14 +1,22 @@
 package com.hvkeyn.ceditneuro.ui.editor
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.graphics.BitmapFactory
 import android.util.Base64
+import android.view.MotionEvent
+import android.view.ViewConfiguration
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ZoomIn
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,6 +26,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -26,6 +35,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -49,7 +59,7 @@ internal fun svgAspect(markup: String): Float {
 
 /** Wraps markup so a scheme fills the frame and keeps its colors on a white page. */
 internal fun previewPage(kind: String, text: String): String = when (kind) {
-    "svg" -> "<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">" +
+    "svg" -> "<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=8, user-scalable=yes\">" +
         "<style>html,body{margin:0;background:#fff}svg{display:block;width:100%;height:auto}</style>" +
         "</head><body>$text</body></html>"
     else -> text
@@ -70,6 +80,7 @@ fun ImagePreview(file: File, modifier: Modifier = Modifier) {
     }
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    var enlarged by remember { mutableStateOf(false) }
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -100,20 +111,62 @@ fun ImagePreview(file: File, modifier: Modifier = Modifier) {
                     },
             )
         }
+        IconButton(
+            onClick = { enlarged = true },
+            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+        ) {
+            Icon(Icons.Filled.ZoomIn, contentDescription = "Enlarge", tint = Color.White)
+        }
+    }
+    if (enlarged && bitmap != null) {
+        com.hvkeyn.ceditneuro.ui.PictureStage(onClose = { enlarged = false }) {
+            Image(
+                bitmap = bitmap!!.asImageBitmap(),
+                contentDescription = file.name,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+/**
+ * A scheme or HTML page. A tap opens it; inside that view a pinch zooms, because a
+ * WebView sits above Compose and would swallow a gesture drawn on top of it.
+ */
+@Composable
+fun ExpandableMarkup(
+    kind: String,
+    text: String,
+    baseDir: File?,
+    modifier: Modifier = Modifier,
+) {
+    var open by remember { mutableStateOf(false) }
+    MarkupPreview(kind, text, baseDir, modifier, onTap = { open = true }, allowZoom = false)
+    if (open) {
+        com.hvkeyn.ceditneuro.ui.WebPictureStage(onClose = { open = false }) {
+            MarkupPreview(kind, text, baseDir, Modifier.fillMaxSize(), allowZoom = true)
+        }
     }
 }
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun MarkupPreview(kind: String, text: String, baseDir: File?, modifier: Modifier = Modifier) {
+fun MarkupPreview(
+    kind: String,
+    text: String,
+    baseDir: File?,
+    modifier: Modifier = Modifier,
+    onTap: (() -> Unit)? = null,
+    allowZoom: Boolean = false,
+) {
     val page = remember(kind, text) { previewPage(kind, text) }
     AndroidView(
         modifier = modifier.fillMaxSize(),
         factory = { context ->
-            WebView(context).apply {
+            PreviewWeb(context).apply {
                 settings.javaScriptEnabled = false
                 settings.allowFileAccess = true
-                settings.builtInZoomControls = true
                 settings.displayZoomControls = false
                 settings.useWideViewPort = true
                 settings.loadWithOverviewMode = false
@@ -121,6 +174,8 @@ fun MarkupPreview(kind: String, text: String, baseDir: File?, modifier: Modifier
             }
         },
         update = { view ->
+            view.onTap = onTap
+            view.zoomEnabled = allowZoom
             if (view.tag != page) {
                 view.tag = page
                 if (kind == "svg") {
@@ -134,4 +189,49 @@ fun MarkupPreview(kind: String, text: String, baseDir: File?, modifier: Modifier
             }
         },
     )
+}
+
+/** Tap opens the picture. While zoom is on, the WebView keeps the pinch for itself. */
+@SuppressLint("ClickableViewAccessibility")
+private class PreviewWeb(context: Context) : WebView(context) {
+    var onTap: (() -> Unit)? = null
+    var zoomEnabled: Boolean = false
+        set(value) {
+            field = value
+            settings.setSupportZoom(value)
+            settings.builtInZoomControls = value
+            settings.displayZoomControls = false
+        }
+    private val slop = ViewConfiguration.get(context).scaledTouchSlop
+    private var downX = 0f
+    private var downY = 0f
+    private var moved = false
+
+    init {
+        webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView, url: String) {
+                settings.setSupportZoom(zoomEnabled)
+                settings.builtInZoomControls = zoomEnabled
+                settings.displayZoomControls = false
+            }
+        }
+        setOnTouchListener { _, event ->
+            if (zoomEnabled) return@setOnTouchListener false
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downX = event.x
+                    downY = event.y
+                    moved = false
+                }
+                MotionEvent.ACTION_POINTER_DOWN -> moved = true
+                MotionEvent.ACTION_MOVE -> {
+                    if (kotlin.math.abs(event.x - downX) > slop || kotlin.math.abs(event.y - downY) > slop) {
+                        moved = true
+                    }
+                }
+                MotionEvent.ACTION_UP -> if (!moved) onTap?.invoke()
+            }
+            true
+        }
+    }
 }

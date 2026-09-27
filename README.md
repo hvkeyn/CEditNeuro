@@ -53,13 +53,14 @@ layer is wired end to end.
 | Chat bar: work focus and skills in one tap; `research_plot` draws a chart from numbers; `calculate` has sum, mean, median, stdev | done |
 | An open `.py` or `.sh` file runs from the editor; output streams into the shell and Stop ends it | done |
 | PNG, JPG, WebP, GIF, BMP, SVG, and HTML open as a preview, with a switch back to the text | done |
-| A ticked skill stays on for that chat (up to three) and the agent follows it on every run | done |
-| Saving or extending a skill switches it on. use_skill switches on a saved skill and follows it in that chat | done |
+| A ticked skill stays on for that chat, with no count cap, and the agent follows it on every run | done |
+| The agent turns on every saved skill that fits the task. use_skill, save_skill, and append_skill switch it on | done |
 | No signal blocks a new agent run. A chat link opens that book or file. SVG schemes draw in the chat and in the reader | done |
 | A scheme named in backticks is drawn in the reader and in chat, including when the file sits in a subfolder | done |
+| A tap on a scheme or photo opens it full screen, and a pinch zooms in and back out | done |
 | Reader tools are labelled icons: contents, find, listen, text, pen, layer, notes, and the book chat | done |
 | A reasoning-only assistant turn still continues, and a failed command, URL, or login is not sent again | done |
-| Starter phone skills `android-debug` and `book-notes`; a deleted starter skill stays deleted | done |
+| Starter phone skills include `review`, `debug`, `security`, and `deep-read`; a deleted starter skill stays deleted | done |
 | `install_jdk`, `install_android_sdk`, `install_runtime` from the Termux mirror | done |
 | Zed-style per-edit Accept/Reject diffs | not yet — edits apply immediately |
 

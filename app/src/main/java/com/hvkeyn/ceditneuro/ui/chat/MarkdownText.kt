@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -45,7 +44,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import com.hvkeyn.ceditneuro.reader.BookText
-import com.hvkeyn.ceditneuro.ui.editor.MarkupPreview
+import com.hvkeyn.ceditneuro.ui.editor.ExpandableMarkup
 import com.hvkeyn.ceditneuro.ui.editor.svgAspect
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -177,13 +176,14 @@ private fun SvgDrawing(markup: String) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp)),
     ) {
-        Box(
+        ExpandableMarkup(
+            kind = "svg",
+            text = markup,
+            baseDir = null,
             modifier = Modifier
                 .fillMaxWidth()
                 .height((maxWidth * aspect).coerceIn(160.dp, 720.dp)),
-        ) {
-            MarkupPreview(kind = "svg", text = markup, baseDir = null, modifier = Modifier.fillMaxSize())
-        }
+        )
     }
 }
 

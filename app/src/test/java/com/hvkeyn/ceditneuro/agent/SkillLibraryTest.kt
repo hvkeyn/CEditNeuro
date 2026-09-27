@@ -11,12 +11,12 @@ import java.nio.file.Files
 
 class SkillLibraryTest {
     @Test
-    fun switchingOnKeepsThreeAndDropsTheOldest() {
+    fun switchingOnAddsAndDoesNotDropOlderSkills() {
         assertEquals(listOf("app:one"), nextActiveSkills(emptyList(), "app:one", enable = true))
-        val full = nextActiveSkills(listOf("app:a", "app:b", "app:c"), "app:photo-ocr", enable = true)
-        assertEquals(listOf("app:b", "app:c", "app:photo-ocr"), full)
-        assertEquals(listOf("app:b", "app:c"), nextActiveSkills(full, "app:photo-ocr", enable = false))
-        assertEquals(full, nextActiveSkills(full, "app:photo-ocr", enable = true))
+        val four = nextActiveSkills(listOf("app:a", "app:b", "app:c"), "app:photo-ocr", enable = true)
+        assertEquals(listOf("app:a", "app:b", "app:c", "app:photo-ocr"), four)
+        assertEquals(listOf("app:a", "app:b", "app:c"), nextActiveSkills(four, "app:photo-ocr", enable = false))
+        assertEquals(four, nextActiveSkills(four, "app:photo-ocr", enable = true))
     }
 
     @Test

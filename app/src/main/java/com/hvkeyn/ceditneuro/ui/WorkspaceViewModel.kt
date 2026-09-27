@@ -162,7 +162,6 @@ internal fun runCommandFor(path: String, absolute: String): String? {
 
 internal fun isRunnable(path: String): Boolean = runCommandFor(path, path) != null
 
-private const val MAX_ACTIVE_SKILLS = 3
 
 data class ShellLine(
     val id: Long,
@@ -2730,12 +2729,8 @@ class WorkspaceViewModel(
             val next = nextActiveSkills(previous, key, enable)
             message = when {
                 !enable -> "Switched off $safe ($where)."
-                key in previous && next == previous -> "Already on: $safe ($where). Follow it."
-                else -> {
-                    val dropped = previous.filter { it !in next }.joinToString { it.substringAfter(':') }
-                    if (dropped.isEmpty()) "Switched on $safe ($where). Follow it for this chat."
-                    else "Switched on $safe ($where). Follow it for this chat. Switched off $dropped to keep 3."
-                }
+                key in previous -> "Already on: $safe ($where). Follow it."
+                else -> "Switched on $safe ($where). Follow it for this chat."
             }
             state.copy(activeSkills = next)
         }
@@ -2748,7 +2743,7 @@ class WorkspaceViewModel(
         val key = "${entry.scope}:${entry.name}"
         editProject(project) {
             val on = key in it.activeSkills
-            it.copy(activeSkills = if (on) it.activeSkills - key else (it.activeSkills + key).takeLast(MAX_ACTIVE_SKILLS))
+            it.copy(activeSkills = if (on) it.activeSkills - key else it.activeSkills + key)
         }
         persistNow(project)
     }

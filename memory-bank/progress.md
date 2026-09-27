@@ -1,6 +1,6 @@
 # Progress
 
-Released: v0.45.0 through v0.53.0 (scheme names in backticks draw in the reader and in chat; see activeContext.md). Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, `SkillLibraryTest`, and `ChatLinkTest`.
+Released: v0.45.0 through v0.54.0 (a scheme or photo opens full screen and pinches to zoom; the agent turns on every skill that fits the task; see activeContext.md). Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, `SkillLibraryTest`, and `ChatLinkTest`.
 
 Known gaps:
 - The file tree does not refresh by itself when files appear on disk; reselecting the project reloads it.

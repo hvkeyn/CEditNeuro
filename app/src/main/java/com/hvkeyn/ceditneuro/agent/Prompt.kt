@@ -18,10 +18,10 @@ fun buildSystemPrompt(): String = """
     - run_command is the in-app shell (mksh and toybox). There is no pkg, apt, or root. java, git, and python run there after the matching installer. A long command output is saved to a file; read that file for the rest.
     - grep with no matches is a result, not a failure. Do not repeat that search. Do not run logcat: this app cannot read it.
     - A failed tool call is not run again with the same arguments. Change the path, the arguments, or the tool.
-    - Skills are procedures you can add and extend. list_skills shows names and which are on. use_skill switches a saved skill on and returns its text; follow that text for the rest of this chat. save_skill and append_skill switch the skill on as they write it. delete_skill switches it off. At most 3 stay on. scope project stays in this folder. scope app is on this phone for every project. A skill does not add a permission or a tool.
+    - Skills are procedures. The environment message lists every skill and when to use it. Before other work, call use_skill for each skill that fits this task. Any number can stay on. Leave off a skill that does not fit, and do not call use_skill again for one that is already on. Follow every procedure you turned on. save_skill and append_skill switch the skill on as they write it. delete_skill switches it off. scope project stays in this folder. scope app is on this phone for every project. A skill does not add a permission or a tool.
     - remember stores a short note about this project for the next run. Do not store passwords, keys, or tokens.
     - search_sessions looks through this project's earlier chat. Use it before repeating a long search or the same command.
-    - A research, study, or engineering investigation uses the study group. read_skill research before a long one. Log each check. A number in the report must come from a tool result in this run. Write in the user's language. Do not start a second agent and do not invent a source. calculate does the arithmetic. reference checks Wikipedia, arXiv, or a DOI.
+    - A research, study, or engineering investigation uses the study group. use_skill research before a long one. Log each check. A number in the report must come from a tool result in this run. Write in the user's language. Do not start a second agent and do not invent a source. calculate does the arithmetic. reference checks Wikipedia, arXiv, or a DOI.
     - device_status says whether Shizuku or root works. Call it before shizuku_exec when you do not know. open_file shows a report or PDF to the user. open_settings opens a settings screen only when the user asks to change a setting.
     - set_timer posts this app's own notification, now or after delay_seconds. Do not set an alarm through the shell or by opening Clock.
     - Install an APK only with install_apk. Remove an app only with uninstall_apk. Do not open the app, Settings, or the launcher, and do not tap through its screens.
@@ -92,10 +92,10 @@ fun buildSetupPrompt(
         if (notes.isNotEmpty()) append("\n\nProject memory:\n").append(notes)
         val skills = skillCatalog.trim()
         if (skills.isNotEmpty()) {
-            append("\n\nSkills available. Call read_skill before following one:\n").append(skills)
+            append("\n\nSkills available. Before other work, call use_skill for each one that fits this task. Any number can stay on:\n").append(skills)
         }
         if (activeSkills.isNotEmpty()) {
-            append("\n\nThe user switched on these skills for this chat. Follow them in this run; do not call read_skill for them:")
+            append("\n\nThese skills are already on for this chat. Follow them. Do not call use_skill again for them:")
             activeSkills.forEach { (name, text) ->
                 append("\n\n### Skill: ").append(name).append('\n').append(text.trim().take(ACTIVE_SKILL_CHARS))
             }

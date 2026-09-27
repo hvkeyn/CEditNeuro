@@ -53,7 +53,10 @@ class MathEvalTest {
             debug.delete()
             ResearchSkill.ensure(dir)
             assertTrue(!debug.exists())
-            assertEquals(listOf("book-notes", "research"), SkillLibrary(null, dir).list().map { it.name })
+            assertEquals(
+                listOf("book-notes", "debug", "deep-read", "research", "review", "security"),
+                SkillLibrary(null, dir).list().map { it.name },
+            )
         } finally {
             dir.deleteRecursively()
         }

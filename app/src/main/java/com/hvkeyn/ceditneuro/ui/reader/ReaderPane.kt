@@ -79,13 +79,15 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hvkeyn.ceditneuro.data.ReaderNote
 import com.hvkeyn.ceditneuro.reader.BookText
 import com.hvkeyn.ceditneuro.reader.PagePiece
 import com.hvkeyn.ceditneuro.ui.ReaderView
-import com.hvkeyn.ceditneuro.ui.editor.MarkupPreview
+import com.hvkeyn.ceditneuro.ui.ExpandablePicture
+import com.hvkeyn.ceditneuro.ui.editor.ExpandableMarkup
 import com.hvkeyn.ceditneuro.ui.editor.svgAspect
 import kotlin.math.min
 
@@ -326,6 +328,7 @@ fun ReaderPane(
         if (mode == "read") Row(
             modifier = Modifier
                 .fillMaxSize()
+                .zIndex(-1f)
                 .pointerInput(count, columns) {
                     var dragged = 0f
                     detectHorizontalDragGestures(
@@ -866,18 +869,19 @@ private fun FigureBlock(
     val bytes = images[id] ?: return
     if (BookText.isSvgBytes(bytes)) {
         val text = remember(id, bytes) { bytes.toString(Charsets.UTF_8) }
+        val aspect = svgAspect(text)
         if (fill) {
-            Box(modifier) { MarkupPreview("svg", text, null, Modifier.fillMaxSize()) }
+            ExpandableMarkup("svg", text, null, modifier)
         } else {
-            val aspect = svgAspect(text)
             BoxWithConstraints(Modifier.fillMaxWidth()) {
-                Box(
+                ExpandableMarkup(
+                    "svg",
+                    text,
+                    null,
                     Modifier
                         .fillMaxWidth()
                         .height((maxWidth * aspect).coerceIn(140.dp, 720.dp)),
-                ) {
-                    MarkupPreview("svg", text, null, Modifier.fillMaxSize())
-                }
+                )
             }
         }
         return
@@ -893,11 +897,13 @@ private fun FigureBlock(
             )
         }
     } else {
-        Image(
-            bitmap = bitmap.asImageBitmap(),
-            contentDescription = id,
-            contentScale = ContentScale.Fit,
-            modifier = modifier,
-        )
+        ExpandablePicture(modifier) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = id,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
