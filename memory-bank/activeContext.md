@@ -1,6 +1,8 @@
 # Active context
 
-Current: v0.63.0. The reader stores the character offset of the open page on this phone. Closing the reader or leaving the app does not drop that place. Reopening uses the offset, then the saved fraction, and does not clamp the screen page down to a coarser page list.
+Current: v0.64.0. `ru-translate` is the full Russian cycle for an article, a book, a game, or a program. The original stays. Russian is written beside it. The agent keeps a state file and does not stop, or ask to continue, until that file says pass. An article or a book passes at P5. A game or a program passes at P6. After the source language is gone it still fixes word order, extra «свой», stiff phrasing, and one term with two names. A stiff line is rewritten three ways. The whole skill is injected (12 000 characters).
+
+v0.63.0. The reader stores the character offset of the open page on this phone. Closing the reader or leaving the app does not drop that place. Reopening uses the offset, then the saved fraction, and does not clamp the screen page down to a coarser page list. Checked on the phone: page 4 of 1192 stayed after the reader was closed and after the app was killed.
 
 v0.62.0. This packages the commit already on main. That commit changes three strings and does not register `design_system` in the agent loop. `Workspace` still refuses another app's private data. `set_timer` still posts this app's own notification. Installed over the existing app. Checked on the phone: the projects are still listed, the chat opens, and frontend-design is still in the menu.
 
