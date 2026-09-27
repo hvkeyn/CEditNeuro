@@ -22,8 +22,9 @@ import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -360,29 +361,41 @@ object PacketCaptureHub {
     var running: Boolean = false
         private set
 
-    private var latch = CountDownLatch(0)
+    @Volatile
+    private var pending: CompletableDeferred<String>? = null
 
     @Synchronized
     fun begin(): Boolean {
         if (running) return false
         running = true
-        latch = CountDownLatch(1)
+        pending = CompletableDeferred()
         return true
     }
 
-    fun await(seconds: Int): String {
-        latch.await((seconds + 20).toLong(), java.util.concurrent.TimeUnit.SECONDS)
+    /** Suspends, never blocks: the service must reach startForeground on the main thread meanwhile. */
+    suspend fun await(seconds: Int): String {
+        val waiting = pending ?: return "The recording did not start."
+        val text = withTimeoutOrNull((seconds + 20) * 1000L) { waiting.await() }
         running = false
-        return result.ifBlank { "The recording did not finish." }
+        return text ?: "The recording did not finish."
     }
-
-    @Volatile
-    var result: String = ""
-        private set
 
     fun finish(text: String) {
-        result = text
         running = false
-        latch.countDown()
+        pending?.complete(text)
     }
+
+    /** Starts the service and waits for its summary. A line starting with "The ", "No ", or "A " is an error. */
+    suspend fun record(context: Context, path: String, seconds: Int): String {
+        if (!begin()) return "A recording is already running."
+        val started = runCatching { PacketCaptureService.start(context, path, seconds) }
+        if (started.isFailure) {
+            finish("The recording did not start.")
+            return "The recording did not start: ${started.exceptionOrNull()?.javaClass?.simpleName}."
+        }
+        return await(seconds)
+    }
+
+    fun isError(text: String): Boolean =
+        text.startsWith("The ") || text.startsWith("No ") || text.startsWith("A ")
 }
