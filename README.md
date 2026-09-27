@@ -65,7 +65,8 @@ layer is wired end to end.
 | A missing skill is searched by plain words. `review_skill` blocks a dangerous prompt, a backdoor, malware, or a key, and `save_skill` stores only the adapted text | done |
 | A product screen is designed in the project: `design_system` names a public system and its gallery swatches, then the agent writes one HTML page | done |
 | `ru-translate` turns an article, a book, a game, or a program into Russian beside the original. It does not stop until the state file says pass (P5 or P6) | done |
-| `net-map` draws a network from a dump. `capture_dump` records this phone's public IPv4 into a pcap and stops by itself. `read_dump` names hosts and ports | done |
+| `net-map` draws a network from a dump. `capture_dump` records this phone's public IPv4 into a pcap, both directions, and stops by itself. `read_dump` names hosts and ports and ends with an audit block | done |
+| `net_audit` checks the Wi-Fi this phone is on: gateway, DNS, private DNS, open ports, SSDP and mDNS devices, an optional /24 sweep, and ranked findings. Connect only, no login | done |
 | Reader tools are labelled icons: contents, find, listen, text, pen, layer, notes, and the book chat | done |
 | A reasoning-only assistant turn still continues, and a failed command, URL, or login is not sent again | done |
 | Starter phone skills include `review`, `debug`, `security`, and `deep-read`; a deleted starter skill stays deleted | done |

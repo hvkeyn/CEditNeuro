@@ -87,6 +87,7 @@ object ToolGroups {
             "reference",
             "capture_dump",
             "read_dump",
+            "net_audit",
     ),
         "health" to listOf(
             "health_log",

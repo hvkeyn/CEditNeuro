@@ -2368,6 +2368,7 @@ class WorkspaceViewModel(
             "reference" -> "Checking a reference"
             "capture_dump" -> "Recording packets"
             "read_dump" -> "Reading a dump"
+            "net_audit" -> "Auditing the network"
             "device_status" -> "Checking the phone"
             "list_apps" -> "Listing apps"
             "open_settings" -> "Opening settings"
@@ -2929,6 +2930,7 @@ class WorkspaceViewModel(
             com.hvkeyn.ceditneuro.tools.ReferenceTool(agentNet) { settingsStore.current.networkEnabled },
             com.hvkeyn.ceditneuro.tools.CaptureDumpTool(appContext, ws),
             com.hvkeyn.ceditneuro.tools.ReadDumpTool(ws),
+            com.hvkeyn.ceditneuro.tools.NetAuditTool(appContext) { settingsStore.current.networkEnabled },
             com.hvkeyn.ceditneuro.tools.DeviceStatusTool(appContext),
             com.hvkeyn.ceditneuro.tools.ListAppsTool(appContext),
             com.hvkeyn.ceditneuro.tools.OpenSettingsTool(appContext),

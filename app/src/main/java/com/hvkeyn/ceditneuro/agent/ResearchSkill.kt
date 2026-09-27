@@ -183,9 +183,13 @@ object StarterSkills {
 
             Use this when the user wants a network drawn from packets. Switch it off when the task is not a dump.
 
-            A file already in the project is read with read_dump. A recording of this phone is capture_dump: it shows a notification, asks for the VPN once, writes a pcap, and stops by itself. ICMP is recorded and is not forwarded, so a ping can fail until the recording stops. TCP and UDP keep working. Private ranges are not recorded. Do not record another device. Do not scan the live network by hand.
+            A file already in the project is read with read_dump. A recording of this phone is capture_dump: it shows a notification, asks for the VPN once, writes a pcap, and stops by itself. ICMP is recorded and is not forwarded, so a ping can fail until the recording stops. TCP and UDP keep working, and both directions are written, so an answered call shows a SYN and a SYN-ACK. Private ranges are not recorded. Do not record another device. Do not scan the live network by hand.
 
-            1. Call load_tools group=study. For this phone, call capture_dump, then use the file it names. For a dump the user already saved, call read_dump. Do not install a sniffer. Do not invent a field. A capture on this phone shows this phone's public IPv4 conversations, not a mirror of someone else's LAN.
+            On a capture_dump recording the phone's own address is shown as 203.0.113.2 and the reply packets are rebuilt by the recorder, so a reply's TTL is always 64 and is not the real remote hop count. On a dump the user saved from real hardware, the TTL is real. Say which kind of dump you are reading.
+
+            The read_dump and capture_dump summary ends with an audit block: how many TCP calls were answered, which calls got no answer, cleartext flows (http, ftp, telnet, and the like), plain DNS counts, QUIC flow counts, and whether a secret field (a cookie, an authorization header, or a password) rode in the clear. Use it: an unanswered call is a closed or filtered port, a cleartext flow is a risk to name, and a secret in the clear is a finding. The value of a secret is never printed; report only that it was present.
+
+            1. Call load_tools group=study. For this phone's own network, call net_audit first: it names the link, the gateway, DNS, private DNS, open gateway ports, and devices that answer SSDP or mDNS. Pass sweep=true only when the user wants the devices on their Wi-Fi listed. Then call capture_dump for the internet conversations and use the file it names. For a dump the user already saved, call read_dump. Do not install a sniffer. Do not invent a field. A capture on this phone shows this phone's public IPv4 conversations, not a mirror of someone else's LAN; the LAN comes from net_audit.
             2. Walk the packets in order. Write research/net-map.md as you go: each line is a fact with the packet number, or a guess marked as a guess. A missing reply is a fact too.
             3. Ethernet. Source and destination MAC. A broadcast or multicast destination is not a second device.
             4. DHCP. Client MAC and option 12 name. Do not draw a requested address until the ACK. From the ACK, take the client address, mask, gateway, and DNS. The server's own IP and MAC are the offerer.
@@ -193,10 +197,11 @@ object StarterSkills {
             6. ARP. Opcode 1 asks, opcode 2 answers. A request with no answer means that host is unconfirmed. Draw it dashed.
             7. CDP or LLDP. Device name, platform, the port that sent the packet, and the addresses on that port. The Ethernet source MAC belongs to that port. Two IP addresses on one MAC and one port are subinterfaces of one physical port, so a switch is likely between the hosts that share it. IP prefixes are networks attached to that device.
             8. A routing advertisement (RIP on UDP 520 to 224.0.0.9, or another routing protocol in the dump). A route with metric 1 and next hop 0.0.0.0 is directly connected. The speaker does not advertise the network it is already speaking into.
-            9. TCP. A SYN names who called which port. Port 80 or 443 is a web server. The handshake is confirmed only when the other side answers. The answer's TTL, compared with 64 or 128, estimates the hops.
-            10. Do not copy a cookie, a token, a password, or a page body into the note, the diagram, or the chat. Say that a private field was present and leave the value out.
-            11. Call research_figure name=net-map with one small SVG. Boxes are devices. Lines are links. Labels are only values a packet printed. Guesses stay in parentheses. Unconfirmed hosts are dashed. A new fact is not drawn until the packet that supports it has been read.
-            12. End with what the dump does not show. Do not say the whole network was seen. When the diagram is written, call use_skill name=net-map scope=app on=false.
+            9. TCP. A SYN names who called which port. Port 80 or 443 is a web server. The handshake is confirmed only when the other side answers with a SYN-ACK. On a saved dump from real hardware, the answer's TTL, compared with 64 or 128, estimates the hops; on a capture_dump recording the reply TTL is synthetic, so do not read hops from it.
+            10. Audit. From the audit block, write research/net-audit.md: answered ports (open), calls with no answer (closed or filtered), every cleartext flow and the risk of it, plain DNS that reveals the sites visited, and any secret field seen in the clear. Rank findings high, medium, low. A cleartext login or a secret in the clear is high. Recommend the fix in one line each (use TLS, close the port, use encrypted DNS). Do not overstate: an unanswered call is not proof a port is closed if the recording itself dropped the traffic.
+            11. Do not copy a cookie, a token, a password, or a page body into the note, the diagram, the audit, or the chat. Say that a private field was present and leave the value out.
+            12. Call research_figure name=net-map with one small SVG. Boxes are devices. Lines are links. Labels are only values a packet printed. Guesses stay in parentheses. Unconfirmed hosts are dashed. A new fact is not drawn until the packet that supports it has been read.
+            13. End with what the dump does not show. Do not say the whole network was seen. When the diagram and the audit are written, call use_skill name=net-map scope=app on=false.
         """.trimIndent() + "\n",
         "ru-translate" to """
             # Translate into Russian
@@ -277,12 +282,12 @@ object StarterSkills {
         )
     }
 
-    /** Phones that saved the first network skill learn that a ping can fail during the recording. */
+    /** Phones that saved an earlier network skill gain the reply and audit steps. */
     private fun extendNetMap(appDir: File) {
         val file = File(appDir, "net-map.md")
         if (!file.isFile) return
         val current = file.readText(Charsets.UTF_8)
-        if (current.contains("ICMP is recorded")) return
+        if (current.contains("audit block")) return
         if (!current.contains("Do not record another device")) return
         file.writeText(skills.getValue("net-map"), Charsets.UTF_8)
     }

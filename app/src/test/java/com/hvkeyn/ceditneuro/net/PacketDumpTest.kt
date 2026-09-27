@@ -27,6 +27,36 @@ class PacketDumpTest {
             assertTrue(text.contains("syn"))
             assertFalse(text.contains("supersecretvalue"))
             assertFalse(text.contains("Cookie"))
+            assertTrue(text.contains("cleartext flows: tcp 198.51.100.20:80 (http)"))
+            assertTrue(text.contains("secret fields in cleartext: cookie header x1 (values not printed)"))
+            assertTrue(text.contains("plain dns queries: 1, names 1"))
+            assertTrue(text.contains("tcp calls answered: 0 of 1"))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun auditCountsAnAnsweredCall() {
+        val dir = kotlin.io.path.createTempDirectory("pcap").toFile()
+        try {
+            val file = File(dir, "capture.pcap")
+            val phone = byteArrayOf(203.toByte(), 0.toByte(), 113.toByte(), 2.toByte())
+            val site = byteArrayOf(198.toByte(), 51.toByte(), 100.toByte(), 7.toByte())
+            RandomAccessFile(file, "rw").use { out ->
+                PacketDump.writeHeader(out, PacketDump.LINK_RAW)
+                val syn = PacketCodec.tcp(phone, site, 40000, 443, 1L, 0L, 0x02, ByteArray(0), 0)
+                val synAck = PacketCodec.tcp(site, phone, 443, 40000, 9L, 2L, 0x12, ByteArray(0), 0)
+                val lost = PacketCodec.tcp(phone, site, 40001, 8443, 1L, 0L, 0x02, ByteArray(0), 0)
+                PacketDump.append(out, syn, syn.size, 1_000)
+                PacketDump.append(out, synAck, synAck.size, 1_010)
+                PacketDump.append(out, lost, lost.size, 1_020)
+            }
+            val text = PacketDump.summarize(file)
+            assertTrue(text.contains("tcp calls answered: 1 of 2"))
+            assertTrue(text.contains("tcp calls with no answer: 198.51.100.7:8443"))
+            assertTrue(text.contains("cleartext flows: none"))
+            assertTrue(text.contains("secret fields in cleartext: none seen"))
         } finally {
             dir.deleteRecursively()
         }
