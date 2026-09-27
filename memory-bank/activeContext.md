@@ -1,6 +1,8 @@
 # Active context
 
-Current: v0.62.0. This packages the commit already on main. That commit changes three strings and does not register `design_system` in the agent loop. `Workspace` still refuses another app's private data. `set_timer` still posts this app's own notification. Installed over the existing app. Checked on the phone: the projects are still listed, the chat opens, and frontend-design is still in the menu.
+Current: v0.63.0. The reader stores the character offset of the open page on this phone. Closing the reader or leaving the app does not drop that place. Reopening uses the offset, then the saved fraction, and does not clamp the screen page down to a coarser page list.
+
+v0.62.0. This packages the commit already on main. That commit changes three strings and does not register `design_system` in the agent loop. `Workspace` still refuses another app's private data. `set_timer` still posts this app's own notification. Installed over the existing app. Checked on the phone: the projects are still listed, the chat opens, and frontend-design is still in the menu.
 
 v0.61.0. The agent turns on `frontend-design` for a landing page, a cabinet, a form, or another product screen. `design_system` looks up a public system from the designsystems.one gallery (name, vendor, card swatches, page URL). The page is one HTML file in the project. Apple-like work keeps the eight public principles and motion that can be stopped. Colors are quoted from the tool or the page. A company product is not copied. Checked on the phone: the skill is in the menu and switches on and off.
 

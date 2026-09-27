@@ -32,7 +32,7 @@ layer is wired end to end.
 | One agent per open project, with its own shade card | done |
 | Install and open an APK with `install_apk` (no Shizuku) | done |
 | Shared-storage paths follow this phone's real storage root and Downloads folder | done |
-| Book and note reader (txt, Markdown, HTML, FB2, EPUB, or a zip of those) with pages, bookmarks, notes, and a book chat | done |
+| Book and note reader (txt, Markdown, HTML, FB2, EPUB, or a zip of those) with pages, bookmarks, notes, and a book chat. The last page is restored after the reader closes or the app exits | done |
 | Foreground layout and tap (`fetch_system_layout`, `execute_system_action`) when Shizuku or root is already allowed | done |
 | Longer agent runs send a stable prompt, load rare tools on demand, and keep file reads and command output short | done |
 | Prepaid balance for the API key in Language models (DeepSeek and other hosts that publish one) | done |

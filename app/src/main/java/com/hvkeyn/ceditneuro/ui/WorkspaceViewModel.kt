@@ -203,6 +203,8 @@ data class ReaderView(
     val ink: List<com.hvkeyn.ceditneuro.data.PageInk> = emptyList(),
     val labels: List<com.hvkeyn.ceditneuro.data.PageLabel> = emptyList(),
     val bookChat: List<BookLine> = emptyList(),
+    val anchor: Int = 0,
+    val fraction: Float = 0f,
 )
 
 data class WorkspaceUiState(
@@ -800,12 +802,13 @@ class WorkspaceViewModel(
         publishReader(reader.path, reader.page, theme, fontSp, reader.title, fontName, spacing)
     }
 
-    fun readerProgress(page: Int, pageCount: Int, chapter: String) {
+    fun readerProgress(page: Int, pageCount: Int, chapter: String, anchor: Int) {
         val reader = _state.value.reader ?: return
-        if (page == reader.page && pageCount == reader.pageCount && chapter == reader.chapter) return
+        if (page == reader.page && pageCount == reader.pageCount && chapter == reader.chapter && anchor == reader.anchor) return
         val record = readerStore.read(reader.path)
         val count = pageCount.coerceAtLeast(1)
-        readerStore.write(record.copy(page = page, fraction = page.toFloat() / count))
+        val fraction = page.toFloat() / count
+        readerStore.write(record.copy(page = page, fraction = fraction, anchor = anchor.coerceAtLeast(0)))
         _state.update {
             it.copy(
                 reader = reader.copy(
@@ -814,6 +817,8 @@ class WorkspaceViewModel(
                     chapter = chapter,
                     percent = ((page + 1) * 100 / count),
                     bookmarked = page in record.bookmarks,
+                    anchor = anchor.coerceAtLeast(0),
+                    fraction = fraction,
                 ),
             )
         }
@@ -1049,7 +1054,7 @@ class WorkspaceViewModel(
             _state.value.reader?.page ?: saved.page
         } else {
             saved.page
-        }.coerceIn(0, openPages.lastIndex.coerceAtLeast(0))
+        }.coerceAtLeast(0)
         publishReader(file.absolutePath, page, saved.theme, font, book.title, saved.fontName, saved.spacing)
     }
 
@@ -1103,12 +1108,12 @@ class WorkspaceViewModel(
             ink = record.ink,
             labels = record.labels,
             bookChat = bookChats[path].orEmpty(),
+            anchor = record.anchor,
+            fraction = record.fraction,
         )
         readerStore.write(
             record.copy(
                 path = path,
-                page = page,
-                fraction = page.toFloat() / count,
                 theme = theme,
                 fontSp = font,
                 fontName = fontName ?: record.fontName,

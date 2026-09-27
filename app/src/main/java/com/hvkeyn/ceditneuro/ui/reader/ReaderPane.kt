@@ -160,7 +160,7 @@ fun ReaderPane(
     images: Map<String, ByteArray> = emptyMap(),
     onClose: () -> Unit,
     onStyle: (fontSp: Int, fontName: String, spacing: Float, theme: String) -> Unit,
-    onProgress: (page: Int, pageCount: Int, chapter: String) -> Unit,
+    onProgress: (page: Int, pageCount: Int, chapter: String, anchor: Int) -> Unit,
     onBookmark: () -> Unit,
     onAddNote: (String) -> Unit,
     onDeleteNote: (ReaderNote) -> Unit,
@@ -211,7 +211,12 @@ fun ReaderPane(
     LaunchedEffect(mode) {
         if (mode == "read") runCatching { keys.requestFocus() }
     }
-    var page by remember(pageText) { mutableIntStateOf(reader.page) }
+    var page by remember(pageText, reader.fontSp, reader.fontName, reader.spacing, reader.path) {
+        mutableIntStateOf(reader.page)
+    }
+    var placed by remember(pageText, reader.fontSp, reader.fontName, reader.spacing, reader.path) {
+        mutableStateOf(false)
+    }
     val font = when (reader.fontName) {
         "sans" -> FontFamily.SansSerif
         "mono" -> FontFamily.Monospace
@@ -255,10 +260,25 @@ fun ReaderPane(
                 )
             }
         }
+        val widthPx = with(density) { textWidth.roundToPx() }
+        val heightPx = with(density) { textHeight.roundToPx() }
         val count = spread.ranges.size.coerceAtLeast(1)
-        if (page > count - 1) page = count - 1
-        LaunchedEffect(count, page, spread.chapters.getOrNull(page)) {
-            onProgress(page, count, spread.chapters.getOrNull(page).orEmpty())
+        LaunchedEffect(spread.ranges, widthPx, heightPx) {
+            if (placed || widthPx <= 80 || heightPx <= 80) return@LaunchedEffect
+            page = com.hvkeyn.ceditneuro.reader.ReaderPlace.pageFor(
+                spread.ranges,
+                pageText.length,
+                reader.anchor,
+                reader.fraction,
+                reader.page,
+            )
+            placed = true
+        }
+        if (placed && page > count - 1) page = count - 1
+        LaunchedEffect(placed, count, page, spread.chapters.getOrNull(page)) {
+            if (!placed) return@LaunchedEffect
+            val anchor = spread.ranges.getOrNull(page)?.first ?: 0
+            onProgress(page, count, spread.chapters.getOrNull(page).orEmpty(), anchor)
         }
         val shown = (0 until columns).map { column ->
             val index = page + column

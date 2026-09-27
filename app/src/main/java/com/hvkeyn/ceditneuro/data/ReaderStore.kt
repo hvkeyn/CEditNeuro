@@ -38,6 +38,8 @@ data class ReaderRecord(
     val path: String,
     val page: Int = 0,
     val fraction: Float = 0f,
+    /** Character offset of the page in the book text. Survives a new screen layout. */
+    val anchor: Int = 0,
     val theme: String = "sepia",
     val fontSp: Int = 20,
     val fontName: String = "serif",
@@ -54,16 +56,27 @@ class ReaderStore(context: Context) {
     private val file = File(context.filesDir, "reader-progress.json")
     private val records = load()
 
-    fun read(path: String): ReaderRecord = records[path] ?: ReaderRecord(path)
+    fun read(path: String): ReaderRecord {
+        val canonical = key(path)
+        return records[canonical] ?: records[path] ?: ReaderRecord(canonical)
+    }
 
     fun write(record: ReaderRecord) {
-        records[record.path] = record.copy(
+        val canonical = key(record.path)
+        if (canonical != record.path) records.remove(record.path)
+        records[canonical] = record.copy(
+            path = canonical,
             notes = record.notes.takeLast(200),
             bookmarks = record.bookmarks.takeLast(200),
             ink = record.ink.takeLast(400),
             labels = record.labels.takeLast(200),
         )
         file.writeText(json.encodeToString(records.values.toList()))
+    }
+
+    private fun key(path: String): String {
+        val file = File(path)
+        return runCatching { if (file.exists()) file.canonicalPath else file.absolutePath }.getOrDefault(path)
     }
 
     private fun load(): MutableMap<String, ReaderRecord> {
