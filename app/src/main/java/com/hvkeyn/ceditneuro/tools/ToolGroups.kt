@@ -96,6 +96,9 @@ object ToolGroups {
             "find_skills",
             "review_skill",
         ),
+        "design" to listOf(
+            "design_system",
+        ),
     )
 
     fun groupOf(toolName: String): String? =
