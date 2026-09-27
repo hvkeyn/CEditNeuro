@@ -19,6 +19,7 @@ commonsCompress = "1.27.1"
 xz = "1.10"
 jsch = "0.2.21"
 shizuku = "13.1.5"
+apksig = "8.7.3"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -56,6 +57,7 @@ xz = { module = "org.tukaani:xz", version.ref = "xz" }
 jsch = { module = "com.github.mwiede:jsch", version.ref = "jsch" }
 shizuku-api = { module = "dev.rikka.shizuku:api", version.ref = "shizuku" }
 shizuku-provider = { module = "dev.rikka.shizuku:provider", version.ref = "shizuku" }
+apksig = { module = "com.android.tools.build:apksig", version.ref = "apksig" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

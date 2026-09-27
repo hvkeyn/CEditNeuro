@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "CEditNeuro"
 include(":app")
+include(":webviewshell")

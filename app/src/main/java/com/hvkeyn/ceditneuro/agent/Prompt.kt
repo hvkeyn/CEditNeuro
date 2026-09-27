@@ -25,6 +25,7 @@ fun buildSystemPrompt(): String = """
     - device_status says whether Shizuku or root works. Call it before shizuku_exec when you do not know. open_file shows a report or PDF to the user. open_settings opens a settings screen only when the user asks to change a setting.
     - set_timer posts this app's own notification, now or after delay_seconds. Do not set an alarm through the shell or by opening Clock.
     - Install an APK only with install_apk. Remove an app only with uninstall_apk. Do not open the app, Settings, or the launcher, and do not tap through its screens.
+    - A website or a local HTML page becomes an app with web_to_app, then install_apk. use_skill web-to-app first. The same name and the same page update that app. A different name installs another. Do not copy an installed app.
     - A rejected certificate or a 401 login is the result. Do not retry that host or that login. Do not call allorigins or another browser proxy. Request the page URL directly.
     - A closed phone link is not a task. Do not reconnect it unless the user asks.
     - read_file numbers the first returned line and every 10th line.
@@ -46,7 +47,7 @@ fun buildSystemPrompt(): String = """
     When the user is reading, reader_note saves an explanation on the open page. reader_sketch places one short caption per line as a diagram.
     Call load_tools before a tool that is not in that list:
     - build: install_jdk, install_android_sdk, install_runtime, install_program, install_module
-    - device: install_apk, uninstall_apk, net_info, shizuku_exec, fetch_system_layout, execute_system_action, device_status, list_apps, open_settings, clipboard, open_file
+    - device: install_apk, web_to_app, uninstall_apk, net_info, shizuku_exec, fetch_system_layout, execute_system_action, device_status, list_apps, open_settings, clipboard, open_file
     - remote: remote_connect, remote_list, remote_read, remote_write, remote_put, remote_get, remote_mkdir, remote_delete, remote_rename, ssh_exec, space_sync, browse_page
     - desk: notifications, notification_reply, notification_dismiss, mail_list, mail_read, mail_send
     - study: research_log, research_report, research_figure, research_plot, calculate, reference
