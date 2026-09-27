@@ -15,8 +15,8 @@ android {
         // API 29+ forbids executing a program this app just wrote. API 28 stays in the
         // compatibility domain that can run compilers installed into the app's private files.
         targetSdk = 28
-        versionCode = 56
-        versionName = "0.56.0"
+        versionCode = 57
+        versionName = "0.57.0"
     }
 
     buildTypes {
@@ -54,6 +54,8 @@ android {
         // Sideloaded on purpose. API 28 is what still allows this app to run installed compilers.
         disable += "ExpiredTargetSdkVersion"
     }
+
+    sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/web-shell"))
 
     packaging {
         jniLibs {
@@ -118,4 +120,22 @@ dependencies {
         exclude(group = "com.googlecode.javaewah", module = "JavaEWAH")
     }
     implementation("com.googlecode.javaewah:JavaEWAH:1.2.3")
+    implementation(libs.apksig)
+}
+
+val packWebShell = tasks.register<Copy>("packWebShell") {
+    description = "Copies the WebView shell into app assets."
+    dependsOn(":webviewshell:assembleDebug")
+    from(rootProject.layout.projectDirectory.dir("webviewshell/build/outputs/apk/debug"))
+    include("webviewshell-debug.apk")
+    into(layout.buildDirectory.dir("generated/web-shell"))
+    rename { "web-shell.apk" }
+    doFirst {
+        project.delete(layout.buildDirectory.dir("generated/web-shell"))
+    }
+}
+
+afterEvaluate {
+    tasks.named("preBuild").configure { dependsOn(packWebShell) }
+    tasks.named("testDebugUnitTest").configure { dependsOn(packWebShell) }
 }

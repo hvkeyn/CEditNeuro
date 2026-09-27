@@ -44,6 +44,7 @@ object ToolGroups {
         ),
         "device" to listOf(
             "install_apk",
+            "web_to_app",
             "uninstall_apk",
             "net_info",
             "shizuku_exec",

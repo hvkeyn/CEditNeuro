@@ -58,6 +58,7 @@ import com.hvkeyn.ceditneuro.tools.NotificationReplyTool
 import com.hvkeyn.ceditneuro.tools.NotificationsTool
 import com.hvkeyn.ceditneuro.tools.TimerTool
 import com.hvkeyn.ceditneuro.tools.InstallApkTool
+import com.hvkeyn.ceditneuro.tools.WebToAppTool
 import com.hvkeyn.ceditneuro.tools.UninstallApkTool
 import com.hvkeyn.ceditneuro.tools.InstallModuleTool
 import com.hvkeyn.ceditneuro.tools.InstallAndroidSdkTool
@@ -2325,6 +2326,7 @@ class WorkspaceViewModel(
             "execute_system_action" -> "Tapping the screen"
             "shizuku_exec" -> "Running a shell command"
             "install_apk" -> "Installing an APK"
+            "web_to_app" -> "Building an app"
             "install_jdk" -> "Installing the JDK"
             "install_android_sdk" -> "Installing the Android SDK"
             "install_runtime" -> "Installing a runtime"
@@ -2834,6 +2836,7 @@ class WorkspaceViewModel(
             ExecuteSystemActionTool(shizukuCommands, this::prepareShizuku),
             NetInfoTool(appContext),
             InstallApkTool(appContext, ws),
+            WebToAppTool(appContext, ws),
             UninstallApkTool(appContext),
             InstallAndroidSdkTool(
                 toolchain = deviceShell.toolchain,
