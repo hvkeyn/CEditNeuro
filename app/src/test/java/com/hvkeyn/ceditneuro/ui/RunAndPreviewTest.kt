@@ -50,11 +50,11 @@ class RunAndPreviewTest {
             accessLine = "",
             storageLine = "",
             loadedGroups = emptySet(),
-            activeSkills = listOf("research" to "Always cite sources.", "huge" to "x".repeat(10_000)),
+            activeSkills = listOf("research" to "Always cite sources.", "huge" to "x".repeat(20_000)),
         )
         assertTrue(prompt.contains("### Skill: research"))
         assertTrue(prompt.contains("Always cite sources."))
-        assertFalse(prompt.contains("x".repeat(5_000)))
+        assertFalse(prompt.contains("x".repeat(13_000)))
         val plain = buildSetupPrompt("/p", "/t", "", "edit", "", "", emptySet())
         assertFalse(plain.contains("### Skill:"))
     }

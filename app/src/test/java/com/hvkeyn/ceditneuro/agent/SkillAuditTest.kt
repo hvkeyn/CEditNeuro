@@ -57,6 +57,30 @@ class SkillAuditTest {
                 val audit = SkillAudit.check(text, name)
                 assertFalse(name, audit.blocked)
             }
+            val translate = StarterSkills.skills.getValue("ru-translate")
+            assertTrue(translate.length <= com.hvkeyn.ceditneuro.agent.ACTIVE_SKILL_CHARS)
+            assertTrue(translate.contains("state file says pass"))
+            assertTrue(translate.contains("свою руку"))
+            listOf("article", "book", "game", "program", "P0", "P5", "P6").forEach {
+                assertTrue(it, translate.contains(it))
+            }
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun oldTranslateSkillGainsTheFullCycle() {
+        val dir = kotlin.io.path.createTempDirectory("translate-skill").toFile()
+        try {
+            File(dir, ".starter-written").writeText("ru-translate\n")
+            File(dir, "ru-translate.md").writeText(
+                "# Translate into Russian\nDo not say the translation is done before P5.\n",
+            )
+            StarterSkills.ensure(dir)
+            val text = File(dir, "ru-translate.md").readText()
+            assertTrue(text.contains("state file says pass"))
+            assertTrue(text.contains("Article."))
         } finally {
             dir.deleteRecursively()
         }
