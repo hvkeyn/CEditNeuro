@@ -579,7 +579,7 @@ private fun AgentToolbar(
                 DropdownMenu(expanded = skillsOpen, onDismissRequest = { skillsOpen = false }) {
                     Text(
                         if (skillList.isEmpty()) "No skills yet. Add one in Settings, or ask the agent to save_skill."
-                        else "Tick a skill to switch it on. The agent follows it in every run of this chat.",
+                        else "Tick any skills to keep them on. The agent also turns on every skill that fits the task.",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp).widthIn(max = 280.dp),

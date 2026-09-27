@@ -95,7 +95,10 @@ fun EditorPane(
             .weight(1f)
         when {
             kind == "image" && file != null -> ImagePreview(file, body)
-            kind != null && previewing -> MarkupPreview(kind, contentProvider(activePath), file?.parentFile, body)
+            kind != null && previewing -> {
+                val markup = contentProvider(activePath)
+                ExpandableMarkup(kind, markup, file?.parentFile, body)
+            }
             else -> CodeEditorHost(
                 activePath = activePath,
                 projectRoot = state.projectRoot,

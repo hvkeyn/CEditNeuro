@@ -11,6 +11,7 @@ object ResearchSkill {
         "calculate" to "Numbers go through calculate. A fact, paper, or DOI goes through reference before it is cited.\n" +
             "open_file shows research/report.pdf to the user when the report is ready.",
         "research_plot" to "A chart of measured numbers is research_plot. Send the data; the app draws the SVG.",
+        "use_skill deep-read" to "Studying a page or a scheme: use_skill deep-read. A code change: use_skill review. A failure: use_skill debug. A key or another app: use_skill security.",
     )
 
     private val TEXT = """
@@ -48,7 +49,13 @@ object ResearchSkill {
     }
 }
 
-/** Short procedures for the phone itself. Written once; the user may edit or delete them. */
+/**
+ * Short procedures for this phone. Written once; the user may edit or delete them.
+ * The four study and engineering ones are original steps for this app's tools.
+ * The domains follow the MIT catalog at github.com/alirezarezvani/claude-skills
+ * (review, debug, security, deep reading). Their Claude Code scripts and the other
+ * few hundred skills are not copied: they call tools this phone does not have.
+ */
 object StarterSkills {
     private const val MARK = ".starter-written"
 
@@ -75,6 +82,48 @@ object StarterSkills {
             3. For a chapter summary, write 5 to 8 points in the user's language, each with its page.
             4. For terms, give the term, a one-line meaning, and the page.
             5. Numbers from the book go through calculate before any comparison.
+        """.trimIndent() + "\n",
+        "review" to """
+            # Review a change
+
+            Use this before saying a code change works.
+
+            1. git_diff the files you changed. Quote the important hunk, not the whole diff.
+            2. Run one check that would fail if the change were wrong: a test, a command, or reading the file back.
+            3. Say what you checked and what you did not run.
+            4. A failed command stays failed. Do not run it again unchanged.
+        """.trimIndent() + "\n",
+        "debug" to """
+            # Find one fault
+
+            Use this when something fails.
+
+            1. Restate the failure in one sentence, from the output you actually saw.
+            2. Write one hypothesis that could be wrong.
+            3. Test it with one read or one command.
+            4. If that check fails, change the hypothesis. Do not repeat the same command.
+            5. The fix is the smallest edit that makes the check pass. Then use_skill review.
+        """.trimIndent() + "\n",
+        "security" to """
+            # Keep secrets and other apps closed
+
+            Use this when the task touches keys, logins, accounts, or another app.
+
+            1. Never write a token, password, or key into a file, a skill, or the chat.
+            2. Do not read another app's private files. Say so if the check needs that.
+            3. Do not invent a permission Android will not grant.
+            4. A host or command that already failed is not tried again.
+        """.trimIndent() + "\n",
+        "deep-read" to """
+            # Read what is in front of you
+
+            Use this when the user wants to study a book, a note, or a scheme.
+
+            1. Use only the page, file, or picture that was opened. Do not fill gaps from memory.
+            2. Separate what the text says from what you infer. Label the inference.
+            3. A number in the text is quoted, not recalculated, unless calculate is asked.
+            4. For a scheme, name the boxes and arrows that are drawn. Do not add steps that are not there.
+            5. Leave a short list the user can check against the page.
         """.trimIndent() + "\n",
     )
 

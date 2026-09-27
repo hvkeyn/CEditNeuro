@@ -13,10 +13,10 @@ data class SkillNote(
     val error: Boolean = false,
 )
 
-/** Keeps at most [max] skills on. The newest stays. Switching off removes that one key. */
-internal fun nextActiveSkills(current: List<String>, key: String, enable: Boolean, max: Int = 3): List<String> {
+/** Switching on adds the skill. Switching off removes that one key. There is no count cap. */
+internal fun nextActiveSkills(current: List<String>, key: String, enable: Boolean): List<String> {
     val without = current.filterNot { it == key }
-    return if (!enable) without else (without + key).takeLast(max.coerceAtLeast(1))
+    return if (!enable) without else without + key
 }
 
 /**
@@ -34,7 +34,7 @@ class SkillLibrary(
         return found.sortedWith(compareBy({ it.scope }, { it.name }))
     }
 
-    fun catalog(limit: Int = 1_600): String {
+    fun catalog(limit: Int = 8_000): String {
         val lines = list().map { entry ->
             "- ${entry.name} (${entry.scope}): ${entry.summary}"
         }
@@ -110,11 +110,12 @@ class SkillLibrary(
         if (dir == null || !dir.isDirectory) return
         dir.listFiles()?.filter { it.isFile && it.extension.equals("md", ignoreCase = true) }?.forEach { file ->
             if (normalizeName(file.nameWithoutExtension) != file.nameWithoutExtension) return@forEach
-            val summary = file.readText(Charsets.UTF_8)
+            val lines = file.readText(Charsets.UTF_8)
                 .lineSequence()
                 .map { it.trim().removePrefix("#").trim() }
-                .firstOrNull { it.isNotEmpty() }
-                ?.take(100)
+                .filter { it.isNotEmpty() }
+            val summary = (lines.firstOrNull { it.startsWith("Use this", ignoreCase = true) } ?: lines.firstOrNull())
+                ?.take(140)
                 ?: "(empty)"
             into += SkillEntry(file.nameWithoutExtension, scope, summary)
         }

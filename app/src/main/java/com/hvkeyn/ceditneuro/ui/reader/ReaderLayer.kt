@@ -122,7 +122,11 @@ internal fun InkLayer(
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(drawing, erasing, selecting, page, color, width) {
+                .then(
+                    if (!drawing && !erasing && !selecting) {
+                        Modifier
+                    } else {
+                        Modifier.pointerInput(drawing, erasing, selecting, page, color, width) {
                     if (selecting) {
                         detectTapGestures { offset ->
                             if (size.width == 0 || size.height == 0) return@detectTapGestures
@@ -138,7 +142,6 @@ internal fun InkLayer(
                         }
                         return@pointerInput
                     }
-                    if (!drawing && !erasing) return@pointerInput
                     detectDragGestures(
                         onDragStart = { live = emptyList() },
                         onDrag = { change, _ ->
@@ -161,7 +164,9 @@ internal fun InkLayer(
                             live = emptyList()
                         },
                     )
-                },
+                        }
+                    }
+                ),
         ) {
             val strokes = ink.filter { it.page == page } + if (live.size > 1) {
                 listOf(PageInk("live", page, color, width, live))

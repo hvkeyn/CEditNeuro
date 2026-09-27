@@ -13,8 +13,8 @@ class ListSkillsTool(
 ) : Tool {
     override val name = "list_skills"
     override val description =
-        "List procedure files for this project and for this phone. Each line is a name, a scope, and a one-line summary. " +
-            "A line marked on is already followed in this chat."
+        "List procedure files for this project and for this phone. Each line is a name, a scope, and when to use it. " +
+            "A line marked on is already followed. Turn on every skill that fits this task with use_skill."
     override val parameters = objectSchema(emptyMap())
 
     override suspend fun execute(args: JsonObject): ToolResult {
@@ -81,8 +81,9 @@ class UseSkillTool(
     override val name = "use_skill"
     override val description =
         "Switch on a saved skill and follow its procedure for this chat. " +
-            "Returns the procedure. Do not call read_skill for a skill you just switched on. " +
-            "scope is project or app. At most 3 skills stay on."
+            "Call this for every skill that fits the task. Any number can stay on. " +
+            "Returns the procedure. Do not call it again for a skill that is already on. " +
+            "scope is project or app."
     override val parameters = objectSchema(
         properties = mapOf(
             "name" to stringProp("Skill name."),
