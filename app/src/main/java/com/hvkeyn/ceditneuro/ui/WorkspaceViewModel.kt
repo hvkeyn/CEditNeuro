@@ -2350,6 +2350,7 @@ class WorkspaceViewModel(
             "health_index" -> "Listing saved tests"
             "find_skills" -> "Searching skills"
             "review_skill" -> "Checking a skill"
+            "design_system" -> "Looking up a design system"
             "save_skill" -> "Saving a skill"
             "append_skill" -> "Extending a skill"
             "delete_skill" -> "Deleting a skill"
@@ -2915,6 +2916,7 @@ class WorkspaceViewModel(
             com.hvkeyn.ceditneuro.tools.HealthIndexTool(ws),
             com.hvkeyn.ceditneuro.tools.FindSkillsTool(agentNet) { settingsStore.current.networkEnabled },
             com.hvkeyn.ceditneuro.tools.ReviewSkillTool(skills, agentNet) { settingsStore.current.networkEnabled },
+            com.hvkeyn.ceditneuro.tools.DesignSystemTool(),
             ResearchReportTool(ws),
             ResearchFigureTool(ws),
             com.hvkeyn.ceditneuro.tools.ResearchPlotTool(ws),

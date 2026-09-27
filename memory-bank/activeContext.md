@@ -1,6 +1,8 @@
 # Active context
 
-Current: v0.60.0. The agent searches the public skills directory with `find_skills` (plain words, no install). `review_skill` checks the file for a dangerous prompt, a hidden command, malware, a broken file, and a key. A blocked file is not saved and is not switched on. A clean file is saved only as a short adapted procedure for this app's tools. The starter skill is `find-skills`. Checked on the phone: the skill is in the menu and switches on and off.
+Current: v0.61.0. The agent turns on `frontend-design` for a landing page, a cabinet, a form, or another product screen. `design_system` looks up a public system from the designsystems.one gallery (name, vendor, card swatches, page URL). The page is one HTML file in the project. Apple-like work keeps the eight public principles and motion that can be stopped. Colors are quoted from the tool or the page. A company product is not copied. Checked on the phone: the skill is in the menu and switches on and off.
+
+v0.60.0. The agent searches the public skills directory with `find_skills` (plain words, no install). `review_skill` checks the file for a dangerous prompt, a hidden command, malware, a broken file, and a key. A blocked file is not saved and is not switched on. A clean file is saved only as a short adapted procedure for this app's tools. The starter skill is `find-skills`. Checked on the phone: the skill is in the menu and switches on and off.
 
 v0.59.0. The health skill also has `health_trend` (min, max, mean, and whether the last number is higher or lower) and `health_index` (every saved test and its latest value). `topic` is the specialty printed on the sheet. A phone that already had the health skill gains these steps; a deleted skill stays deleted. The record stays in `.ceditneuro/health` and is not copied to the other phone. This does not diagnose and does not turn several tests into a new disease name.
 
