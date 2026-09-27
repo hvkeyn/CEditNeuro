@@ -21,7 +21,8 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.InetSocketAddress
-import java.net.Socket
+import java.nio.ByteBuffer
+import java.nio.channels.SocketChannel
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.ConcurrentHashMap
@@ -100,7 +101,7 @@ class PacketCaptureService : VpnService() {
                 pcap.setLength(0)
                 PacketDump.writeHeader(pcap, PacketDump.LINK_RAW)
                 val input = FileInputStream(tunnel.fileDescriptor)
-                val output = FileOutputStream(tunnel.fileDescriptor)
+                val sink = Sink(pcap, FileOutputStream(tunnel.fileDescriptor))
                 val deadline = System.currentTimeMillis() + seconds * 1000L
                 Thread {
                     while (!stop.get() && System.currentTimeMillis() < deadline) Thread.sleep(200)
@@ -109,13 +110,14 @@ class PacketCaptureService : VpnService() {
                 }.start()
                 val buf = ByteArray(32_767)
                 var count = 0
-                while (!stop.get() && count < 400) {
+                while (!stop.get() && count < 800) {
                     val n = runCatching { input.read(buf) }.getOrDefault(-1)
                     if (n <= 0) break
-                    PacketDump.append(pcap, buf, n, System.currentTimeMillis())
+                    sink.record(buf, n)
                     count++
-                    forward(buf, n, output, udp, tcp)
+                    forward(buf, n, sink, udp, tcp)
                 }
+                sink.close()
             }
             val text = PacketDump.summarize(file) + "\nfile=" + file.absolutePath + " bytes=" + file.length()
             File(file.absolutePath + ".txt").writeText(text)
@@ -128,10 +130,33 @@ class PacketCaptureService : VpnService() {
         }
     }
 
+    /** Writes a reply into the tunnel and records it in the pcap, so both sides of a flow are seen. */
+    private class Sink(private val pcap: RandomAccessFile, private val tun: FileOutputStream) {
+        private val open = AtomicBoolean(true)
+
+        @Synchronized
+        fun record(packet: ByteArray, length: Int) {
+            if (!open.get()) return
+            runCatching { PacketDump.append(pcap, packet, length, System.currentTimeMillis()) }
+        }
+
+        @Synchronized
+        fun reply(packet: ByteArray) {
+            if (!open.get()) return
+            runCatching { tun.write(packet) }
+            runCatching { PacketDump.append(pcap, packet, packet.size, System.currentTimeMillis()) }
+        }
+
+        @Synchronized
+        fun close() {
+            open.set(false)
+        }
+    }
+
     private fun forward(
         packet: ByteArray,
         length: Int,
-        output: FileOutputStream,
+        output: Sink,
         udp: ConcurrentHashMap<String, DatagramSocket>,
         tcp: ConcurrentHashMap<String, TcpLeg>,
     ) {
@@ -153,7 +178,7 @@ class PacketCaptureService : VpnService() {
         ihl: Int,
         src: ByteArray,
         dst: ByteArray,
-        output: FileOutputStream,
+        output: Sink,
         udp: ConcurrentHashMap<String, DatagramSocket>,
     ) {
         if (length < ihl + 8 || udp.size >= 48) return
@@ -174,7 +199,7 @@ class PacketCaptureService : VpnService() {
                     }.getOrDefault(-1)
                     if (n > 0) {
                         val reply = PacketCodec.udp(dst, src, dport, sport, buf, n)
-                        synchronized(output) { runCatching { output.write(reply) } }
+                        output.reply(reply)
                     }
                 }
             }.start()
@@ -192,7 +217,7 @@ class PacketCaptureService : VpnService() {
         ihl: Int,
         src: ByteArray,
         dst: ByteArray,
-        output: FileOutputStream,
+        output: Sink,
         tcp: ConcurrentHashMap<String, TcpLeg>,
     ) {
         if (length < ihl + 20) return
@@ -248,19 +273,25 @@ class PacketCaptureService : VpnService() {
         private val server: ByteArray,
         private val serverPort: Int,
         initialClient: Long,
-        private val output: FileOutputStream,
+        private val output: Sink,
         private val vpn: VpnService,
     ) {
+        @Volatile
         var clientNext: Long = initialClient
+
+        @Volatile
         private var serverNext: Long = (System.nanoTime() and 0xffffffffL)
-        private val socket = Socket()
+
+        /** A channel has its descriptor before connect, so protect() can keep it out of the tunnel.
+         * Its socket streams share one lock, so reads and writes go through the channel itself. */
+        private val channel: SocketChannel = SocketChannel.open()
         private val opened = AtomicBoolean(true)
 
         fun connect() {
             Thread {
                 val ok = runCatching {
-                    vpn.protect(socket)
-                    socket.connect(InetSocketAddress(InetAddress.getByAddress(server), serverPort), 4000)
+                    if (!vpn.protect(channel.socket())) return@runCatching false
+                    channel.socket().connect(InetSocketAddress(InetAddress.getByAddress(server), serverPort), 4000)
                     true
                 }.getOrDefault(false)
                 if (!ok) {
@@ -270,12 +301,13 @@ class PacketCaptureService : VpnService() {
                 }
                 write(0x12, ByteArray(0), 0)
                 serverNext = (serverNext + 1) and 0xffffffffL
-                val buf = ByteArray(1400)
+                val buf = ByteBuffer.allocate(1400)
                 while (opened.get()) {
-                    val n = runCatching { socket.getInputStream().read(buf) }.getOrDefault(-1)
+                    buf.clear()
+                    val n = runCatching { channel.read(buf) }.getOrDefault(-1)
                     if (n < 0) break
                     if (n > 0) {
-                        write(0x18, buf, n)
+                        write(0x18, buf.array(), n)
                         serverNext = (serverNext + n) and 0xffffffffL
                     }
                 }
@@ -284,11 +316,15 @@ class PacketCaptureService : VpnService() {
         }
 
         fun sendToServer(packet: ByteArray, at: Int, length: Int) {
-            runCatching { socket.getOutputStream().write(packet, at, length) }
+            if (!channel.isConnected) return
+            runCatching {
+                val data = ByteBuffer.wrap(packet, at, length)
+                while (data.hasRemaining()) channel.write(data)
+            }
         }
 
         fun shutdownServer() {
-            runCatching { socket.shutdownOutput() }
+            runCatching { channel.shutdownOutput() }
         }
 
         fun ack() {
@@ -297,7 +333,7 @@ class PacketCaptureService : VpnService() {
 
         fun close() {
             if (!opened.compareAndSet(true, false)) return
-            runCatching { socket.close() }
+            runCatching { channel.close() }
         }
 
         private fun reset() {
@@ -306,7 +342,7 @@ class PacketCaptureService : VpnService() {
 
         private fun write(flags: Int, payload: ByteArray, length: Int) {
             val packet = PacketCodec.tcp(server, client, serverPort, clientPort, serverNext, clientNext, flags, payload, length)
-            synchronized(output) { runCatching { output.write(packet) } }
+            output.reply(packet)
         }
     }
 

@@ -29,6 +29,13 @@ class SkillWiringTest {
     }
 
     @Test
+    fun everyStarterSkillFitsTheActiveCap() {
+        StarterSkills.skills.forEach { (name, text) ->
+            assertTrue("$name is ${text.length} chars", text.length <= ACTIVE_SKILL_CHARS)
+        }
+    }
+
+    @Test
     fun aGroupWithoutBuiltToolsOffersNone() {
         val session = ToolSession(emptySet())
         session.present = setOf("list_dir")

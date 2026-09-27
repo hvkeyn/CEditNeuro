@@ -54,6 +54,7 @@ object PacketDump {
             val link = header.int
             val flows = LinkedHashMap<String, Flow>()
             val names = LinkedHashSet<String>()
+            val audit = Audit()
             var packets = 0
             var arp = 0
             var other = 0
@@ -76,6 +77,7 @@ object PacketDump {
                         flow.syn = flow.syn || kind.syn
                         flow.ack = flow.ack || kind.ack
                         if (kind.note.isNotBlank()) names += kind.note
+                        audit.add(kind)
                     }
                     Kind.Arp -> arp++
                     Kind.Skip -> other++
@@ -96,12 +98,62 @@ object PacketDump {
                 }
                 if (flows.size > 40) append("... ").append(flows.size - 40).append(" more flows\n")
                 names.take(20).forEach { append("name ").append(it).append('\n') }
+                append(audit.report())
                 append("Payloads are not printed.")
             }
         }
     }
 
     private class Flow(val key: String, var ttl: Int, var syn: Boolean, var ack: Boolean)
+
+    /** Cleartext ports: what crosses them can be read by anyone on the path. */
+    private val CLEAR = mapOf(21 to "ftp", 23 to "telnet", 25 to "smtp", 80 to "http", 110 to "pop3", 143 to "imap", 8080 to "http")
+
+    private class Audit {
+        val called = LinkedHashSet<String>()
+        val answered = HashSet<String>()
+        val clear = LinkedHashSet<String>()
+        val secrets = LinkedHashMap<String, Int>()
+        val dnsNames = LinkedHashSet<String>()
+        var plainDns = 0
+        val quic = LinkedHashSet<String>()
+
+        fun add(kind: Kind.Ip) {
+            val out = "${kind.dst}:${kind.dport}"
+            val back = "${kind.src}:${kind.sport}"
+            if (kind.proto == "tcp") {
+                if (kind.syn && !kind.ack) called += out
+                if (kind.syn && kind.ack) answered += back
+                CLEAR[kind.dport]?.let { clear += "tcp $out (${it})" }
+                if (kind.secret.isNotEmpty()) secrets[kind.secret] = (secrets[kind.secret] ?: 0) + 1
+            }
+            if (kind.proto == "udp") {
+                if (kind.dport == 53) {
+                    plainDns++
+                    if (kind.note.isNotBlank()) dnsNames += kind.note
+                }
+                if (kind.dport == 443) quic += out
+            }
+        }
+
+        fun report(): String = buildString {
+            append("audit\n")
+            val confirmed = called.count { it in answered }
+            append("tcp calls answered: ").append(confirmed).append(" of ").append(called.size).append('\n')
+            val silent = called.filter { it !in answered }
+            if (silent.isNotEmpty()) append("tcp calls with no answer: ").append(silent.take(10).joinToString(", ")).append('\n')
+            append("cleartext flows: ").append(if (clear.isEmpty()) "none" else clear.take(10).joinToString(", ")).append('\n')
+            append("plain dns queries: ").append(plainDns).append(", names ").append(dnsNames.size).append('\n')
+            append("quic flows: ").append(quic.size).append('\n')
+            if (secrets.isEmpty()) {
+                append("secret fields in cleartext: none seen\n")
+            } else {
+                append("secret fields in cleartext: ")
+                append(secrets.entries.joinToString(", ") { "${it.key} x${it.value}" })
+                append(" (values not printed)\n")
+            }
+        }
+    }
 
     private sealed class Kind {
         data class Ip(
@@ -114,6 +166,7 @@ object PacketDump {
             val syn: Boolean,
             val ack: Boolean,
             val note: String,
+            val secret: String = "",
         ) : Kind()
         data object Arp : Kind()
         data object Skip : Kind()
@@ -161,7 +214,24 @@ object PacketDump {
         val flags = body[at + 13].toInt() and 0xff
         val header = ((body[at + 12].toInt() ushr 4) and 0xf) * 4
         val note = if (dport == 443) sni(body, at + header) else ""
-        return Kind.Ip("tcp", src, sport, dst, dport, ttl, syn = flags and 0x02 != 0, ack = flags and 0x10 != 0, note = note)
+        val secret = if (dport in CLEAR || sport in CLEAR) secretKind(body, at + header) else ""
+        return Kind.Ip(
+            "tcp", src, sport, dst, dport, ttl,
+            syn = flags and 0x02 != 0, ack = flags and 0x10 != 0, note = note, secret = secret,
+        )
+    }
+
+    /** Names the kind of secret a cleartext payload carries. The value itself is never returned. */
+    private fun secretKind(body: ByteArray, at: Int): String {
+        if (at >= body.size) return ""
+        val text = String(body, at, body.size - at, Charsets.ISO_8859_1).lowercase()
+        return when {
+            "authorization:" in text -> "authorization header"
+            "cookie:" in text -> "cookie header"
+            "password=" in text || "passwd=" in text || "pass=" in text -> "password field"
+            text.startsWith("pass ") || "\npass " in text -> "login password"
+            else -> ""
+        }
     }
 
     private fun udp(body: ByteArray, at: Int, src: String, dst: String, ttl: Int): Kind {

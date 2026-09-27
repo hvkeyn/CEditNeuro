@@ -8,6 +8,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
 import com.hvkeyn.ceditneuro.net.PacketCaptureHub
+import com.hvkeyn.ceditneuro.tools.NetAuditTool
 import kotlinx.coroutines.launch
 import com.hvkeyn.ceditneuro.ui.WorkspaceScreen
 import com.hvkeyn.ceditneuro.ui.theme.CEditNeuroTheme
@@ -53,6 +54,18 @@ class MainActivity : ComponentActivity() {
 
     /** A same-app start used to check the recorder. The VPN prompt and the notification still apply. */
     private fun maybeCapture(intent: Intent?) {
+        if (intent?.getBooleanExtra("cedit_audit", false) == true) {
+            val dir = getExternalFilesDir(null) ?: return
+            val sweep = intent.getBooleanExtra("sweep", false)
+            lifecycleScope.launch {
+                val args = kotlinx.serialization.json.buildJsonObject {
+                    put("sweep", kotlinx.serialization.json.JsonPrimitive(sweep))
+                }
+                val result = NetAuditTool(applicationContext) { true }.execute(args)
+                java.io.File(dir, "net-audit.txt").writeText(result.content)
+            }
+            return
+        }
         val consentOnly = intent?.getBooleanExtra("cedit_consent", false) == true
         val asked = consentOnly ||
             intent?.getBooleanExtra("cedit_capture", false) == true ||
