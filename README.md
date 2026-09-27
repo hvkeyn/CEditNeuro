@@ -61,6 +61,7 @@ layer is wired end to end.
 | The menu button hides the project list and Choose folder, so the file list can use the height | done |
 | Chat attach offers the camera, the photo picker, and the system file picker | done |
 | A website or a local HTML folder becomes a signed WebView app (`web_to_app`, then `install_apk`) | done |
+| A lab sheet is logged and checked against the range printed on it (`health_log`, `health_panel`). The agent turns the health skill on and off | done |
 | Reader tools are labelled icons: contents, find, listen, text, pen, layer, notes, and the book chat | done |
 | A reasoning-only assistant turn still continues, and a failed command, URL, or login is not sent again | done |
 | Starter phone skills include `review`, `debug`, `security`, and `deep-read`; a deleted starter skill stays deleted | done |

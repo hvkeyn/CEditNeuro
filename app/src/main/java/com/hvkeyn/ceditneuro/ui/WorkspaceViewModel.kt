@@ -2343,7 +2343,9 @@ class WorkspaceViewModel(
             "browse_page" -> "Opening a page"
             "list_skills" -> "Listing skills"
             "read_skill" -> "Reading a skill"
-            "use_skill" -> "Switching on a skill"
+            "use_skill" -> "Switching a skill"
+            "health_log" -> "Saving a reading"
+            "health_panel" -> "Checking readings"
             "save_skill" -> "Saving a skill"
             "append_skill" -> "Extending a skill"
             "delete_skill" -> "Deleting a skill"
@@ -2890,12 +2892,14 @@ class WorkspaceViewModel(
         tools += listOf(
             ListSkillsTool(skills, activeKeys),
             ReadSkillTool(skills),
-            UseSkillTool(skills, switchOn),
+            UseSkillTool(skills) { name, scope, enable -> switchSkill(project, name, scope, enable) },
             SaveSkillTool(skills, switchOn),
             AppendSkillTool(skills, switchOn),
             DeleteSkillTool(skills, switchOff),
             RememberTool(ws.root),
             ResearchLogTool(ws),
+            com.hvkeyn.ceditneuro.tools.HealthLogTool(ws),
+            com.hvkeyn.ceditneuro.tools.HealthPanelTool(ws),
             ResearchReportTool(ws),
             ResearchFigureTool(ws),
             com.hvkeyn.ceditneuro.tools.ResearchPlotTool(ws),
