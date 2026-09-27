@@ -49,6 +49,8 @@ class SkillLibrary(
         val text = runCatching { file.readText(Charsets.UTF_8) }.getOrElse {
             return SkillNote("Could not read ${file.name}.", error = true)
         }
+        val audit = SkillAudit.check(text, file.nameWithoutExtension)
+        if (audit.blocked) return SkillNote(SkillAudit.refusal(file.nameWithoutExtension, audit), error = true)
         return SkillNote(text.take(MAX_CHARS))
     }
 
@@ -79,6 +81,8 @@ class SkillLibrary(
         if (next.length > MAX_CHARS) {
             return SkillNote("A skill can be at most $MAX_CHARS characters. Shorten it before saving.", error = true)
         }
+        val audit = SkillAudit.check(next, file.nameWithoutExtension)
+        if (audit.blocked) return SkillNote(SkillAudit.refusal(file.nameWithoutExtension, audit), error = true)
         val parent = file.parentFile
         if (parent != null && !parent.exists() && !parent.mkdirs()) {
             return SkillNote("Could not create ${parent.absolutePath}.", error = true)

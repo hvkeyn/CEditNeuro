@@ -2348,6 +2348,8 @@ class WorkspaceViewModel(
             "health_panel" -> "Checking readings"
             "health_trend" -> "Checking a trend"
             "health_index" -> "Listing saved tests"
+            "find_skills" -> "Searching skills"
+            "review_skill" -> "Checking a skill"
             "save_skill" -> "Saving a skill"
             "append_skill" -> "Extending a skill"
             "delete_skill" -> "Deleting a skill"
@@ -2729,6 +2731,10 @@ class WorkspaceViewModel(
             else -> return "scope is project or app."
         }
         val key = "$where:$safe"
+        if (enable) {
+            val note = skillLibrary(project).read(safe, where)
+            if (note.error) return note.text
+        }
         var message = ""
         editProject(project) { state ->
             val previous = state.activeSkills
@@ -2747,6 +2753,9 @@ class WorkspaceViewModel(
     fun toggleSkill(entry: SkillEntry) {
         val project = current ?: return
         val key = "${entry.scope}:${entry.name}"
+        val shown = if (current === project) _state.value else project.ui
+        val turningOn = key !in shown.activeSkills
+        if (turningOn && skillLibrary(project).read(entry.name, entry.scope).error) return
         editProject(project) {
             val on = key in it.activeSkills
             it.copy(activeSkills = if (on) it.activeSkills - key else it.activeSkills + key)
@@ -2904,6 +2913,8 @@ class WorkspaceViewModel(
             com.hvkeyn.ceditneuro.tools.HealthPanelTool(ws),
             com.hvkeyn.ceditneuro.tools.HealthTrendTool(ws),
             com.hvkeyn.ceditneuro.tools.HealthIndexTool(ws),
+            com.hvkeyn.ceditneuro.tools.FindSkillsTool(agentNet) { settingsStore.current.networkEnabled },
+            com.hvkeyn.ceditneuro.tools.ReviewSkillTool(skills, agentNet) { settingsStore.current.networkEnabled },
             ResearchReportTool(ws),
             ResearchFigureTool(ws),
             com.hvkeyn.ceditneuro.tools.ResearchPlotTool(ws),

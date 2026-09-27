@@ -92,7 +92,11 @@ object ToolGroups {
             "health_trend",
             "health_index",
         ),
-)
+        "skills" to listOf(
+            "find_skills",
+            "review_skill",
+        ),
+    )
 
     fun groupOf(toolName: String): String? =
         groups.entries.firstOrNull { toolName in it.value }?.key
