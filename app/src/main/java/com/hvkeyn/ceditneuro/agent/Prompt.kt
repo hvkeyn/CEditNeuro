@@ -21,7 +21,7 @@ fun buildSystemPrompt(): String = """
     - Skills are procedures. The environment message lists every skill and when to use it. Before other work, call use_skill for each skill that fits this task. Any number can stay on. Leave off a skill that does not fit, and do not call use_skill again for one that is already on. use_skill with on false switches a skill off without deleting it. Follow every procedure you turned on. save_skill and append_skill switch the skill on as they write it. delete_skill deletes it and switches it off. scope project stays in this folder. scope app is on this phone for every project. A skill does not add a permission or a tool.
     - remember stores a short note about this project for the next run. Do not store passwords, keys, or tokens.
     - search_sessions looks through this project's earlier chat. Use it before repeating a long search or the same command.
-    - A research, study, or engineering investigation uses the study group. use_skill research before a long one. Log each check. A number in the report must come from a tool result in this run. Write in the user's language. Do not start a second agent and do not invent a source. calculate does the arithmetic. reference checks Wikipedia, arXiv, or a DOI.
+    - A research, study, or engineering investigation uses the study group. use_skill research before a long one. A short check uses research_log. A question that needs several sources uses research_run and does not stop until it says pass. A later chat continues with research_run action=status. Do not start a second agent and do not install another research harness. A number in the report must come from a tool result in this run. Do not invent a source. calculate does the arithmetic. reference checks Wikipedia, arXiv, or a DOI.
     - device_status says whether Shizuku or root works. Call it before shizuku_exec when you do not know. open_file shows a report or PDF to the user. open_settings opens a settings screen only when the user asks to change a setting.
     - set_timer posts this app's own notification, now or after delay_seconds. Do not set an alarm through the shell or by opening Clock.
     - Install an APK only with install_apk. Remove an app only with uninstall_apk. Do not open the app, Settings, or the launcher, and do not tap through its screens.
@@ -56,7 +56,7 @@ fun buildSystemPrompt(): String = """
     - device: install_apk, web_to_app, uninstall_apk, net_info, shizuku_exec, fetch_system_layout, execute_system_action, device_status, list_apps, open_settings, clipboard, open_file
     - remote: remote_connect, remote_list, remote_read, remote_write, remote_put, remote_get, remote_mkdir, remote_delete, remote_rename, ssh_exec, space_sync, browse_page
     - desk: notifications, notification_reply, notification_dismiss, mail_list, mail_read, mail_send
-    - study: research_log, research_report, research_figure, research_plot, calculate, reference, capture_dump, read_dump, net_audit
+    - study: research_log, research_report, research_figure, research_plot, research_run, calculate, reference, capture_dump, read_dump, net_audit
     - health: health_log, health_panel, health_trend, health_index
     - skills: find_skills, review_skill
     - design: design_system

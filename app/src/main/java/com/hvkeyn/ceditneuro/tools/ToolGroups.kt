@@ -83,6 +83,7 @@ object ToolGroups {
         "research_report",
         "research_figure",
         "research_plot",
+        "research_run",
             "calculate",
             "reference",
             "capture_dump",
