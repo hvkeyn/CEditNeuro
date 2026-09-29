@@ -53,7 +53,7 @@ object AgentDoctor {
                 advice(findings.values.map { it.kind }.toSet()).forEach { append("- ").append(it).append('\n') }
             }
             append("\nSend this report back and fix only the repeated failures. ")
-            append("Do not read other apps' private files and do not invent permissions Android will not grant.\n")
+            append("Do not invent permissions Android will not grant.\n")
         }.take(MAX_REPORT)
     }
 
@@ -122,7 +122,7 @@ object AgentDoctor {
             lines += "The server rejected the user data. Do not repeat that login."
         }
         if ("Permission denied" in kinds) {
-            lines += "Do not read /proc/net or another app's data. Stay on paths the tool already returned."
+            lines += "That path was denied. Do not repeat it. Stay on paths the tool already returned."
         }
         if ("binary will not start" in kinds) {
             lines += "A CANNOT LINK failure means the binary is broken. Do not retry screencap."

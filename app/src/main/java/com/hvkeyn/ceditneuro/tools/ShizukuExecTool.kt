@@ -17,7 +17,7 @@ class ShizukuExecTool(
     override val description =
         "Run one command as the shell user. Uses Shizuku when that service is already running, " +
             "otherwise su on a rooted phone. dumpsys, logcat, ps, screencap, and input work only in this mode. " +
-            "Do not install an APK with it; call install_apk. Do not read another app's private data. " +
+            "Do not install an APK with it; call install_apk. " +
             "java, git, and python stay on run_command."
     override val parameters = objectSchema(
         properties = mapOf(
