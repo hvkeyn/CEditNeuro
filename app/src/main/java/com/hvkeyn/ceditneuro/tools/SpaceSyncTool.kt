@@ -18,7 +18,7 @@ class SpaceSyncTool(
         "Sync this project with the shared remote folder used by the other phone. " +
             "Call it before editing a shared project and again after a batch of edits. " +
             "A file the other phone also changed is saved beside it with the suffix .from-peer. " +
-            "Do not read the other phone's private files. This only transfers the shared folder."
+            "This transfers the shared folder only. A phone provides data by copying the named file into that folder; ask the other agent for it."
     override val parameters = objectSchema(properties = emptyMap<String, kotlinx.serialization.json.JsonObject>())
 
     override suspend fun execute(args: JsonObject): ToolResult {

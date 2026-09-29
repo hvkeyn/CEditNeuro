@@ -177,6 +177,21 @@ object StarterSkills {
             4. For a scheme, name the boxes and arrows that are drawn. Do not add steps that are not there.
             5. Leave a short list the user can check against the page.
         """.trimIndent() + "\n",
+        "video-notes" to """
+            # Notes from a video
+
+            Use this when the user sends a YouTube, RuTube, Yandex, or Dzen video, or asks to find YouTube videos, a channel's latest uploads, or a playlist. Switch it off when the task is not a video.
+
+            Do not sign up for a transcript service and do not store an API key for one. This phone reads the public page. Do not download the video. Do not open a stream, an m3u8, an mp4, or a googlevideo host. Do not call http_request on those.
+
+            1. Call load_tools group=study. One page is video_brief with the page URL. RuTube, Yandex, and Dzen are this step only.
+            2. Use only the title, the description, and the captions the tool printed. Captions are cut, so a long video is the start of the public captions, not a viewing of the picture. Do not invent a scene, a quote, a speaker's face, or a number. If captions is no, say the picture was not seen and judge only the description.
+            3. Write in the user's language, in this order. Смысл: one short paragraph of what the video is actually about. Важные мысли: 3 to 7 points, each tied to a caption sentence or the description. Skip a point the text does not support. Вывод: what a viewer should take away. Стоит ли смотреть: yes, only a part, or no. Name what is interesting and what is filler, a repeat, or an advertisement. If the text is thin, say there is not enough to judge the picture.
+            4. A topic is video_brief action=search query= the user's words. At most 8 titles. A channel is action=channel with the @handle, the channel URL, or the UC id. A playlist is action=playlist with the playlist URL or the PL id, at most 12 titles. Those lines are titles only. Open at most 3 of them with video_brief before judging the meaning.
+            5. Several pages at once: video_brief action=batch urls= up to 3 page URLs separated by |. Then one comparison, and the same four parts for each video that had captions.
+            6. A number in the note goes through calculate. Do not store a cookie or a token from the page.
+            7. When the note is written, call use_skill name=video-notes scope=app on=false.
+        """.trimIndent() + "\n",
         "web-to-app" to """
             # Turn a page into an app
 
@@ -306,6 +321,7 @@ object StarterSkills {
         extendDesign(appDir)
         extendDebug(appDir)
         extendSecurity(appDir)
+        extendVideo(appDir)
     }
 
     /** Phones that saved the short debug skill learn to hand a real failure to the full case. */
@@ -325,6 +341,24 @@ object StarterSkills {
         val current = file.readText(Charsets.UTF_8)
         if (!current.contains("Do not read another app's private files")) return
         file.writeText(skills.getValue("security"), Charsets.UTF_8)
+    }
+
+    /** Phones that saved the first video skill also learn search, a channel, a playlist, and a batch of three. */
+    private fun extendVideo(appDir: File) {
+        val file = File(appDir, "video-notes.md")
+        if (!file.isFile) return
+        val current = file.readText(Charsets.UTF_8)
+        if (current.contains("action=search")) return
+        if (!current.contains("video_brief")) return
+        file.writeText(
+            current.trimEnd() + "\n\n" +
+                "Find path. A topic is video_brief action=search. A channel is action=channel. " +
+                "A playlist is action=playlist. Up to 3 pages are action=batch urls separated by |. " +
+                "Those list lines are titles only. Open a video before judging its meaning. " +
+                "Do not sign up for a transcript service and do not store an API key for one. " +
+                "Captions are cut, so a long video is the start of the public captions, not a viewing of the picture.\n",
+            Charsets.UTF_8,
+        )
     }
 
     /** Phones that saved the first design skill learn what to do when design_system is not built in. */

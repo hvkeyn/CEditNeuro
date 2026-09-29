@@ -84,6 +84,7 @@ object ToolGroups {
         "research_figure",
         "research_plot",
         "research_run",
+        "video_brief",
             "calculate",
             "reference",
             "capture_dump",

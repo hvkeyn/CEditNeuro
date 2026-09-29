@@ -69,6 +69,7 @@ layer is wired end to end.
 | `net_audit` checks the Wi-Fi this phone is on: gateway, DNS, private DNS, open ports, SSDP and mDNS devices, an optional /24 sweep, and ranked findings. Connect only, no login | done |
 | `systematic-debugging` reproduces a failure, records facts, and tests one cause at a time. `debug_case` refuses a fix until a test supports it, and the case passes only when the same check that failed now passes | done |
 | `research` keeps a short check on `research_log`. A question that needs several sources uses `research_run`: a plan, independent sources, a reprint that does not count, critics, and a cite that has to use the quote. The run resumes from `research/run.md` | done |
+| `video-notes` reads a public YouTube, RuTube, or Yandex page with `video_brief` and writes the point, the important ideas, the takeaway, and whether it is worth watching. YouTube search, a channel's latest uploads, a playlist, and a batch of three stay on the same tool. The video file is not downloaded | done |
 | Reader tools are labelled icons: contents, find, listen, text, pen, layer, notes, and the book chat | done |
 | A reasoning-only assistant turn still continues, and a failed command, URL, or login is not sent again | done |
 | Starter phone skills include `review`, `debug`, `security`, and `deep-read`; a deleted starter skill stays deleted | done |

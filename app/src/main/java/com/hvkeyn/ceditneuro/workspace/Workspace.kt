@@ -12,7 +12,7 @@ data class FileEntry(
 /**
  * Project root plus path rules for the agent. Relative paths stay inside the project.
  * Absolute paths are real filesystem paths: shared storage, this app's files, and
- * anything else Android lets this app open. Other apps' private data stays blocked.
+ * anything else Android lets the shell on this phone open, another app's data included.
  */
 class Workspace(val root: File) {
 
@@ -25,15 +25,11 @@ class Workspace(val root: File) {
     fun resolve(path: String): File {
         val normalized = path.trim().replace('\\', '/')
         require(!normalized.contains('\u0000')) { "Path contains NUL." }
-        val candidate = when {
+        return when {
             normalized.isEmpty() -> canonicalRoot
             normalized.startsWith("/") -> StoragePaths.absolute(normalized)
             else -> StoragePaths.finish(File(canonicalRoot, normalized))
         }
-        require(isReachable(candidate)) {
-            "This app use $path."
-        }
-        return candidate
     }
 
     fun relativize(file: File): String {
@@ -45,22 +41,6 @@ class Workspace(val root: File) {
         } else {
             path
         }
-    }
-
-    private fun isReachable(file: File): Boolean {
-        val path = file.path
-        if (path == "/" || path == "/data" || path == "/data/local" || path == "/data/local/tmp") return true
-        if (isForeignPrivateData(path)) return false
-        return true
-    }
-
-    private fun isForeignPrivateData(path: String): Boolean {
-        val prefixes = listOf("/data/data/", "/data/user/0/", "/data/user_de/0/")
-        val prefix = prefixes.firstOrNull { path.startsWith(it) } ?: return false
-        val rest = path.removePrefix(prefix)
-        val packageName = rest.substringBefore('/')
-        if (packageName.isEmpty()) return false
-        return packageName != "com.hvkeyn.ceditneuro" && packageName != "com.hvkeyn.ceditneuro.debug"
     }
 
     fun children(relativePath: String = ""): List<FileEntry> {

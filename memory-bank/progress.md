@@ -3,6 +3,7 @@
 Released: v0.45.0 through v0.69.0 (`research_run` keeps a deep study in order until its cites match the quotes; see activeContext.md). Unit tests include `ResearchRunTest`. Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, `SkillLibraryTest`, `ChatLinkTest`, `WebAppPackTest`, `HealthRecordTest`, `SkillAuditTest`, `DesignCatalogTest`, and `ReaderPlaceTest`.
 
 Known gaps:
+- `video-notes` is in this tree and not in a release. It searches YouTube, lists a channel's latest uploads, lists a playlist, and reads up to 3 pages. Unit tests passed. The phone has this build: the skill file gained `action=search`. A live chat against a video was not run.
 - The reader finger fix is in this tree: left, right, center, swipe, and the volume key were checked on the phone before v0.69.0. A scheme page was not opened in that check.
 
 - Phone was checked on v0.67.0: HTTP works during a recording, and `net_audit` with and without sweep. The recorder does not retransmit or honor the client's window, so a large download during a recording may stall. The agent chat was not run against the model.
