@@ -5,6 +5,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -43,6 +45,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +56,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
@@ -76,15 +80,65 @@ internal fun markupColor(argb: Long): Color = Color(argb.toInt())
 @Composable
 internal fun ZoomableImage(
     modifier: Modifier,
+    onZone: ((Float) -> Unit)? = null,
+    onFlip: ((Int) -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    val zoneNow = rememberUpdatedState(onZone)
+    val flipNow = rememberUpdatedState(onFlip)
     Box(
-        modifier = modifier.pointerInput(Unit) {
-            detectTransformGestures { _, pan, zoom, _ ->
-                scale = (scale * zoom).coerceIn(1f, 5f)
-                offset = if (scale <= 1.01f) Offset.Zero else offset + pan
+        modifier = modifier.pointerInput(onZone != null || onFlip != null) {
+            if (zoneNow.value == null && flipNow.value == null) {
+                detectTransformGestures { _, pan, zoom, _ ->
+                    scale = (scale * zoom).coerceIn(1f, 5f)
+                    offset = if (scale <= 1.01f) Offset.Zero else offset + pan
+                }
+                return@pointerInput
+            }
+            val slop = viewConfiguration.touchSlop
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                var totalX = 0f
+                var totalY = 0f
+                var span = 0f
+                var multi = false
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val pressed = event.changes.filter { it.pressed }
+                    if (pressed.size >= 2) {
+                        multi = true
+                        val next = kotlin.math.hypot(
+                            pressed[0].position.x - pressed[1].position.x,
+                            pressed[0].position.y - pressed[1].position.y,
+                        )
+                        if (span > 1f && next > 1f) scale = (scale * (next / span)).coerceIn(1f, 5f)
+                        span = next
+                        event.changes.forEach { it.consume() }
+                    } else if (!multi && scale > 1.01f) {
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        val delta = change.positionChange()
+                        if (change.pressed) offset += delta else break
+                        change.consume()
+                    } else if (!multi) {
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        val delta = change.positionChange()
+                        totalX += delta.x
+                        totalY += delta.y
+                        if (!change.pressed) break
+                    } else if (pressed.isEmpty()) {
+                        break
+                    }
+                }
+                if (scale <= 1.01f) offset = Offset.Zero
+                if (multi || scale > 1.01f) return@awaitEachGesture
+                val width = size.width.toFloat().coerceAtLeast(1f)
+                if (kotlin.math.abs(totalX) > slop * 3 && kotlin.math.abs(totalX) > kotlin.math.abs(totalY)) {
+                    flipNow.value?.invoke(if (totalX < 0f) 1 else -1)
+                } else if (kotlin.math.abs(totalX) < slop && kotlin.math.abs(totalY) < slop) {
+                    zoneNow.value?.invoke(down.position.x / width)
+                }
             }
         },
     ) {

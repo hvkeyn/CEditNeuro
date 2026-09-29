@@ -2364,6 +2364,7 @@ class WorkspaceViewModel(
             "research_report" -> "Writing the report"
             "research_figure" -> "Drawing a figure"
             "research_plot" -> "Drawing a chart"
+            "research_run" -> "Running the study"
             "calculate" -> "Calculating"
             "reference" -> "Checking a reference"
             "capture_dump" -> "Recording packets"
@@ -2927,6 +2928,7 @@ class WorkspaceViewModel(
             ResearchReportTool(ws),
             ResearchFigureTool(ws),
             com.hvkeyn.ceditneuro.tools.ResearchPlotTool(ws),
+            com.hvkeyn.ceditneuro.tools.ResearchRunTool(ws),
             com.hvkeyn.ceditneuro.tools.CalculateTool(),
             com.hvkeyn.ceditneuro.tools.ReferenceTool(agentNet) { settingsStore.current.networkEnabled },
             com.hvkeyn.ceditneuro.tools.CaptureDumpTool(appContext, ws),

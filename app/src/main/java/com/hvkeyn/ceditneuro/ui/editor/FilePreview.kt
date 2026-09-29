@@ -140,9 +140,20 @@ fun ExpandableMarkup(
     text: String,
     baseDir: File?,
     modifier: Modifier = Modifier,
+    onZone: ((Float) -> Unit)? = null,
+    onFlip: ((Int) -> Unit)? = null,
 ) {
     var open by remember { mutableStateOf(false) }
-    MarkupPreview(kind, text, baseDir, modifier, onTap = { open = true }, allowZoom = false)
+    MarkupPreview(
+        kind,
+        text,
+        baseDir,
+        modifier,
+        onTap = { open = true },
+        allowZoom = false,
+        onZone = onZone,
+        onFlip = onFlip,
+    )
     if (open) {
         com.hvkeyn.ceditneuro.ui.WebPictureStage(onClose = { open = false }) {
             MarkupPreview(kind, text, baseDir, Modifier.fillMaxSize(), allowZoom = true)
@@ -159,6 +170,8 @@ fun MarkupPreview(
     modifier: Modifier = Modifier,
     onTap: (() -> Unit)? = null,
     allowZoom: Boolean = false,
+    onZone: ((Float) -> Unit)? = null,
+    onFlip: ((Int) -> Unit)? = null,
 ) {
     val page = remember(kind, text) { previewPage(kind, text) }
     AndroidView(
@@ -175,6 +188,8 @@ fun MarkupPreview(
         },
         update = { view ->
             view.onTap = onTap
+            view.onZone = onZone
+            view.onFlip = onFlip
             view.zoomEnabled = allowZoom
             if (view.tag != page) {
                 view.tag = page
@@ -195,6 +210,8 @@ fun MarkupPreview(
 @SuppressLint("ClickableViewAccessibility")
 private class PreviewWeb(context: Context) : WebView(context) {
     var onTap: (() -> Unit)? = null
+    var onZone: ((Float) -> Unit)? = null
+    var onFlip: ((Int) -> Unit)? = null
     var zoomEnabled: Boolean = false
         set(value) {
             field = value
@@ -206,6 +223,7 @@ private class PreviewWeb(context: Context) : WebView(context) {
     private var downX = 0f
     private var downY = 0f
     private var moved = false
+    private var lastTap = 0L
 
     init {
         webViewClient = object : WebViewClient() {
@@ -229,7 +247,24 @@ private class PreviewWeb(context: Context) : WebView(context) {
                         moved = true
                     }
                 }
-                MotionEvent.ACTION_UP -> if (!moved) onTap?.invoke()
+                MotionEvent.ACTION_UP -> {
+                    val dx = event.x - downX
+                    val dy = event.y - downY
+                    if (!moved) {
+                        val now = event.eventTime
+                        if (now - lastTap < 320L) {
+                            onTap?.invoke()
+                            lastTap = 0L
+                        } else {
+                            lastTap = now
+                            val zone = onZone
+                            if (zone != null) zone(event.x / width.coerceAtLeast(1))
+                            else onTap?.invoke()
+                        }
+                    } else if (kotlin.math.abs(dx) > slop * 3 && kotlin.math.abs(dx) > kotlin.math.abs(dy)) {
+                        onFlip?.invoke(if (dx < 0f) 1 else -1)
+                    }
+                }
             }
             true
         }

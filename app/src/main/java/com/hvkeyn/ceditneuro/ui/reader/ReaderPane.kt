@@ -15,7 +15,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Stop
@@ -34,7 +35,9 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -66,6 +69,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -79,7 +83,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hvkeyn.ceditneuro.data.ReaderNote
@@ -223,10 +226,63 @@ fun ReaderPane(
         else -> FontFamily.Serif
     }
     var turn by remember { mutableIntStateOf(0) }
+    var allowFinger by remember { mutableStateOf(true) }
+    val menuClock = remember { intArrayOf(0) }
+    var menuPulse by remember { mutableIntStateOf(0) }
+    LaunchedEffect(menuPulse) {
+        if (menuPulse != 0) chrome = !chrome
+    }
+    val allowFingerNow = rememberUpdatedState(allowFinger)
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(paper.background)
+            .pointerInput(Unit) {
+                val slop = viewConfiguration.touchSlop
+                val flip = 48.dp.toPx()
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    if (!allowFingerNow.value) return@awaitEachGesture
+                    var totalX = 0f
+                    var totalY = 0f
+                    var taken = false
+                    var childTookTap = false
+                    val pointerId = down.id
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        val change = event.changes.firstOrNull { it.id == pointerId } ?: break
+                        val delta = change.positionChange()
+                        totalX += delta.x
+                        totalY += delta.y
+                        if (!taken && kotlin.math.abs(totalX) > slop && kotlin.math.abs(totalX) > kotlin.math.abs(totalY)) {
+                            taken = true
+                        }
+                        if (taken) change.consume()
+                        if (!change.pressed) {
+                            if (!taken) {
+                                val finished = awaitPointerEvent(PointerEventPass.Final)
+                                childTookTap = finished.changes.firstOrNull { it.id == pointerId }?.isConsumed == true
+                            }
+                            break
+                        }
+                    }
+                    if (!allowFingerNow.value) return@awaitEachGesture
+                    val width = size.width.toFloat().coerceAtLeast(1f)
+                    if (kotlin.math.abs(totalX) >= flip && kotlin.math.abs(totalX) > kotlin.math.abs(totalY)) {
+                        turn = if (totalX < 0f) 1 else -1
+                    } else if (!childTookTap && kotlin.math.abs(totalX) < slop && kotlin.math.abs(totalY) < slop) {
+                        val fraction = down.position.x / width
+                        when {
+                            fraction < 1f / 3f -> turn = -1
+                            fraction > 2f / 3f -> turn = 1
+                            else -> {
+                                menuClock[0] = menuClock[0] + 1
+                                menuPulse = menuClock[0]
+                            }
+                        }
+                    }
+                }
+            }
             .onPreviewKeyEvent { event ->
                 if (mode != "read" || event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 when (event.key) {
@@ -290,6 +346,16 @@ fun ReaderPane(
                 turn = 0
             }
         }
+        fun flipPage(direction: Int) {
+            page = (page + direction * columns).coerceIn(0, count - 1)
+        }
+        fun applyZone(fraction: Float) {
+            when {
+                fraction < 1f / 3f -> flipPage(-1)
+                fraction > 2f / 3f -> flipPage(1)
+                else -> chrome = !chrome
+            }
+        }
         LaunchedEffect(speaking, page, count) {
             if (!speaking) {
                 aloud.stop()
@@ -302,7 +368,14 @@ fun ReaderPane(
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = side, vertical = 8.dp)) {
             Row(modifier = Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 for (column in shown) {
-                    ReaderColumn(column, images, style, Modifier.weight(1f).fillMaxHeight())
+                    ReaderColumn(
+                        column,
+                        images,
+                        style,
+                        Modifier.weight(1f).fillMaxHeight(),
+                        onZone = { fraction -> applyZone(fraction) },
+                        onFlip = { direction -> flipPage(direction) },
+                    )
                 }
             }
             Box(
@@ -345,33 +418,12 @@ fun ReaderPane(
                     if (selectedLabel == it) selectedLabel = null
                 },
         )
-        if (mode == "read") Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .zIndex(-1f)
-                .pointerInput(count, columns) {
-                    var dragged = 0f
-                    detectHorizontalDragGestures(
-                        onDragStart = { dragged = 0f },
-                        onDragEnd = {
-                            val threshold = 48.dp.toPx()
-                            if (dragged < -threshold) page = (page + columns).coerceAtMost(count - 1)
-                            else if (dragged > threshold) page = (page - columns).coerceAtLeast(0)
-                        },
-                    ) { change, amount ->
-                        change.consume()
-                        dragged += amount
-                    }
-                },
-        ) {
-            Box(modifier = Modifier.weight(1f).fillMaxSize().clickable {
-                page = (page - columns).coerceAtLeast(0)
-            })
-            Box(modifier = Modifier.weight(1.1f).fillMaxSize().clickable { chrome = !chrome })
-            Box(modifier = Modifier.weight(1f).fillMaxSize().clickable {
-                page = (page + columns).coerceAtMost(count - 1)
-            })
+        val photoPage = shown.isNotEmpty() && shown.all { column ->
+            val only = com.hvkeyn.ceditneuro.reader.BookText.pagePieces(column).singleOrNull()
+            only is com.hvkeyn.ceditneuro.reader.PagePiece.Figure &&
+                images[only.id]?.let { !com.hvkeyn.ceditneuro.reader.BookText.isSvgBytes(it) } == true
         }
+        allowFinger = mode == "read" && !photoPage && !settings && !toc && !finding && !notes
         if (chrome) {
             Surface(color = paper.background.copy(alpha = 0.96f), modifier = Modifier.align(Alignment.TopCenter)) {
                 Column(modifier = Modifier.fillMaxWidth()) {
@@ -849,11 +901,13 @@ private fun ReaderColumn(
     images: Map<String, ByteArray>,
     style: TextStyle,
     modifier: Modifier,
+    onZone: (Float) -> Unit,
+    onFlip: (Int) -> Unit,
 ) {
     val pieces = remember(column) { BookText.pagePieces(column) }
     val only = pieces.singleOrNull()
     if (only is PagePiece.Figure) {
-        FigureBlock(only.id, images, modifier, fill = true)
+        FigureBlock(only.id, images, modifier, fill = true, onZone = onZone, onFlip = onFlip)
         return
     }
     if (pieces.all { it is PagePiece.Words }) {
@@ -873,6 +927,8 @@ private fun ReaderColumn(
                     images,
                     Modifier.fillMaxWidth(),
                     fill = false,
+                    onZone = onZone,
+                    onFlip = onFlip,
                 )
             }
         }
@@ -885,13 +941,15 @@ private fun FigureBlock(
     images: Map<String, ByteArray>,
     modifier: Modifier,
     fill: Boolean,
+    onZone: (Float) -> Unit,
+    onFlip: (Int) -> Unit,
 ) {
     val bytes = images[id] ?: return
     if (BookText.isSvgBytes(bytes)) {
         val text = remember(id, bytes) { bytes.toString(Charsets.UTF_8) }
         val aspect = svgAspect(text)
         if (fill) {
-            ExpandableMarkup("svg", text, null, modifier)
+            ExpandableMarkup("svg", text, null, modifier, onZone = onZone, onFlip = onFlip)
         } else {
             BoxWithConstraints(Modifier.fillMaxWidth()) {
                 ExpandableMarkup(
@@ -901,6 +959,8 @@ private fun FigureBlock(
                     Modifier
                         .fillMaxWidth()
                         .height((maxWidth * aspect).coerceIn(140.dp, 720.dp)),
+                    onZone = onZone,
+                    onFlip = onFlip,
                 )
             }
         }
@@ -908,7 +968,7 @@ private fun FigureBlock(
     }
     val bitmap = remember(id, bytes) { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) } ?: return
     if (fill) {
-        ZoomableImage(modifier = modifier) {
+        ZoomableImage(modifier = modifier, onZone = onZone, onFlip = onFlip) {
             Image(
                 bitmap = bitmap.asImageBitmap(),
                 contentDescription = id,
