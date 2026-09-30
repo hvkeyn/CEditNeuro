@@ -26,5 +26,24 @@ class DesignCatalogTest {
         val audit = SkillAudit.check(text, "frontend-design")
         assertFalse(audit.blocked)
         assertTrue(text.contains("design_system"))
+        assertTrue(text.contains("styles.refero.design"))
+        assertTrue(text.contains("48dp"))
+        assertTrue(text.contains("44pt"))
+    }
+
+    @Test
+    fun anOldDesignSkillGainsTheSurfaces() {
+        val dir = java.nio.file.Files.createTempDirectory("design-skill").toFile()
+        val file = java.io.File(dir, "frontend-design.md")
+        file.writeText(
+            "# Design a page\n2. call design_system with that name.\n" +
+                "If load_tools says the group has no tools, http_request that system's public page instead.\n",
+        )
+        StarterSkills.ensure(dir)
+        val saved = file.readText()
+        assertTrue(saved.startsWith("# Design a page"))
+        assertTrue(saved.contains("styles.refero.design"))
+        assertTrue(saved.contains("component.gallery"))
+        assertTrue(saved.contains("no HyperFrames"))
     }
 }

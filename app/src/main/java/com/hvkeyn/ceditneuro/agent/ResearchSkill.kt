@@ -206,17 +206,23 @@ object StarterSkills {
             7. A local folder is stored inside the APK and works offline. A url opens live and needs a network.
         """.trimIndent() + "\n",
         "frontend-design" to """
-            # Design a page
+            # Design a screen
 
-            Use this when the user wants a landing page, a cabinet, a form, or another product screen.
+            Use this for a new web page, a desktop window, an Android screen, or an iOS screen. Also use it when the user says the screen looks wrong, or names Refero, a DESIGN.md, 21st.dev, component.gallery, Kinetics, or designsystems.one. A small edit stays a small edit: do that task and do not open this procedure.
 
-            1. Call load_tools group=design. Restate who the page is for and the one job of the screen.
-            2. If they name a design system, or ask how a known company builds screens, call design_system with that name. Quote only the swatches the tool printed. If load_tools says the group has no tools, http_request that system's public page instead. For type, spacing, and corners, http_request the page URL and quote only what that page printed. Do not invent a hex and call it official. Do not copy a company's product.
-            3. For an Apple-like feel, hold to purpose, agency, responsibility, familiarity, flexibility, simplicity, craft, and delight. A press answers at once. Motion follows the finger and can be stopped. Honor reduced motion. Do not add a library this phone cannot run.
-            4. Before code, write a short plan in the chat: four to six color roles, two type roles, one layout sentence, and one signature element that belongs to this brief. If that plan would fit any other product, change it.
-            5. write_file one HTML page in the project, with a plain style block in the file. Use system fonts. No package install and no remote script. The editor preview shows html and htm.
-            6. Name the file in backticks so the user can open it. If they want an installable app, use_skill web-to-app and follow it.
-            7. When the page is written, call use_skill name=frontend-design scope=app on=false.
+            The project's existing design and components win. An external page is only for a choice that is not made yet.
+
+            Do not install a package, an MCP, or a command-line tool. This phone has no 21st.dev MCP and no HyperFrames. Do not pretend either ran. If a page cannot be read, stop and ask the user to paste it. Do not fill a color, a type size, or a component from memory.
+
+            1. Call load_tools group=design. Name the surface: web, desktop, Android, or iOS. Restate who it is for and the one job of the screen.
+            2. If the project already has DESIGN.md or a style block, follow that. Otherwise pick one public DESIGN.md. http_request https://styles.refero.design/ or one raw file from https://github.com/voltagent/awesome-design-md. If they name a design system, call design_system with that name. Quote only the swatches the tool printed. If load_tools says the group has no tools, http_request that system's public page on https://www.designsystems.one/ instead. Write the quoted colors, type, and spacing into DESIGN.md in the project root. Say which page you used and what you took. Do not invent a hex and call it official. Do not copy a company's product.
+            3. Components. Say in the chat what you will look up, then http_request https://component.gallery/ and use only a pattern that page printed. There is no 21st.dev MCP on this phone. http_request https://21st.dev/ or ask the user to paste the component. Do not invent the markup.
+            4. Motion, only when the screen needs it. http_request https://kinetics.colorion.co/ and copy only CSS that page printed. A press answers at once. Motion follows the finger and can be stopped. Honor reduced motion. No remote script and no library this phone cannot run.
+            5. Platform, on top of the quoted style. Web: one HTML file, system fonts, a plain style block. Desktop: visible keyboard focus, a label as well as a shortcut, hover is extra, do not lay it out as a phone. Android: a target is at least 48dp, content clears the system bars, the system back leaves the screen. iOS: a target is at least 44pt, content clears the safe area and the home indicator. A vendor rule that is not in this list is fetched with http_request. If that fetch fails, stop.
+            6. Before code, write a short plan in the chat: four to six color roles taken from DESIGN.md or the page, two type roles, one layout sentence, and one signature element that belongs to this brief. If that plan would fit any other product, change it. For an Apple-like feel, hold to purpose, agency, responsibility, familiarity, flexibility, simplicity, craft, and delight.
+            7. write_file one HTML page in the project. The editor preview shows html and htm. Name the file in backticks. A demo is the frames of that page in a row. Do not render a video and do not install HyperFrames.
+            8. If the user says it still looks wrong, edit the file: one accent, cut decoration that does not serve the job, align to the spacing already quoted, and check that text is readable on its background. Say what you changed. Do not run an external polish command.
+            9. If they want an installable Android app, use_skill web-to-app and follow it. When the screen is written, call use_skill name=frontend-design scope=app on=false.
         """.trimIndent() + "\n",
         "find-skills" to """
             # Find a skill for a task
@@ -361,15 +367,25 @@ object StarterSkills {
         )
     }
 
-    /** Phones that saved the first design skill learn what to do when design_system is not built in. */
+    /** Phones that saved the first design skill learn the public style pages and the other surfaces. */
     private fun extendDesign(appDir: File) {
         val file = File(appDir, "frontend-design.md")
         if (!file.isFile) return
-        val current = file.readText(Charsets.UTF_8)
-        if (current.contains("group has no tools")) return
-        if (!current.contains("call design_system")) return
+        var current = file.readText(Charsets.UTF_8)
+        if (!current.contains("group has no tools") && current.contains("call design_system")) {
+            current = current.trimEnd() + "\n\nIf load_tools says the group has no tools, http_request that system's public page instead.\n"
+            file.writeText(current, Charsets.UTF_8)
+        }
+        if (current.contains("styles.refero.design")) return
+        if (!current.contains("call design_system") && !current.contains("Design a page")) return
         file.writeText(
-            current.trimEnd() + "\n\nIf load_tools says the group has no tools, http_request that system's public page instead.\n",
+            current.trimEnd() + "\n\n" +
+                "Surfaces. Also use this for a desktop window, an Android screen, or an iOS screen, and when the user names styles.refero.design, awesome-design-md, 21st.dev, component.gallery, or kinetics.colorion.co. A small edit stays a small edit.\n" +
+                "The project's existing design wins. Do not install a package, an MCP, or a command-line tool. This phone has no 21st.dev MCP and no HyperFrames. If a page cannot be read, stop and ask the user to paste it. Do not fill a color from memory.\n" +
+                "Pick one public DESIGN.md with http_request of https://styles.refero.design/ or one raw file from https://github.com/voltagent/awesome-design-md. Quote only what that page printed into DESIGN.md. Say which page and what you took.\n" +
+                "Before a component lookup, say what you will open, then http_request https://component.gallery/. For motion, http_request https://kinetics.colorion.co/ and copy only CSS that page printed.\n" +
+                "Desktop: visible keyboard focus, a label as well as a shortcut, hover is extra. Android: a target is at least 48dp, clear the system bars, the system back leaves. iOS: a target is at least 44pt, clear the safe area and the home indicator. A rule that is not in this list is fetched; if the fetch fails, stop.\n" +
+                "A demo is frames in one HTML file. If it still looks wrong, keep one accent and cut decoration. Say what changed.\n",
             Charsets.UTF_8,
         )
     }
