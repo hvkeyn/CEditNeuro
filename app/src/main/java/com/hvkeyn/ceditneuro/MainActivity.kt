@@ -54,6 +54,16 @@ class MainActivity : ComponentActivity() {
 
     /** A same-app start used to check the recorder. The VPN prompt and the notification still apply. */
     private fun maybeCapture(intent: Intent?) {
+        if (intent?.getBooleanExtra("cedit_shell", false) == true) {
+            val dir = getExternalFilesDir(null) ?: return
+            lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                val text = runCatching {
+                    com.hvkeyn.ceditneuro.shizuku.ShizukuShell(applicationContext).exec("id", "/", 15)
+                }.getOrElse { "down ${it.message ?: "failed"}" }
+                java.io.File(dir, "shell-check.txt").writeText(text)
+            }
+            return
+        }
         if (intent?.getBooleanExtra("cedit_audit", false) == true) {
             val dir = getExternalFilesDir(null) ?: return
             val sweep = intent.getBooleanExtra("sweep", false)

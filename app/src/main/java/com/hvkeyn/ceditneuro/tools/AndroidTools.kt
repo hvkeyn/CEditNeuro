@@ -41,9 +41,9 @@ class DeviceStatusTool(private val context: Context) : Tool {
         val shizuku = runCatching { Shizuku.pingBinder() }.getOrDefault(false)
         val root = runCatching { SuShell.available() }.getOrDefault(false)
         val mode = when {
-            shizuku -> "shizuku_exec runs as the shell user through Shizuku."
+            shizuku -> "shizuku_exec runs as the shell user. The Shizuku app does not need to be open."
             root -> "shizuku_exec runs through su as root."
-            else -> "No Shizuku and no root. Use run_command and the app's own tools."
+            else -> "Shizuku's server is not running and there is no root. Use run_command and the app's own tools. Do not open the Shizuku app."
         }
         ToolResult.ok(
             buildString {

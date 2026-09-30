@@ -53,6 +53,22 @@ class SkillWiringTest {
     }
 
     @Test
+    fun androidSkillsStayOnThisPhone() {
+        val app = StarterSkills.skills.getValue("android-app")
+        assertTrue(app.contains("https://github.com/android/skills"))
+        assertTrue(app.contains("Do not decompile another app"))
+        assertTrue(app.contains("install_android_sdk"))
+        val compose = StarterSkills.skills.getValue("android-compose")
+        assertTrue(compose.contains("enableEdgeToEdge"))
+        assertTrue(compose.contains("Navigation 3"))
+        assertTrue(compose.contains("navigation-3/SKILL.md"))
+        val ui = StarterSkills.skills.getValue("android-ui")
+        assertTrue(ui.contains("frontend-design"))
+        assertTrue(ui.contains("48dp"))
+        assertFalse(ui.contains("decompile"))
+    }
+
+    @Test
     fun oldPhoneSkillsGainTheirFixes() {
         val dir = Files.createTempDirectory("skills-wiring").toFile()
         java.io.File(dir, "frontend-design.md").writeText("# Design\n2. call design_system with that name.\n")

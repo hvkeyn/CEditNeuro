@@ -1,6 +1,10 @@
 # Active context
 
-Current: v0.71.0. `frontend-design` covers a new web page, a desktop window, and an Android or iOS screen. The project's own design wins. A public DESIGN.md is quoted from Refero or awesome-design-md, or from designsystems.one when a system is named. component.gallery and Kinetics are read with http_request. There is no 21st.dev MCP and no HyperFrames on this phone. If a page cannot be read, the agent stops. `design_system` stays unregistered. An old `frontend-design.md` gains the surface steps.
+Current: v0.72.0 is released. A private socket between the app and a shell worker is denied by SELinux in both directions, so that path was removed. `shizuku_exec` uses the installed Shizuku server (uid 2000) or su. The app cannot grant itself that uid. `scripts/start-shell.ps1` starts the server from the existing wireless adb link, so the Shizuku screen stays closed.
+
+`android-app`, `android-compose`, and `android-ui` are starter skills for writing an Android or Kotlin Multiplatform app on this phone. They keep UI, domain, and data apart, and they follow Compose, Navigation 3, and edge-to-edge. A specialized public page from `github.com/android/skills` is read with `http_request`. The Android CLI is not installed. Another app is not decompiled.
+
+v0.71.0. `frontend-design` covers a new web page, a desktop window, and an Android or iOS screen. The project's own design wins. A public DESIGN.md is quoted from Refero or awesome-design-md, or from designsystems.one when a system is named. component.gallery and Kinetics are read with http_request. There is no 21st.dev MCP and no HyperFrames on this phone. If a page cannot be read, the agent stops. `design_system` stays unregistered. An old `frontend-design.md` gains the surface steps.
 
 video-notes is in this same tree. A YouTube, RuTube, Yandex, or Dzen link turns on `video-notes`. `video_brief` reads the public title, author, description, and captions. YouTube search, a channel's latest uploads, and a playlist return titles only; a batch reads up to 3 pages. This does not call a transcript service. The video file and any stream are refused. If there are no captions, the picture was not seen.
 
