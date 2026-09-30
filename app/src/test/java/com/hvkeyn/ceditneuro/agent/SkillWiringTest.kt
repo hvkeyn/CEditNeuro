@@ -74,10 +74,14 @@ class SkillWiringTest {
         java.io.File(dir, "frontend-design.md").writeText("# Design\n2. call design_system with that name.\n")
         java.io.File(dir, "net-map.md").writeText("# Map\nDo not record another device.\n")
         java.io.File(dir, "debug.md").writeText("# Find one fault\nThe fix is the smallest edit that makes the check pass.\n")
+        java.io.File(dir, "android-app.md").writeText("# Android app structure\n13. Do not decompile another app.\n")
+        java.io.File(dir, "android-apk.md").writeText("# Android APK check\n1. sha256sum APP.apk.\n")
         ResearchSkill.ensure(dir)
         assertTrue(java.io.File(dir, "frontend-design.md").readText().contains("group has no tools"))
         assertEquals(StarterSkills.skills.getValue("net-map"), java.io.File(dir, "net-map.md").readText())
         assertTrue(java.io.File(dir, "debug.md").readText().contains("systematic-debugging"))
         assertTrue(java.io.File(dir, "systematic-debugging.md").readText().contains("debug_case"))
+        assertTrue(java.io.File(dir, "android-app.md").readText().contains("use_skill android-apk"))
+        assertTrue(java.io.File(dir, "android-apk.md").readText().contains("Reproducing a behavior is allowed"))
     }
 }
