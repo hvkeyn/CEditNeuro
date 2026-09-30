@@ -2236,9 +2236,9 @@ class WorkspaceViewModel(
     private suspend fun prepareShizuku(): String? {
         if (!runCatching { Shizuku.pingBinder() }.getOrDefault(false)) {
             if (com.hvkeyn.ceditneuro.shizuku.SuShell.available()) return null
-            return "Shell access is not available. Root is not present and Shizuku is not running. " +
+            return "Shell access is not available. Shizuku's server is not running and root is not present. " +
                 "Do not call shizuku_exec, fetch_system_layout, or execute_system_action again. " +
-                "Do not open Shizuku or another app. Install with install_apk and remove with uninstall_apk."
+                "Do not open the Shizuku app. Install with install_apk and remove with uninstall_apk."
         }
         if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) return null
         if (shizukuDenied) {

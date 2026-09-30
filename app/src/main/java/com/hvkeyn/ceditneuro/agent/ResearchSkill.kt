@@ -101,11 +101,71 @@ object StarterSkills {
             Use this when an app crashes, drains battery, or a phone setting misbehaves.
 
             1. load_tools group=device. device_status shows battery, storage, memory, and whether root or Shizuku is on.
-            2. With root or Shizuku, shizuku_exec runs: logcat -d -t 300 *:E, dumpsys battery, dumpsys meminfo PACKAGE, pm list packages -3, getprop ro.build.version.release.
-            3. Without them, say which check needs root or Shizuku. Do not pretend a command ran.
+            2. When device_status says shizuku or root is on, shizuku_exec runs: logcat -d -t 300 *:E, dumpsys battery, dumpsys meminfo PACKAGE, pm list packages -3, getprop ro.build.version.release. The Shizuku app does not need to be open.
+            3. Without them, say which check needs Shizuku or root. Do not pretend a command ran. Do not open the Shizuku app.
             4. Filter logs to the package or the error. Quote at most 20 lines.
             5. open_settings takes the user to the right screen when the fix is a setting. The user changes it.
             6. Write what was found and one next step.
+        """.trimIndent() + "\n",
+        "android-app" to """
+            # Android app structure
+
+            Use this when the task is a new Android or Kotlin Multiplatform app, a feature in one, or its architecture, data, network, storage, Gradle, or tests.
+
+            1. Read the project before adding a library. Match the DI, the JSON parser, the image loader, and the network client already in the files. Do not add a second one.
+            2. Keep three layers. The screen draws state and sends events. The domain holds the rule and does not import Android UI. The data layer talks to the network and the database. The screen does not call Retrofit, Ktor, or Room.
+            3. The repository is the error boundary. It returns a result the domain already names. A network error is not thrown through the UI as a raw exception.
+            4. Local data is Room when it is rows, and DataStore when it is a few settings. A list that must work offline is stored, then shown. Do not invent a cache in a composable.
+            5. Network calls are suspend functions. Retrofit returns the body. Ktor maps the error in the repository. Do not start a coroutine with GlobalScope.
+            6. One-shot UI events are a channel the screen collects. Do not replay them from a state flow.
+            7. Hilt or Koin, whichever the project already uses. A new implementation stays internal behind the interface another module needs.
+            8. RxJava stays until the user asks to migrate that file. Then replace that file's types with suspend and Flow. Do not migrate the whole app in one edit.
+            9. One module until a second module has a real boundary. Widening a type to public needs a caller outside the module.
+            10. A behavior change gets a unit test the project already knows how to run. Run it with run_command. A failed test stays failed. Do not say the screen works without that test or a check on this phone.
+            11. load_tools group=build and install_android_sdk only when the user asked for a build and the SDK is missing.
+            12. For AGP 9, CameraX, Wear, TV, XR, Play billing, permissions, or this project's own R8 rules, http_request the matching raw file under https://github.com/android/skills and follow only the steps that page printed. If the page cannot be read, stop and ask the user to paste it. Do not install the Android CLI or a plugin.
+            13. Do not decompile another app. Do not recover another app's class names or its private endpoints.
+        """.trimIndent() + "\n",
+        "android-compose" to """
+            # Compose on this phone
+
+            Use this when the task is Jetpack Compose, a screen, Navigation 3, an XML layout migration, or edge-to-edge.
+
+            1. State is hoisted. A composable receives state and events. remember holds UI-only state. derivedStateOf is for a value that is expensive to recompute.
+            2. A lazy list uses a stable key. Do not apply the list inset as padding on the parent. Pass it as contentPadding so rows can scroll under the system bars.
+            3. A new Activity calls enableEdgeToEdge before setContent. The manifest uses adjustResize for a screen with a text field. Scaffold padding is applied once. Do not add ime padding when the scaffold content insets already include the keyboard.
+            4. A full-screen dialog sets decorFitsSystemWindows to false. Touch targets are at least 48dp. System back leaves the screen.
+            5. Navigation stays on the library the project already uses. A new app uses Navigation 3: a typed route, NavDisplay, and one back stack per top-level tab. Do not invent a route string if the project is already type-safe.
+            6. An XML layout is migrated one screen at a time. The old view stays until that screen's Compose replacement builds.
+            7. Before changing navigation, edge-to-edge, or an XML migration, http_request the matching file: https://raw.githubusercontent.com/android/skills/main/navigation/navigation-3/SKILL.md or https://raw.githubusercontent.com/android/skills/main/system/edge-to-edge/SKILL.md or https://raw.githubusercontent.com/android/skills/main/jetpack-compose/migration/migrate-xml-views-to-jetpack-compose/SKILL.md. Follow only a step that page printed. If the page cannot be read, stop and ask the user to paste it.
+            8. The project's theme wins. Do not copy a company's screen.
+        """.trimIndent() + "\n",
+        "android-ui" to """
+            # Android screen design
+
+            Use this when the task is how an Android screen should look, or the user asks for a phone mockup. A one-line copy change stays a small edit.
+
+            1. use_skill frontend-design. The project's own design wins. Quote a color only from a page http_request printed.
+            2. One job per screen. The primary action is the one obvious button. Empty, loading, and error are separate states with their own text.
+            3. Body text is at least 14sp. A control is at least 48dp. System bars stay clear. System back leaves. Honor reduced motion.
+            4. A mockup is frames in one HTML file in the project. Do not install a design package and do not copy a company's product.
+            5. When the HTML is written and the task was only the mockup, use_skill name=android-ui scope=app on=false.
+        """.trimIndent() + "\n",
+        "android-apk" to """
+            # Android APK check
+
+            Use this to see what a release APK of your own project actually ships: its manifest flags, the names R8 left, and the hosts a reader can pull out of it. An APK you built, or one the user is allowed to analyze, is the only target.
+
+            1. load_tools group=build, then install_android_sdk when aapt2, apkanalyzer, or dexdump is missing. They come with build-tools and cmdline-tools.
+            2. Manifest: aapt2 dump badging APP.apk, and apkanalyzer manifest print APP.apk. Quote the package, the versions, the permissions, and every exported component.
+            3. These flags are the findings in a release: android:debuggable true, usesCleartextTraffic true, allowBackup true, and an exported component with no permission. Quote the line each one came from.
+            4. Resources and strings: aapt2 dump resources APP.apk. A test host or a debug-only string in a release is a finding.
+            5. Dex: dexdump -f APP.apk, and apkanalyzer dex packages APP.apk. Report the count and the names exactly as they were printed.
+            6. A name R8 shortened is not guessed. Your own build has app/build/outputs/mapping/release/mapping.txt: retrace the name with that file and say that you did. With no mapping file, quote the short name unchanged and do not invent the original.
+            7. Hosts: grep the dumped tree for http and https. Report one line per host with the file it came from. This is exactly what a reader of the published APK sees, which is the point of the check.
+            8. Do not call a host the APK named, and do not sign in with a value found in it. A finding is reported, never used.
+            9. Write the package, the version, the flags, the hosts, and one next step. Keep the APK and the dumped tree out of the project, and delete them when the check is done.
+            10. Another person's app is not a target. When the APK is not yours and the user has not said in writing that they are allowed to analyze it, stop and say so. Do not recover another app's class names or its private endpoints, and do not reuse its code, assets, or branding.
         """.trimIndent() + "\n",
         "book-notes" to """
             # Notes from a book
@@ -328,6 +388,24 @@ object StarterSkills {
         extendDebug(appDir)
         extendSecurity(appDir)
         extendVideo(appDir)
+        extendAndroidDebug(appDir)
+    }
+
+    /** Phones that saved an older android-debug skill learn that the Shizuku screen stays closed. */
+    private fun extendAndroidDebug(appDir: File) {
+        val file = File(appDir, "android-debug.md")
+        if (!file.isFile) return
+        val current = file.readText(Charsets.UTF_8)
+        val note = "Shizuku's server can be running without the Shizuku app on screen. " +
+            "If device_status says shizuku is true, do not open the Shizuku app."
+        val wrong = "The in-app shell server is the same shell user as Shizuku. " +
+            "If device_status says it is on, do not open the Shizuku app."
+        if (current.contains(wrong)) {
+            file.writeText(current.replace(wrong, note), Charsets.UTF_8)
+            return
+        }
+        if (current.contains(note) || !current.contains("shizuku_exec")) return
+        file.writeText(current.trimEnd() + "\n\n$note\n", Charsets.UTF_8)
     }
 
     /** Phones that saved the short debug skill learn to hand a real failure to the full case. */

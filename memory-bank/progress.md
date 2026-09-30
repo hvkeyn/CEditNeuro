@@ -1,8 +1,9 @@
 # Progress
 
-Released: v0.45.0 through v0.71.0 (`frontend-design` quotes a public style page for web, desktop, Android, and iOS; `video_brief` reads a public video page, a search, a channel, or a playlist; see activeContext.md). Unit tests include `DesignCatalogTest` and `VideoBriefTest`. Unit tests include `ResearchRunTest`. Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, `SkillLibraryTest`, `ChatLinkTest`, `WebAppPackTest`, `HealthRecordTest`, `SkillAuditTest`, and `ReaderPlaceTest`.
+Released: v0.45.0 through v0.72.0 (`android-app`, `android-compose`, and `android-ui` cover a phone app's layers, Compose, and edge-to-edge; a public page from android/skills is quoted; the shell user is the installed Shizuku server; see activeContext.md). Unit tests include `DesignCatalogTest` and `VideoBriefTest`. Unit tests include `ResearchRunTest`. Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, `SkillLibraryTest`, `ChatLinkTest`, `WebAppPackTest`, `HealthRecordTest`, `SkillAuditTest`, and `ReaderPlaceTest`.
 
 Known gaps:
+- v0.72.0 is released. A socket between the app and a shell worker is denied, so `shizuku_exec` uses the installed Shizuku server. `scripts/start-shell.ps1` starts that server from wireless adb without opening the Shizuku screen. Another app is not decompiled.
 - `video-notes` ships in v0.71.0 with search, a channel, a playlist, and a batch of three. A live chat against a video was not run. `frontend-design` on the phone gains the surface steps when this build starts.
 - The reader finger fix is in this tree: left, right, center, swipe, and the volume key were checked on the phone before v0.69.0. A scheme page was not opened in that check.
 

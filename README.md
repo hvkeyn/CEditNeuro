@@ -64,6 +64,7 @@ layer is wired end to end.
 | A lab sheet is logged and checked against the range printed on it. `health_trend` gives min, max, mean, and direction. `health_index` lists saved tests | done |
 | A missing skill is searched by plain words. `review_skill` blocks a dangerous prompt, a backdoor, malware, or a key, and `save_skill` stores only the adapted text | done |
 | A product screen is designed in the project for web, desktop, Android, or iOS. The project's own design wins. A public DESIGN.md or gallery page is quoted, not invented. `design_system` names a gallery system when that tool is built in | done |
+| `android-app`, `android-compose`, and `android-ui` cover a phone app's layers, Compose, Navigation 3, and edge-to-edge. `android-apk` checks your own release build: the manifest flags, the names R8 left, and the hosts a reader can pull out of it. A public page from android/skills is quoted. Another app is not decompiled | done |
 | `ru-translate` turns an article, a book, a game, or a program into Russian beside the original. It does not stop until the state file says pass (P5 or P6) | done |
 | `net-map` draws a network from a dump. `capture_dump` records this phone's public IPv4 into a pcap, both directions, and stops by itself. `read_dump` names hosts and ports and ends with an audit block | done |
 | `net_audit` checks the Wi-Fi this phone is on: gateway, DNS, private DNS, open ports, SSDP and mDNS devices, an optional /24 sweep, and ranked findings. Connect only, no login | done |
@@ -167,6 +168,7 @@ system installer and opens it after you confirm. Shizuku is not required for tha
 another installed app.
 When Shizuku is already running, or the phone is rooted, `fetch_system_layout` returns
 the foreground UI XML and `execute_system_action` taps one point taken from that layout.
+`scripts/start-shell.ps1` starts that server from the computer's wireless adb link. The Shizuku screen stays closed.
 
 ## Reading
 
