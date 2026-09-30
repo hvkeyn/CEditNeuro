@@ -56,7 +56,7 @@ class SkillWiringTest {
     fun androidSkillsStayOnThisPhone() {
         val app = StarterSkills.skills.getValue("android-app")
         assertTrue(app.contains("https://github.com/android/skills"))
-        assertTrue(app.contains("Do not decompile another app"))
+        assertTrue(app.contains("use_skill android-apk"))
         assertTrue(app.contains("install_android_sdk"))
         val compose = StarterSkills.skills.getValue("android-compose")
         assertTrue(compose.contains("enableEdgeToEdge"))
