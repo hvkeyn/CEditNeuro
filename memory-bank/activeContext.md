@@ -1,8 +1,8 @@
 # Active context
 
-Current: v0.72.0 is released. A private socket between the app and a shell worker is denied by SELinux in both directions, so that path was removed. `shizuku_exec` uses the installed Shizuku server (uid 2000) or su. The app cannot grant itself that uid. `scripts/start-shell.ps1` starts the server from the existing wireless adb link, so the Shizuku screen stays closed.
+Current: v0.73.0 is released. `android-apk` reads an APK before it is trusted: permissions, what starts by itself, calls that read a user store or open a socket, where a read is written, the text R8 keeps, and the hosts. A remote system is judged from the outside only. A found value is not reused, and the app's code is not copied into the project.
 
-`android-app`, `android-compose`, and `android-ui` are starter skills for writing an Android or Kotlin Multiplatform app on this phone. They keep UI, domain, and data apart, and they follow Compose, Navigation 3, and edge-to-edge. A specialized public page from `github.com/android/skills` is read with `http_request`. The Android CLI is not installed. Another app is not decompiled.
+`android-app`, `android-compose`, and `android-ui` are starter skills for writing an Android or Kotlin Multiplatform app on this phone. They keep UI, domain, and data apart, and they follow Compose, Navigation 3, and edge-to-edge. A specialized public page from `github.com/android/skills` is read with `http_request`. The Android CLI is not installed. Checking another app uses `android-apk` and does not copy its code.
 
 v0.71.0. `frontend-design` covers a new web page, a desktop window, and an Android or iOS screen. The project's own design wins. A public DESIGN.md is quoted from Refero or awesome-design-md, or from designsystems.one when a system is named. component.gallery and Kinetics are read with http_request. There is no 21st.dev MCP and no HyperFrames on this phone. If a page cannot be read, the agent stops. `design_system` stays unregistered. An old `frontend-design.md` gains the surface steps.
 
