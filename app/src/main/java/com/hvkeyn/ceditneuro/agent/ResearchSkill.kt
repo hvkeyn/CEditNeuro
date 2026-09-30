@@ -98,14 +98,19 @@ object StarterSkills {
         "android-debug" to """
             # Android debug on this phone
 
-            Use this when an app crashes, drains battery, or a phone setting misbehaves.
+            Use this when an app crashes, a feature of an app you built does the wrong thing, or a phone setting misbehaves.
 
-            1. load_tools group=device. device_status shows battery, storage, memory, and whether root or Shizuku is on.
-            2. When device_status says shizuku or root is on, shizuku_exec runs: logcat -d -t 300 *:E, dumpsys battery, dumpsys meminfo PACKAGE, pm list packages -3, getprop ro.build.version.release. The Shizuku app does not need to be open.
-            3. Without them, say which check needs Shizuku or root. Do not pretend a command ran. Do not open the Shizuku app.
-            4. Filter logs to the package or the error. Quote at most 20 lines.
-            5. open_settings takes the user to the right screen when the fix is a setting. The user changes it.
-            6. Write what was found and one next step.
+            1. load_tools group=device and load_tools group=debug. device_status shows battery, storage, memory, and whether root or Shizuku is on.
+            2. A feature check is the project in this folder, or the apk you just installed. use_skill systematic-debugging. debug_case action=open names that behavior in one sentence.
+            3. Read the activity from the manifest. shizuku_exec starts it with am start and that component. Do not guess the class. Then fetch_system_layout.
+            4. The check fails when the row you expected is missing or its label is not the one the task named. debug_case action=reproduce result=fail. Do not say it works.
+            5. One step only. execute_system_action uses the tap center the last dump printed for one row of this app. Then fetch_system_layout again. That second list is the result. Do not invent a coordinate. Do not tap a different app, the installer, or a system dialog. install_apk and uninstall_apk own install and remove.
+            6. Logs go through shizuku_exec: logcat -d -t 200 filtered to that package or its pid. Quote at most 20 lines. Do not run logcat in run_command. Leave out any line that looks like a token or a password.
+            7. If device_status says shizuku and root are both off, say the screen was not checked. Do not invent a tap or a log line.
+            8. The fix follows systematic-debugging. After the edit, run the same Gradle task, install_apk again, and repeat the same screen check. A unit test does not replace that check.
+            9. A crash, battery, or memory question still uses shizuku_exec for logcat -d -t 300 *:E, dumpsys battery, and dumpsys meminfo of that package. The Shizuku app does not need to be open.
+            10. open_settings takes the user to the right screen when the fix is a setting. The user changes it.
+            11. Write what the dump showed, what you did not run, and one next step.
         """.trimIndent() + "\n",
         "android-app" to """
             # Android app structure
@@ -121,10 +126,12 @@ object StarterSkills {
             7. Hilt or Koin, whichever the project already uses. A new implementation stays internal behind the interface another module needs.
             8. RxJava stays until the user asks to migrate that file. Then replace that file's types with suspend and Flow. Do not migrate the whole app in one edit.
             9. One module until a second module has a real boundary. Widening a type to public needs a caller outside the module.
-            10. A behavior change gets a unit test the project already knows how to run. Run it with run_command. A failed test stays failed. Do not say the screen works without that test or a check on this phone.
-            11. load_tools group=build and install_android_sdk only when the user asked for a build and the SDK is missing.
-            12. For AGP 9, CameraX, Wear, TV, XR, Play billing, permissions, or this project's own R8 rules, http_request the matching raw file under https://github.com/android/skills and follow only the steps that page printed. If the page cannot be read, stop and ask the user to paste it. Do not install the Android CLI or a plugin.
-            13. Another app is opened only to check it: a build from a colleague, or an app the user is about to install. use_skill android-apk and follow it. A part of that code may be copied into a separate test app to reproduce one behavior. Its assets and branding are not reused, and the whole feature is not rebuilt.
+            10. A behavior change gets a unit test the project already knows how to run. Run it with run_command. A failed test stays failed. A green test is not the screen.
+            11. A build uses the one Gradle task the project already has. If gradlew is in the project, run_command that. Otherwise load_tools group=build, install_jdk, then install_android_sdk, then run_command gradle. assembleDebug unless they asked for a release. Give the command several minutes. Success is the line BUILD SUCCESSFUL and an apk path you listed afterward. A compile that stopped is not a build. Quote the first error. Do not run that command again unchanged.
+            12. install_apk that apk. Do not install with the package manager from the shell, and do not uninstall first unless the user asked.
+            13. Then use_skill android-debug and check the behavior they named on the installed app. Do not say the feature works from the unit test alone.
+            14. For AGP 9, CameraX, Wear, TV, XR, Play billing, permissions, or this project's own R8 rules, http_request the matching raw file under https://github.com/android/skills and follow only the steps that page printed. If the page cannot be read, stop and ask the user to paste it. Do not install the Android CLI or a plugin.
+            15. Another app is opened only to check it: a build from a colleague, or an app the user is about to install. use_skill android-apk and follow it. A part of that code may be copied into a separate test app to reproduce one behavior. Its assets and branding are not reused, and the whole feature is not rebuilt.
         """.trimIndent() + "\n",
         "android-compose" to """
             # Compose on this phone
@@ -227,7 +234,7 @@ object StarterSkills {
             4. One hypothesis: debug_case action=hypothesis. Then one smallest check, action=test with that id and result=supports or rules-out. A ruled-out idea is not patched. A new idea is a new hypothesis. Do not change two things in one test.
             5. The cause is one sentence, action=cause, and only after a test supports it. Say where the bad value starts, not only where it crashes.
             6. The fix is the smallest edit of that cause. No extra cleanup. action=fix names that one edit.
-            7. Run the same check that failed. action=verify with that same check. result=pass is the only way the case says pass. A different check does not count. If it still fails, return to the facts. After three failed fixes the tool stops you: question the design with the user, and do not try a fourth patch.
+            7. Run the same check that failed. action=verify with that same check. result=pass is the only way the case says pass. A different check does not count. An Android screen uses android-debug, and that verify check is the same screen, not only a unit test. If it still fails, return to the facts. After three failed fixes the tool stops you: question the design with the user, and do not try a fourth patch.
             8. Say what you ran and what you did not run. A failed command stays failed. Then use_skill review, and use_skill name=systematic-debugging scope=app on=false.
         """.trimIndent() + "\n",
         "security" to """
@@ -406,14 +413,16 @@ object StarterSkills {
         extendAndroidDebug(appDir)
         extendAndroidApp(appDir)
         extendAndroidApk(appDir)
+        extendSystematic(appDir)
     }
 
-    /** Phones that saved the first android-app skill learn that a check may open another app. */
+    /** Phones that saved an older android-app skill learn the build and the screen check. */
     private fun extendAndroidApp(appDir: File) {
         val file = File(appDir, "android-app.md")
         if (!file.isFile) return
         val current = file.readText(Charsets.UTF_8)
-        if (!current.contains("Do not decompile another app")) return
+        if (current.contains("BUILD SUCCESSFUL")) return
+        if (!current.contains("install_android_sdk") && !current.contains("Do not decompile another app")) return
         file.writeText(skills.getValue("android-app"), Charsets.UTF_8)
     }
 
@@ -426,21 +435,27 @@ object StarterSkills {
         file.writeText(skills.getValue("android-apk"), Charsets.UTF_8)
     }
 
-    /** Phones that saved an older android-debug skill learn that the Shizuku screen stays closed. */
+    /** Phones that saved an older android-debug skill learn to check the installed screen. */
     private fun extendAndroidDebug(appDir: File) {
         val file = File(appDir, "android-debug.md")
         if (!file.isFile) return
         val current = file.readText(Charsets.UTF_8)
-        val note = "Shizuku's server can be running without the Shizuku app on screen. " +
-            "If device_status says shizuku is true, do not open the Shizuku app."
-        val wrong = "The in-app shell server is the same shell user as Shizuku. " +
-            "If device_status says it is on, do not open the Shizuku app."
-        if (current.contains(wrong)) {
-            file.writeText(current.replace(wrong, note), Charsets.UTF_8)
-            return
-        }
-        if (current.contains(note) || !current.contains("shizuku_exec")) return
-        file.writeText(current.trimEnd() + "\n\n$note\n", Charsets.UTF_8)
+        if (current.contains("fetch_system_layout")) return
+        if (!current.contains("shizuku_exec") && !current.contains("Android debug")) return
+        file.writeText(skills.getValue("android-debug"), Charsets.UTF_8)
+    }
+
+    /** Phones that saved systematic-debugging learn that an Android screen is its own check. */
+    private fun extendSystematic(appDir: File) {
+        val file = File(appDir, "systematic-debugging.md")
+        if (!file.isFile) return
+        val current = file.readText(Charsets.UTF_8)
+        if (current.contains("android-debug")) return
+        if (!current.contains("debug_case")) return
+        file.writeText(
+            current.trimEnd() + "\n\nAn Android screen uses android-debug, and the verify check is that same screen, not only a unit test.\n",
+            Charsets.UTF_8,
+        )
     }
 
     /** Phones that saved the short debug skill learn to hand a real failure to the full case. */
