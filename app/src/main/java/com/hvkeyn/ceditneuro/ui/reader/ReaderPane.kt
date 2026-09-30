@@ -73,8 +73,10 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -87,6 +89,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hvkeyn.ceditneuro.data.ReaderNote
 import com.hvkeyn.ceditneuro.reader.BookText
+import com.hvkeyn.ceditneuro.reader.PageBreak
 import com.hvkeyn.ceditneuro.reader.PagePiece
 import com.hvkeyn.ceditneuro.ui.ReaderView
 import com.hvkeyn.ceditneuro.ui.ExpandablePicture
@@ -298,29 +301,32 @@ fun ReaderPane(
         val columns = if (landscape && maxWidth > 640.dp) 2 else 1
         val side = if (landscape) 28.dp else 20.dp
         val textWidth = (maxWidth - side * 2) / columns - if (columns == 2) 12.dp else 0.dp
-        val textHeight = maxHeight - 36.dp
+        var columnHeight by remember { mutableIntStateOf(0) }
         val style = TextStyle(
             fontFamily = font,
             fontSize = reader.fontSp.sp,
             lineHeight = (reader.fontSp * reader.spacing).sp,
             color = paper.ink,
         )
-        val spread = remember(pageText, textWidth, textHeight, reader.fontSp, reader.fontName, reader.spacing) {
+        val textHeightPx = with(density) {
+            val measured = if (columnHeight > 80) columnHeight - 8.dp.roundToPx() else (maxHeight - 96.dp).roundToPx()
+            measured.coerceAtLeast(1)
+        }
+        val spread = remember(pageText, textWidth, textHeightPx, reader.fontSp, reader.fontName, reader.spacing) {
             with(density) {
                 paginate(
                     pageText,
                     measurer,
                     style,
                     textWidth.roundToPx().coerceAtLeast(1),
-                    textHeight.roundToPx().coerceAtLeast(1),
+                    textHeightPx,
                 )
             }
         }
         val widthPx = with(density) { textWidth.roundToPx() }
-        val heightPx = with(density) { textHeight.roundToPx() }
         val count = spread.ranges.size.coerceAtLeast(1)
-        LaunchedEffect(spread.ranges, widthPx, heightPx) {
-            if (placed || widthPx <= 80 || heightPx <= 80) return@LaunchedEffect
+        LaunchedEffect(spread.ranges, widthPx, textHeightPx) {
+            if (placed || widthPx <= 80 || columnHeight <= 80) return@LaunchedEffect
             page = com.hvkeyn.ceditneuro.reader.ReaderPlace.pageFor(
                 spread.ranges,
                 pageText.length,
@@ -366,7 +372,13 @@ fun ReaderPane(
             }
         }
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = side, vertical = 8.dp)) {
-            Row(modifier = Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .onSizeChanged { columnHeight = it.height },
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
                 for (column in shown) {
                     ReaderColumn(
                         column,
@@ -397,6 +409,8 @@ fun ReaderPane(
                     if (speaking) "  ·  reading aloud" else "",
                 color = paper.muted,
                 style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp),
             )
         }
@@ -847,9 +861,9 @@ private fun paginate(
 ): Spread {
     if (text.isBlank()) return Spread(listOf(0..0), listOf(""))
     val sample = "Строка для замера ширины страницы читалки. ".repeat(6)
-    val layout = measurer.measure(sample, style = style, constraints = Constraints(maxWidth = width))
-    val lines = layout.lineCount.coerceAtLeast(1)
-    val lineHeight = (layout.size.height / lines).coerceAtLeast(1)
+    val sampleLayout = measurer.measure(sample, style = style, constraints = Constraints(maxWidth = width))
+    val lines = sampleLayout.lineCount.coerceAtLeast(1)
+    val lineHeight = (sampleLayout.size.height / lines).coerceAtLeast(1)
     val charsPerLine = (sample.length / lines).coerceAtLeast(12)
     val budget = (charsPerLine * (height / lineHeight).coerceAtLeast(1)).coerceIn(240, 3_200)
     val ranges = ArrayList<IntRange>()
@@ -874,15 +888,29 @@ private fun paginate(
             continue
         }
         val imageAt = text.indexOf('\u0001', start).takeIf { it > start }
-        val window = minOf(text.length, start + budget, imageAt ?: text.length)
-        val broken = if (window >= text.length) {
-            window
-        } else {
-            text.lastIndexOf('\n', window - 1).takeIf { it > start + budget / 5 }
-                ?: text.lastIndexOf(' ', window - 1).takeIf { it > start + budget / 5 }
-                ?: window
+        val limit = minOf(text.length, imageAt ?: text.length)
+        var probe = minOf(limit, start + budget)
+        var layout = measurer.measure(
+            text.substring(start, probe),
+            style = style,
+            constraints = Constraints(maxWidth = width),
+            softWrap = true,
+            overflow = TextOverflow.Clip,
+        )
+        if (layout.size.height <= height && probe < limit) {
+            val missing = ((height - layout.size.height) / lineHeight).coerceAtLeast(1)
+            probe = minOf(limit, probe + missing * charsPerLine + charsPerLine)
+            layout = measurer.measure(
+                text.substring(start, probe),
+                style = style,
+                constraints = Constraints(maxWidth = width),
+                softWrap = true,
+                overflow = TextOverflow.Clip,
+            )
         }
-        val end = broken.coerceIn(start + 1, text.length)
+        val bottoms = List(layout.lineCount) { layout.getLineBottom(it) }
+        val ends = List(layout.lineCount) { layout.getLineEnd(it) }
+        val end = PageBreak.exclusiveEnd(start, probe, height, bottoms, ends)
         ranges.add(start until end)
         chapters.add(chapter)
         start = end
@@ -911,7 +939,12 @@ private fun ReaderColumn(
         return
     }
     if (pieces.all { it is PagePiece.Words }) {
-        Text(text = column, style = style, modifier = modifier)
+        Text(
+            text = column,
+            style = style,
+            overflow = TextOverflow.Clip,
+            modifier = modifier.clipToBounds(),
+        )
         return
     }
     Column(modifier.verticalScroll(rememberScrollState())) {

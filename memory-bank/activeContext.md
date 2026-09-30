@@ -1,6 +1,6 @@
 # Active context
 
-Current: v0.75.0 is released. `frontend-design` treats a bland screen as a failed draft: one mood (editorial, technical, or warm), two type faces, and no empty chips. The Google design guide is read with `http_request`. This phone does not open Google AI Studio and does not call an image generator. `design_system` stays unregistered.
+Current: v0.76.0. Reader pages end on the last measured line that fits, so the next page continues and the progress line stays under the text. `android-app` treats a build as done only after BUILD SUCCESSFUL and `install_apk`. `android-debug` checks that screen with one dump, one tap on a printed row, and the dump again. A unit test is not the screen. Without Shizuku or root the screen check is reported as not run.
 
 `android-app`, `android-compose`, and `android-ui` are starter skills for writing an Android or Kotlin Multiplatform app on this phone. They keep UI, domain, and data apart, and they follow Compose, Navigation 3, and edge-to-edge. A specialized public page from `github.com/android/skills` is read with `http_request`. The Android CLI is not installed. Checking another app uses `android-apk` and does not copy its code.
 
