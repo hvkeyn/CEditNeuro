@@ -29,6 +29,8 @@ class DesignCatalogTest {
         assertTrue(text.contains("styles.refero.design"))
         assertTrue(text.contains("48dp"))
         assertTrue(text.contains("44pt"))
+        assertTrue(text.contains("ai-ui-design-google-ai-studio"))
+        assertTrue(text.contains("Do not mix them"))
     }
 
     @Test
@@ -45,5 +47,6 @@ class DesignCatalogTest {
         assertTrue(saved.contains("styles.refero.design"))
         assertTrue(saved.contains("component.gallery"))
         assertTrue(saved.contains("no HyperFrames"))
+        assertTrue(saved.contains("ai-ui-design-google-ai-studio"))
     }
 }

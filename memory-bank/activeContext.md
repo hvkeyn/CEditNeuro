@@ -1,6 +1,6 @@
 # Active context
 
-Current: v0.73.0 is released. `android-apk` reads an APK before it is trusted: permissions, what starts by itself, calls that read a user store or open a socket, where a read is written, the text R8 keeps, and the hosts. A remote system is judged from the outside only. A found value is not reused, and the app's code is not copied into the project.
+Current: v0.75.0 is released. `frontend-design` treats a bland screen as a failed draft: one mood (editorial, technical, or warm), two type faces, and no empty chips. The Google design guide is read with `http_request`. This phone does not open Google AI Studio and does not call an image generator. `design_system` stays unregistered.
 
 `android-app`, `android-compose`, and `android-ui` are starter skills for writing an Android or Kotlin Multiplatform app on this phone. They keep UI, domain, and data apart, and they follow Compose, Navigation 3, and edge-to-edge. A specialized public page from `github.com/android/skills` is read with `http_request`. The Android CLI is not installed. Checking another app uses `android-apk` and does not copy its code.
 
