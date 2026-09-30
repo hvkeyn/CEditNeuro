@@ -148,7 +148,7 @@ object StarterSkills {
             1. use_skill frontend-design. The project's own design wins. Quote a color only from a page http_request printed.
             2. One job per screen. The primary action is the one obvious button. Empty, loading, and error are separate states with their own text.
             3. Body text is at least 14sp. A control is at least 48dp. System bars stay clear. System back leaves. Honor reduced motion.
-            4. A mockup is frames in one HTML file in the project. Do not install a design package and do not copy a company's product.
+            4. A mockup is frames in one HTML file in the project. A frame that could belong to any app is a failed draft: follow the one-mood rule in frontend-design. Do not install a design package and do not copy a company's product.
             5. When the HTML is written and the task was only the mockup, use_skill name=android-ui scope=app on=false.
         """.trimIndent() + "\n",
         "android-apk" to """
@@ -282,7 +282,7 @@ object StarterSkills {
         "frontend-design" to """
             # Design a screen
 
-            Use this for a new web page, a desktop window, an Android screen, or an iOS screen. Also use it when the user says the screen looks wrong, or names Refero, a DESIGN.md, 21st.dev, component.gallery, Kinetics, or designsystems.one. A small edit stays a small edit: do that task and do not open this procedure.
+            Use this for a new web page, a desktop window, an Android screen, or an iOS screen. Also use it when the user says the screen looks wrong, bland, or generic, or names Refero, a DESIGN.md, 21st.dev, component.gallery, Kinetics, designsystems.one, or the Google AI Studio design guide. A small edit stays a small edit: do that task and do not open this procedure.
 
             The project's existing design and components win. An external page is only for a choice that is not made yet.
 
@@ -293,10 +293,11 @@ object StarterSkills {
             3. Components. Say in the chat what you will look up, then http_request https://component.gallery/ and use only a pattern that page printed. There is no 21st.dev MCP on this phone. http_request https://21st.dev/ or ask the user to paste the component. Do not invent the markup.
             4. Motion, only when the screen needs it. http_request https://kinetics.colorion.co/ and copy only CSS that page printed. A press answers at once. Motion follows the finger and can be stopped. Honor reduced motion. No remote script and no library this phone cannot run.
             5. Platform, on top of the quoted style. Web: one HTML file, system fonts, a plain style block. Desktop: visible keyboard focus, a label as well as a shortcut, hover is extra, do not lay it out as a phone. Android: a target is at least 48dp, content clears the system bars, the system back leaves the screen. iOS: a target is at least 44pt, content clears the safe area and the home indicator. A vendor rule that is not in this list is fetched with http_request. If that fetch fails, stop.
-            6. Before code, write a short plan in the chat: four to six color roles taken from DESIGN.md or the page, two type roles, one layout sentence, and one signature element that belongs to this brief. If that plan would fit any other product, change it. For an Apple-like feel, hold to purpose, agency, responsibility, familiarity, flexibility, simplicity, craft, and delight.
-            7. write_file one HTML page in the project. The editor preview shows html and htm. Name the file in backticks. A demo is the frames of that page in a row. Do not render a video and do not install HyperFrames.
-            8. If the user says it still looks wrong, edit the file: one accent, cut decoration that does not serve the job, align to the spacing already quoted, and check that text is readable on its background. Say what you changed. Do not run an external polish command.
-            9. If they want an installable Android app, use_skill web-to-app and follow it. When the screen is written, call use_skill name=frontend-design scope=app on=false.
+            6. Before code, write a short plan in the chat: who it is for, the one job, one mood, two type roles, and one signature element that belongs to this brief. The mood is one of these, and only one: editorial (a serif display face, wide space, a light ground), technical (dense rows, monospace for metadata, a visible grid), or warm (soft cards, pill buttons, round corners). Do not mix them. If that plan would fit any other product, change it. Do not default to Inter, Roboto, or Arial unless the project already uses that face. Name one display face and one body face. For an Apple-like feel, hold to purpose, agency, responsibility, familiarity, flexibility, simplicity, craft, and delight.
+            7. If the user attached a picture, describe its layout, type roles, card edges, spacing, and mood, and follow that description. Quote a color only when a tool printed it. Do not copy that picture's product. A picture in the page is a file they attached or a flat shape in CSS. Do not leave a broken stock URL. Do not call an image generator.
+            8. write_file one HTML page in the project. Link the two faces from fonts.googleapis.com. A demo is two or three frames in that file, the same words and controls, one mood each; keep the frame that matches the brief. Then edit the kept frame: one spacing step, aligned edges, room inside a card, and cut every chip, badge, and widget that does not do the job. The editor preview shows html and htm. Name the file in backticks. Do not render a video and do not install HyperFrames.
+            9. When they name the Google design guide, or the draft still looks generic, http_request https://aistudio.google.com/learn/ai-ui-design-google-ai-studio and follow only a step that page printed and this phone can do. Do not open Google AI Studio, do not click Remix, and do not pretend an Edit tool ran. If the page cannot be read, keep the mood rules and say the page was not read.
+            10. If they want an installable Android app, use_skill web-to-app and follow it. When the screen is written, call use_skill name=frontend-design scope=app on=false.
         """.trimIndent() + "\n",
         "find-skills" to """
             # Find a skill for a task
@@ -488,16 +489,28 @@ object StarterSkills {
             current = current.trimEnd() + "\n\nIf load_tools says the group has no tools, http_request that system's public page instead.\n"
             file.writeText(current, Charsets.UTF_8)
         }
-        if (current.contains("styles.refero.design")) return
-        if (!current.contains("call design_system") && !current.contains("Design a page")) return
-        file.writeText(
-            current.trimEnd() + "\n\n" +
+        if (!current.contains("styles.refero.design") &&
+            (current.contains("call design_system") || current.contains("Design a page"))
+        ) {
+            current = current.trimEnd() + "\n\n" +
                 "Surfaces. Also use this for a desktop window, an Android screen, or an iOS screen, and when the user names styles.refero.design, awesome-design-md, 21st.dev, component.gallery, or kinetics.colorion.co. A small edit stays a small edit.\n" +
                 "The project's existing design wins. Do not install a package, an MCP, or a command-line tool. This phone has no 21st.dev MCP and no HyperFrames. If a page cannot be read, stop and ask the user to paste it. Do not fill a color from memory.\n" +
                 "Pick one public DESIGN.md with http_request of https://styles.refero.design/ or one raw file from https://github.com/voltagent/awesome-design-md. Quote only what that page printed into DESIGN.md. Say which page and what you took.\n" +
                 "Before a component lookup, say what you will open, then http_request https://component.gallery/. For motion, http_request https://kinetics.colorion.co/ and copy only CSS that page printed.\n" +
                 "Desktop: visible keyboard focus, a label as well as a shortcut, hover is extra. Android: a target is at least 48dp, clear the system bars, the system back leaves. iOS: a target is at least 44pt, clear the safe area and the home indicator. A rule that is not in this list is fetched; if the fetch fails, stop.\n" +
-                "A demo is frames in one HTML file. If it still looks wrong, keep one accent and cut decoration. Say what changed.\n",
+                "A demo is frames in one HTML file. If it still looks wrong, keep one accent and cut decoration. Say what changed.\n"
+            file.writeText(current, Charsets.UTF_8)
+        }
+        if (current.contains("ai-ui-design-google-ai-studio")) return
+        if (!current.contains("Design a page") && !current.contains("Design a screen") && !current.contains("styles.refero.design")) return
+        file.writeText(
+            current.trimEnd() + "\n\n" +
+                "A bland screen is a failed draft. Pick one mood and do not mix them: editorial, technical, or warm. " +
+                "Do not default to Inter, Roboto, or Arial unless the project already uses that face. Name one display face and one body face and link them from fonts.googleapis.com. " +
+                "A picture is an attached file or a flat shape in CSS. Do not leave a broken stock URL and do not call an image generator. " +
+                "Put two or three frames in the one HTML file, keep the frame that matches the brief, align the spacing, and cut every chip that does not do the job. " +
+                "When the user names the Google design guide, http_request https://aistudio.google.com/learn/ai-ui-design-google-ai-studio and follow only a step that page printed. " +
+                "Do not open Google AI Studio and do not pretend an Edit tool ran.\n",
             Charsets.UTF_8,
         )
     }

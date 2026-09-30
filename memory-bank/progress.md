@@ -1,9 +1,9 @@
 # Progress
 
-Released: v0.45.0 through v0.73.0 (`android-apk` reads an APK before it is trusted; see activeContext.md). Unit tests include `DesignCatalogTest` and `VideoBriefTest`. Unit tests include `ResearchRunTest`. Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, `SkillLibraryTest`, `ChatLinkTest`, `WebAppPackTest`, `HealthRecordTest`, `SkillAuditTest`, and `ReaderPlaceTest`.
+Released: v0.45.0 through v0.75.0 (`frontend-design` rejects a bland draft: one mood, two type faces, no empty chips; see activeContext.md). Unit tests include `DesignCatalogTest` and `VideoBriefTest`. Unit tests include `ResearchRunTest`. Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, `SkillLibraryTest`, `ChatLinkTest`, `WebAppPackTest`, `HealthRecordTest`, `SkillAuditTest`, and `ReaderPlaceTest`.
 
 Known gaps:
-- v0.73.0 is released. `android-apk` reads an APK before it is trusted and does not call a host it found, replay a request, or copy the app's code.
+- v0.75.0 is released. A bland screen is a failed draft. The Google design guide is quoted from the page. Google AI Studio is not opened.
 - `video-notes` ships in v0.71.0 with search, a channel, a playlist, and a batch of three. A live chat against a video was not run. `frontend-design` on the phone gains the surface steps when this build starts.
 - The reader finger fix is in this tree: left, right, center, swipe, and the volume key were checked on the phone before v0.69.0. A scheme page was not opened in that check.
 
