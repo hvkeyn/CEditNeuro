@@ -124,7 +124,7 @@ object StarterSkills {
             10. A behavior change gets a unit test the project already knows how to run. Run it with run_command. A failed test stays failed. Do not say the screen works without that test or a check on this phone.
             11. load_tools group=build and install_android_sdk only when the user asked for a build and the SDK is missing.
             12. For AGP 9, CameraX, Wear, TV, XR, Play billing, permissions, or this project's own R8 rules, http_request the matching raw file under https://github.com/android/skills and follow only the steps that page printed. If the page cannot be read, stop and ask the user to paste it. Do not install the Android CLI or a plugin.
-            13. Do not decompile another app. Do not recover another app's class names or its private endpoints.
+            13. Another app is opened only to check it: a build from a colleague, or an app the user is about to install. use_skill android-apk and follow it. Do not move its code, assets, or branding into this project.
         """.trimIndent() + "\n",
         "android-compose" to """
             # Compose on this phone
@@ -154,18 +154,27 @@ object StarterSkills {
         "android-apk" to """
             # Android APK check
 
-            Use this to see what a release APK of your own project actually ships: its manifest flags, the names R8 left, and the hosts a reader can pull out of it. An APK you built, or one the user is allowed to analyze, is the only target.
+            Use this to read an APK before it is trusted: a release you built, a colleague's test build, or an app that looks hostile. The report says what it asks for, what starts by itself, which calls it makes, where data leaves, and whether a remote system is worth trusting.
 
-            1. load_tools group=build, then install_android_sdk when aapt2, apkanalyzer, or dexdump is missing. They come with build-tools and cmdline-tools.
-            2. Manifest: aapt2 dump badging APP.apk, and apkanalyzer manifest print APP.apk. Quote the package, the versions, the permissions, and every exported component.
-            3. These flags are the findings in a release: android:debuggable true, usesCleartextTraffic true, allowBackup true, and an exported component with no permission. Quote the line each one came from.
-            4. Resources and strings: aapt2 dump resources APP.apk. A test host or a debug-only string in a release is a finding.
-            5. Dex: dexdump -f APP.apk, and apkanalyzer dex packages APP.apk. Report the count and the names exactly as they were printed.
-            6. A name R8 shortened is not guessed. Your own build has app/build/outputs/mapping/release/mapping.txt: retrace the name with that file and say that you did. With no mapping file, quote the short name unchanged and do not invent the original.
-            7. Hosts: grep the dumped tree for http and https. Report one line per host with the file it came from. This is exactly what a reader of the published APK sees, which is the point of the check.
-            8. Do not call a host the APK named, and do not sign in with a value found in it. A finding is reported, never used.
-            9. Write the package, the version, the flags, the hosts, and one next step. Keep the APK and the dumped tree out of the project, and delete them when the check is done.
-            10. Another person's app is not a target. When the APK is not yours and the user has not said in writing that they are allowed to analyze it, stop and say so. Do not recover another app's class names or its private endpoints, and do not reuse its code, assets, or branding.
+            1. load_tools group=build, then install_android_sdk when aapt2, apkanalyzer, or dexdump is missing. They come with build-tools and cmdline-tools. sha256sum, unzip, strings, and xxd are already in run_command.
+            2. sha256sum APP.apk. That hash names the sample in every line of the report.
+            3. Manifest: aapt2 dump badging APP.apk, and apkanalyzer manifest print APP.apk. Quote the package, the versions, the permissions, and every exported component.
+            4. Release flags: android:debuggable true, usesCleartextTraffic true, allowBackup true, and an exported component with no permission. Quote the line each one came from.
+            5. Weigh the permissions that carry weight: SMS and CALL_LOG, SYSTEM_ALERT_WINDOW, REQUEST_INSTALL_PACKAGES, BIND_ACCESSIBILITY_SERVICE, BIND_DEVICE_ADMIN, BIND_NOTIFICATION_LISTENER_SERVICE, RECEIVE_BOOT_COMPLETED, QUERY_ALL_PACKAGES. A flashlight with SMS is a finding, and so is an accessibility service the screens never mention.
+            6. Persistence: the receivers, services, and providers the manifest declares for BOOT_COMPLETED and PACKAGE_ADDED, and any foreground service. Say what starts with no tap from the user.
+            7. Calls. unzip APP.apk into a folder, then dexdump -d on each classes*.dex, and grep the disassembly for the calls that decide a verdict. Quote one line per hit:
+               - a socket or a client: Ljava/net/Socket, Ljavax/net/ssl/, Lokhttp3/, Lretrofit2/, Lorg/apache/, WebView.loadUrl, java.net.URL
+               - an identity or a user store: getDeviceId, getImei, getSubscriberId, getLine1Number, TelephonyManager, Settings.Secure, getAccounts, ContactsContract, CalendarContract, SmsManager, ContentResolver
+               - a sensor the screens never explain: LocationManager, Camera, AudioRecord, MediaRecorder, ClipboardManager, MediaProjection
+               - code that arrives late: DexClassLoader, PathClassLoader, loadClass, System.loadLibrary, Runtime.exec, ProcessBuilder, Ljava/lang/reflect/
+               - an install or an update: PackageInstaller, PackageInstaller.Session, an Intent that carries an apk
+            8. Join the two ends. For one method, name the call that reads the data and the call that writes it out, as the disassembly shows them. Contacts read beside a request is a finding. Say when the pair is not visible instead of guessing it.
+            9. Text survives R8; names do not. strings the dex files and the resources: a host, a telegram or paste host, a long base64 copy, a shell line, a hardcoded word. Quote it. A shortened name is retraced only with your own app/build/outputs/mapping/release/mapping.txt, and say that you did. With no mapping file, quote the short name unchanged and do not invent the original.
+            10. Hosts: grep the unpacked tree and the strings output for http and https. One line per host with the file it came from, and say which of them a normal run would never contact.
+            11. A remote system is judged from the outside only: the name, a whois, the port the URL uses, the certificate issuer, and a public blocklist page read with http_request. Do not sign in, do not replay a request found in the app, and do not call the host to see what it answers.
+            12. Say plainly whether the app looks normal, suspicious, or malicious, and name the two or three lines that decide it. End with the hosts and the hash as findings, and say what you could not check.
+            13. Do not move the app's code, assets, or branding into this project, and do not defeat its license or a paid feature. A colleague's build is named as such. Do not install the app to watch it run; the user decides that.
+            14. Keep the APK and the unpacked tree out of the project, and delete them when the check is done.
         """.trimIndent() + "\n",
         "book-notes" to """
             # Notes from a book
