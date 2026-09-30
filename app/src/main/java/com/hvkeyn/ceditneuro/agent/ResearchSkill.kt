@@ -403,6 +403,26 @@ object StarterSkills {
         extendSecurity(appDir)
         extendVideo(appDir)
         extendAndroidDebug(appDir)
+        extendAndroidApp(appDir)
+        extendAndroidApk(appDir)
+    }
+
+    /** Phones that saved the first android-app skill learn that a check may open another app. */
+    private fun extendAndroidApp(appDir: File) {
+        val file = File(appDir, "android-app.md")
+        if (!file.isFile) return
+        val current = file.readText(Charsets.UTF_8)
+        if (!current.contains("Do not decompile another app")) return
+        file.writeText(skills.getValue("android-app"), Charsets.UTF_8)
+    }
+
+    /** Phones that saved the first android-apk skill gain the phased check and the test copy. */
+    private fun extendAndroidApk(appDir: File) {
+        val file = File(appDir, "android-apk.md")
+        if (!file.isFile) return
+        val current = file.readText(Charsets.UTF_8)
+        if (current.contains("Reproducing a behavior is allowed")) return
+        file.writeText(skills.getValue("android-apk"), Charsets.UTF_8)
     }
 
     /** Phones that saved an older android-debug skill learn that the Shizuku screen stays closed. */
