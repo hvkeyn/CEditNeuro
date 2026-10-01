@@ -113,6 +113,9 @@ object ToolGroups {
             "make_music",
             "voiceover",
         ),
+        "harness" to listOf(
+            "harness_rrsi",
+        ),
     )
 
     fun groupOf(toolName: String): String? =

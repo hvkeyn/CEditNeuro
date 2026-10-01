@@ -17,10 +17,11 @@ class LoadToolsTool(private val session: ToolSession) : Tool {
             "skills: find_skills, review_skill. " +
             "design: design_system. " +
             "debug: debug_case. " +
-            "video: render_video, sound_effect, make_music, voiceover."
+            "video: render_video, sound_effect, make_music, voiceover. " +
+            "harness: harness_rrsi."
     override val parameters = objectSchema(
         properties = mapOf(
-            "group" to stringProp("One of: build, device, remote, desk, study, health, skills, design, debug, video."),
+            "group" to stringProp("One of: build, device, remote, desk, study, health, skills, design, debug, video, harness."),
         ),
         required = listOf("group"),
     )

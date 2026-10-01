@@ -2390,6 +2390,7 @@ class WorkspaceViewModel(
             "append_skill" -> "Extending a skill"
             "delete_skill" -> "Deleting a skill"
             "remember" -> "Saving a project note"
+            "harness_rrsi" -> "Checking a harness edit"
             "search_sessions" -> "Searching past chat"
             "research_log" -> "Logging a check"
             "research_report" -> "Writing the report"
@@ -2954,6 +2955,7 @@ class WorkspaceViewModel(
             AppendSkillTool(skills, switchOn),
             DeleteSkillTool(skills, switchOff),
             RememberTool(ws.root),
+            com.hvkeyn.ceditneuro.tools.HarnessRrsiTool(ws.root),
             ResearchLogTool(ws),
             com.hvkeyn.ceditneuro.tools.HealthLogTool(ws),
             com.hvkeyn.ceditneuro.tools.HealthPanelTool(ws),
