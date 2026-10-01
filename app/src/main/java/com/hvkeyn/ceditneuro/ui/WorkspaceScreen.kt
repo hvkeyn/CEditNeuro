@@ -906,6 +906,7 @@ private fun EditorSurface(
         modifier = modifier,
         onRun = viewModel::runActiveFile,
         onStop = viewModel::stopShellCommand,
+        onRender = viewModel::renderComposition,
     )
 }
 

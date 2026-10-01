@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.util.Base64
 import android.view.MotionEvent
 import android.view.ViewConfiguration
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.Image
@@ -41,12 +42,53 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
-/** image, svg, html, or null when the file is only text. */
+/** image, video, svg, html, or null when the file is only text. */
 fun previewKind(path: String): String? = when (path.substringAfterLast('.', "").lowercase()) {
     "png", "jpg", "jpeg", "webp", "gif", "bmp" -> "image"
+    "mp4", "webm", "3gp", "mkv", "m4v" -> "video"
     "svg" -> "svg"
     "html", "htm" -> "html"
     else -> null
+}
+
+/** A finished video plays in place with the system controls. It loops until the tab closes. */
+@Composable
+fun VideoPreview(file: File, modifier: Modifier = Modifier) {
+    AndroidView(
+        modifier = modifier.fillMaxSize().background(Color.Black),
+        factory = { context ->
+            android.widget.FrameLayout(context).apply {
+                setBackgroundColor(android.graphics.Color.BLACK)
+                val video = android.widget.VideoView(context)
+                val controls = android.widget.MediaController(context)
+                controls.setAnchorView(video)
+                video.setMediaController(controls)
+                video.setOnPreparedListener { player ->
+                    player.isLooping = true
+                    video.start()
+                }
+                video.setOnErrorListener { _, _, _ -> true }
+                addView(
+                    video,
+                    android.widget.FrameLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                        android.view.Gravity.CENTER,
+                    ),
+                )
+                tag = video
+            }
+        },
+        update = { frame ->
+            val video = frame.tag as android.widget.VideoView
+            val key = file.path + "@" + file.lastModified()
+            if (video.tag != key) {
+                video.tag = key
+                video.setVideoPath(file.absolutePath)
+            }
+        },
+        onRelease = { frame -> (frame.tag as? android.widget.VideoView)?.stopPlayback() },
+    )
 }
 
 /** Height divided by width, so a scheme can use the full pane width without cropping. */
@@ -62,7 +104,11 @@ internal fun previewPage(kind: String, text: String): String = when (kind) {
     "svg" -> "<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=8, user-scalable=yes\">" +
         "<style>html,body{margin:0;background:#fff}svg{display:block;width:100%;height:auto}</style>" +
         "</head><body>$text</body></html>"
-    else -> text
+    else -> if (com.hvkeyn.ceditneuro.video.Composition.isComposition(text)) {
+        com.hvkeyn.ceditneuro.video.Composition.hosted(text, play = true)
+    } else {
+        text
+    }
 }
 
 @Composable
@@ -180,6 +226,7 @@ fun MarkupPreview(
             PreviewWeb(context).apply {
                 settings.javaScriptEnabled = false
                 settings.allowFileAccess = true
+                settings.mediaPlaybackRequiresUserGesture = false
                 settings.displayZoomControls = false
                 settings.useWideViewPort = true
                 settings.loadWithOverviewMode = false
@@ -191,6 +238,11 @@ fun MarkupPreview(
             view.onZone = onZone
             view.onFlip = onFlip
             view.zoomEnabled = allowZoom
+            val animate = kind != "svg" && text.contains("data-composition-id")
+            view.settings.javaScriptEnabled = animate
+            if (animate) {
+                view.settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+            }
             if (view.tag != page) {
                 view.tag = page
                 if (kind == "svg") {
