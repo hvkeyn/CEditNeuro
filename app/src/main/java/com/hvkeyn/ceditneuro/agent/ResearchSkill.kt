@@ -293,7 +293,7 @@ object StarterSkills {
 
             The project's existing design and components win. An external page is only for a choice that is not made yet.
 
-            Do not install a package, an MCP, or a command-line tool. This phone has no 21st.dev MCP and no HyperFrames. Do not pretend either ran. If a page cannot be read, stop and ask the user to paste it. Do not fill a color, a type size, or a component from memory.
+            Do not install a package, an MCP, or a command-line tool. This phone has no 21st.dev MCP. A video, an animation, or a motion graphic uses use_skill hyperframes. Do not pretend a renderer ran. If a page cannot be read, stop and ask the user to paste it. Do not fill a color, a type size, or a component from memory.
 
             1. Call load_tools group=design. Name the surface: web, desktop, Android, or iOS. Restate who it is for and the one job of the screen.
             2. If the project already has DESIGN.md or a style block, follow that. Otherwise pick one public DESIGN.md. http_request https://styles.refero.design/ or one raw file from https://github.com/voltagent/awesome-design-md. If they name a design system, call design_system with that name. Quote only the swatches the tool printed. If load_tools says the group has no tools, http_request that system's public page on https://www.designsystems.one/ instead. Write the quoted colors, type, and spacing into DESIGN.md in the project root. Say which page you used and what you took. Do not invent a hex and call it official. Do not copy a company's product.
@@ -302,7 +302,7 @@ object StarterSkills {
             5. Platform, on top of the quoted style. Web: one HTML file, system fonts, a plain style block. Desktop: visible keyboard focus, a label as well as a shortcut, hover is extra, do not lay it out as a phone. Android: a target is at least 48dp, content clears the system bars, the system back leaves the screen. iOS: a target is at least 44pt, content clears the safe area and the home indicator. A vendor rule that is not in this list is fetched with http_request. If that fetch fails, stop.
             6. Before code, write a short plan in the chat: who it is for, the one job, one mood, two type roles, and one signature element that belongs to this brief. The mood is one of these, and only one: editorial (a serif display face, wide space, a light ground), technical (dense rows, monospace for metadata, a visible grid), or warm (soft cards, pill buttons, round corners). Do not mix them. If that plan would fit any other product, change it. Do not default to Inter, Roboto, or Arial unless the project already uses that face. Name one display face and one body face. For an Apple-like feel, hold to purpose, agency, responsibility, familiarity, flexibility, simplicity, craft, and delight.
             7. If the user attached a picture, describe its layout, type roles, card edges, spacing, and mood, and follow that description. Quote a color only when a tool printed it. Do not copy that picture's product. A picture in the page is a file they attached or a flat shape in CSS. Do not leave a broken stock URL. Do not call an image generator.
-            8. write_file one HTML page in the project. Link the two faces from fonts.googleapis.com. A demo is two or three frames in that file, the same words and controls, one mood each; keep the frame that matches the brief. Then edit the kept frame: one spacing step, aligned edges, room inside a card, and cut every chip, badge, and widget that does not do the job. The editor preview shows html and htm. Name the file in backticks. Do not render a video and do not install HyperFrames.
+            8. write_file one HTML page in the project. Link the two faces from fonts.googleapis.com. A demo is two or three frames in that file, the same words and controls, one mood each; keep the frame that matches the brief. Then edit the kept frame: one spacing step, aligned edges, room inside a card, and cut every chip, badge, and widget that does not do the job. The editor preview shows html and htm. Name the file in backticks. A video uses use_skill hyperframes instead of this page.
             9. When they name the Google design guide, or the draft still looks generic, http_request https://aistudio.google.com/learn/ai-ui-design-google-ai-studio and follow only a step that page printed and this phone can do. Do not open Google AI Studio, do not click Remix, and do not pretend an Edit tool ran. If the page cannot be read, keep the mood rules and say the page was not read.
             10. If they want an installable Android app, use_skill web-to-app and follow it. When the screen is written, call use_skill name=frontend-design scope=app on=false.
         """.trimIndent() + "\n",
@@ -332,6 +332,20 @@ object StarterSkills {
             7. If the file is a scan report, quote the impression already written there. Do not add findings that are not in the text.
             8. The record stays in this project and is not copied to the other phone. Do not upload it.
             9. When the health task is finished, call use_skill name=health scope=app on=false.
+        """.trimIndent() + "\n",
+        "hyperframes" to """
+            # Make a video as HTML
+
+            Use this when the user wants a video, an animation, a motion graphic, a title card, a slideshow, or a HyperFrames composition. Switch it off when the task is not a video.
+
+            This phone writes the HTML composition. It does not install a package or a command-line renderer, and it does not encode an MP4. Say the file is the composition and the video was not encoded. Do not pretend a preview server or a render ran. If a page cannot be read, stop and ask the user to paste it.
+
+            1. Name the piece in one sentence: the subject, the length in seconds, and the kind. A navigable deck is a slideshow. Captions on footage stay captions. A short unnarrated sting is motion. A site or product promo is a launch. A topic with no site is an explainer. Anything else is a general video.
+            2. Before writing HTML, http_request https://raw.githubusercontent.com/heygen-com/hyperframes/main/skills/hyperframes-core/SKILL.md and follow only a step that page printed and this phone can do. Do not invent a timing attribute.
+            3. write_file one index.html in the project. One stage element carries data-composition-id, data-start of 0, data-width, and data-height. Each visible piece is class clip with data-start, data-duration, and data-track-index. Times are seconds. A timeline stays paused and is stored on window.__timelines under the composition id. Do not copy a company's product.
+            4. Media is a file the user already put in the project. Do not download a video and do not call an image generator. A missing file is named, not replaced with a stock URL.
+            5. The editor preview shows the html. Name the file in backticks. Do not say an MP4 exists.
+            6. When the file is written, call use_skill name=hyperframes scope=app on=false.
         """.trimIndent() + "\n",
         "net-map" to """
             # Map a network from a dump
@@ -516,8 +530,14 @@ object StarterSkills {
                 "A demo is frames in one HTML file. If it still looks wrong, keep one accent and cut decoration. Say what changed.\n"
             file.writeText(current, Charsets.UTF_8)
         }
-        if (current.contains("ai-ui-design-google-ai-studio")) return
-        if (!current.contains("Design a page") && !current.contains("Design a screen") && !current.contains("styles.refero.design")) return
+        if (current.contains("ai-ui-design-google-ai-studio")) {
+            appendVideoSkill(file)
+            return
+        }
+        if (!current.contains("Design a page") && !current.contains("Design a screen") && !current.contains("styles.refero.design")) {
+            appendVideoSkill(file)
+            return
+        }
         file.writeText(
             current.trimEnd() + "\n\n" +
                 "A bland screen is a failed draft. Pick one mood and do not mix them: editorial, technical, or warm. " +
@@ -526,6 +546,18 @@ object StarterSkills {
                 "Put two or three frames in the one HTML file, keep the frame that matches the brief, align the spacing, and cut every chip that does not do the job. " +
                 "When the user names the Google design guide, http_request https://aistudio.google.com/learn/ai-ui-design-google-ai-studio and follow only a step that page printed. " +
                 "Do not open Google AI Studio and do not pretend an Edit tool ran.\n",
+            Charsets.UTF_8,
+        )
+        appendVideoSkill(file)
+    }
+
+    /** An old design skill learns that a video is the HyperFrames composition, not a renderer. */
+    private fun appendVideoSkill(file: File) {
+        val current = file.readText(Charsets.UTF_8)
+        if (current.contains("use_skill hyperframes")) return
+        if (!current.contains("no HyperFrames") && !current.contains("Design a screen") && !current.contains("Design a page")) return
+        file.writeText(
+            current.trimEnd() + "\n\nA video, an animation, or a motion graphic uses use_skill hyperframes. This phone writes the HTML composition. It does not install a renderer and does not pretend an MP4 was encoded.\n",
             Charsets.UTF_8,
         )
     }
