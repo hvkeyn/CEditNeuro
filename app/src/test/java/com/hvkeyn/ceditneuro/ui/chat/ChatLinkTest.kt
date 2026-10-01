@@ -26,6 +26,7 @@ class ChatLinkTest {
     fun offlineWording() {
         assertTrue(ChatLinks.looksOffline("Unable to resolve host \"api.example.com\": No address associated with hostname"))
         assertFalse(ChatLinks.looksOffline("HTTP 400 Invalid assistant message"))
+        assertFalse(ChatLinks.looksOffline("DeepSeek did not answer. It may be overloaded. Try again in a moment."))
     }
 
     @Test

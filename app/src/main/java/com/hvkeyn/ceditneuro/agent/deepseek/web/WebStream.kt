@@ -70,6 +70,12 @@ class WebStream {
                 val raw = match.groupValues[1].toInt()
                 active = if (raw == -1) types.size - 1 else raw
             }
+            if (path == "response/status") {
+                val status = (v as? JsonPrimitive)?.contentOrNull
+                if (status == "FAILED" || status == "ERROR") {
+                    error = error ?: "DeepSeek stopped this reply ($status)."
+                }
+            }
             if (path.endsWith("message_id")) (v as? JsonPrimitive)?.longOrNull?.let { messageId = it }
             val text = (v as? JsonPrimitive)?.takeIf { it.isString }?.content
             if (op == "APPEND" && text != null && match != null) return append(text)

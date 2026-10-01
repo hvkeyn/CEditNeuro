@@ -875,6 +875,7 @@ private fun AgentChat(
         settings = settings,
         onSend = viewModel::sendPrompt,
         onContinue = viewModel::continueAgent,
+        onRecheck = viewModel::recheckNetwork,
         onCancel = viewModel::cancelAgent,
         onClose = viewModel::toggleChat,
         onDoctor = viewModel::agentDoctorReport,

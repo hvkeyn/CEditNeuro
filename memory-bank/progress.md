@@ -3,6 +3,7 @@
 Released: v0.45.0 through v0.75.0 (`frontend-design` rejects a bland draft: one mood, two type faces, no empty chips; see activeContext.md). Unit tests include `DesignCatalogTest` and `VideoBriefTest`. Unit tests include `ResearchRunTest`. Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, `SkillLibraryTest`, `ChatLinkTest`, `WebAppPackTest`, `HealthRecordTest`, `SkillAuditTest`, and `ReaderPlaceTest`.
 
 Known gaps:
+- v0.84.0. A lost link comes back when the radio is validated again (Check again, resume, or a short watch). A busy or silent DeepSeek stops after one 90-second quiet read, or at once if the stream says it failed. Not checked on the phone against a live overloaded DeepSeek.
 - v0.83.0. Native libraries are aligned to 16 KB pages, so Android 16 does not add a new compatibility warning. The phone already had the warning cached; it was dismissed and a cold start opens the project list. versionCode is 85.
 - v0.82.0. DeepSeek Web (on this phone): sign-in in a WebView, PoW, SSE, emulated tools, all on the phone. Checked live with the user's own sign-in (Check plus a one-tool agent task). Tests: `WebPhoneTest` (PoW vectors, tool parsing, truncation, prompt, stream, provider). Not yet seen: the silent token refresh after expiry, and whether `chat_session/delete` really removes the web chats.
 - v0.81.0. The `dreams` skill is written to the phone on start (checked); a live dream chat was not run.

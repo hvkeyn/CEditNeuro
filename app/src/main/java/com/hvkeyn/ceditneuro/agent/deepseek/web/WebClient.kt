@@ -1,5 +1,6 @@
 package com.hvkeyn.ceditneuro.agent.deepseek.web
 
+import com.hvkeyn.ceditneuro.agent.deepseek.ModelStall
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -75,15 +76,15 @@ class WebClient(private val http: OkHttpClient = defaultClient()) {
             val reasoning = StringBuilder()
             while (!source.exhausted()) {
                 val line = source.readUtf8Line() ?: break
-                val delta = stream.feed(line) ?: continue
-                if (delta.text.isEmpty() && delta.reasoning.isEmpty()) continue
+                val delta = stream.feed(line)
+                stream.error?.let { message ->
+                    if (looksLikeLogin(message)) throw WebLoginRequired(LOGIN)
+                    throw IOException(ModelStall.userMessage(message))
+                }
+                if (delta == null || (delta.text.isEmpty() && delta.reasoning.isEmpty())) continue
                 text.append(delta.text)
                 reasoning.append(delta.reasoning)
                 onDelta(delta)
-            }
-            stream.error?.let { message ->
-                if (looksLikeLogin(message)) throw WebLoginRequired(LOGIN)
-                throw IOException("DeepSeek web error: $message")
             }
             return Reply(text.toString(), reasoning.toString(), sessionId, stream.messageId)
         }
@@ -164,7 +165,7 @@ class WebClient(private val http: OkHttpClient = defaultClient()) {
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(60, TimeUnit.SECONDS)
-            .readTimeout(300, TimeUnit.SECONDS)
+            .readTimeout(90, TimeUnit.SECONDS)
             .build()
     }
 }
