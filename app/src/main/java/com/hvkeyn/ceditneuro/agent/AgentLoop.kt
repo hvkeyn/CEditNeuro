@@ -1,5 +1,6 @@
 package com.hvkeyn.ceditneuro.agent
 
+import com.hvkeyn.ceditneuro.agent.deepseek.ModelStall
 import com.hvkeyn.ceditneuro.tools.ToolRegistry
 import com.hvkeyn.ceditneuro.tools.ToolResult
 import com.hvkeyn.ceditneuro.tools.ToolSession
@@ -135,6 +136,7 @@ class AgentLoop(
                     if (!noted.isNullOrBlank()) emit(activity(messages, round, noted))
                     break
                 } catch (error: IOException) {
+                    if (ModelStall.isStall(error)) throw ModelStall.explain(error)
                     if (!retryable(error) || received || attempt >= MAX_NET_RETRIES) {
                         if (received) {
                             finishReason = "connection"
@@ -242,6 +244,7 @@ class AgentLoop(
     private fun retryable(error: IOException): Boolean {
         val text = error.message.orEmpty()
         if (text.contains("No API key") || text.contains("login_required") || text.contains("Sign in")) return false
+        if (text.contains("stopped this reply")) return false
         return !text.contains("HTTP 400") &&
             !text.contains("HTTP 401") &&
             !text.contains("HTTP 403") &&

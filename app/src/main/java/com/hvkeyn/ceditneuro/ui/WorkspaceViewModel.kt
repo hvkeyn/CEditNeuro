@@ -356,6 +356,7 @@ class WorkspaceViewModel(
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var networkWasUp = false
     private var linkDown = false
+    private var linkWatch: Job? = null
 
     init {
         watchNetwork()
@@ -3176,15 +3177,7 @@ class WorkspaceViewModel(
 
     private fun watchNetwork() {
         val manager = appContext.getSystemService(ConnectivityManager::class.java) ?: return
-        fun publish() {
-            val up = networkIsUp(manager)
-            if (up != networkWasUp) {
-                networkWasUp = up
-                if (up) linkDown = false
-            }
-            val online = up && !linkDown
-            if (_state.value.online != online) _state.update { it.copy(online = online) }
-        }
+        fun publish() = applyNetwork(manager, announce = false)
         networkWasUp = networkIsUp(manager)
         publish()
         val callback = object : ConnectivityManager.NetworkCallback() {
@@ -3196,9 +3189,42 @@ class WorkspaceViewModel(
         runCatching { manager.registerDefaultNetworkCallback(callback) }
     }
 
+    /** The radio can stay "validated" through a blip, so the callback never fires when the link returns. */
+    fun recheckNetwork() {
+        val manager = appContext.getSystemService(ConnectivityManager::class.java) ?: return
+        applyNetwork(manager, announce = true)
+    }
+
+    private fun applyNetwork(manager: ConnectivityManager, announce: Boolean) {
+        val up = networkIsUp(manager)
+        networkWasUp = up
+        if (up) linkDown = false
+        val online = up && !linkDown
+        if (_state.value.online != online) _state.update { it.copy(online = online) }
+        if (online) {
+            linkWatch?.cancel()
+        } else {
+            armLinkWatch()
+            if (announce) showMessage("Still no connection.")
+        }
+    }
+
+    private fun armLinkWatch() {
+        if (linkWatch?.isActive == true) return
+        linkWatch = viewModelScope.launch {
+            repeat(45) {
+                delay(4_000)
+                val manager = appContext.getSystemService(ConnectivityManager::class.java) ?: return@launch
+                applyNetwork(manager, announce = false)
+                if (_state.value.online) return@launch
+            }
+        }
+    }
+
     private fun noteLinkDown() {
         linkDown = true
         if (_state.value.online) _state.update { it.copy(online = false) }
+        armLinkWatch()
     }
 
     private fun networkIsUp(manager: ConnectivityManager): Boolean {
@@ -3209,6 +3235,7 @@ class WorkspaceViewModel(
     }
 
     override fun onCleared() {
+        linkWatch?.cancel()
         networkCallback?.let { callback ->
             val manager = appContext.getSystemService(ConnectivityManager::class.java)
             runCatching { manager?.unregisterNetworkCallback(callback) }

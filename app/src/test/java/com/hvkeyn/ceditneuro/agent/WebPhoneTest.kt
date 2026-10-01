@@ -105,6 +105,10 @@ class WebPhoneTest {
         val failed = WebStream()
         failed.feed("""data: {"code":40003,"msg":"Authorization Failed"}""")
         assertNotNull(failed.error)
+
+        val busy = WebStream()
+        busy.feed("""data: {"p":"response/status","v":"FAILED"}""")
+        assertNotNull(busy.error)
     }
 
     @Test

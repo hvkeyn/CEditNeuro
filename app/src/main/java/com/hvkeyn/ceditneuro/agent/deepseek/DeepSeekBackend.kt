@@ -241,8 +241,8 @@ class DeepSeekBackend(
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
-            // Streaming responses stay open for as long as the model keeps generating.
-            .readTimeout(0, TimeUnit.SECONDS)
+            // A live stream resets this on every byte. Silence this long means the host stalled.
+            .readTimeout(90, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
             .build()
     }

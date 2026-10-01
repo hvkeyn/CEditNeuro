@@ -122,6 +122,7 @@ fun ChatPanel(
     modifier: Modifier = Modifier,
     onToggleSkill: (SkillEntry) -> Unit = {},
     onOpenLink: (String) -> Unit = {},
+    onRecheck: () -> Unit = {},
 ) {
     var input by rememberSaveable { mutableStateOf("") }
     var attachments by remember { mutableStateOf<List<Uri>>(emptyList()) }
@@ -380,7 +381,11 @@ fun ChatPanel(
                         text = " No connection. The agent cannot work.",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.weight(1f),
                     )
+                    androidx.compose.material3.TextButton(onClick = onRecheck) {
+                        Text("Check again")
+                    }
                 }
             }
             val buttonSize = if (compact) 40.dp else 48.dp
@@ -445,6 +450,7 @@ fun ChatPanel(
                         }
                     },
                     onContinue = onContinue,
+                    onRecheck = onRecheck,
                     onCancel = onCancel,
                     onSend = {
                         if (listening) {
@@ -497,6 +503,7 @@ private fun ComposerActions(
     onFiles: () -> Unit,
     onMic: () -> Unit,
     onContinue: () -> Unit,
+    onRecheck: () -> Unit,
     onCancel: () -> Unit,
     onSend: () -> Unit,
 ) {
@@ -552,11 +559,11 @@ private fun ComposerActions(
     if (!state.online) {
         RoundAction(
             icon = Icons.Filled.WifiOff,
-            description = "No connection",
+            description = "Check connection",
             filled = false,
             size = buttonSize,
-            enabled = false,
-            onClick = {},
+            enabled = true,
+            onClick = onRecheck,
         )
         return
     }
