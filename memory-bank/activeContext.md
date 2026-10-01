@@ -1,5 +1,7 @@
 # Active context
 
+v0.81.0. Starter skill `dreams`: a Jungian psychotherapist persona (the user's own wording) that reads a dream as told. Steps: drama structure, subject and object level, amplification (not a dream book), archetypes only when the image carries one, emotional background, compensation, real-life examples, small practical steps, questions. Not a diagnosis; suicide, self-harm, violence, or a post-trauma nightmare first gets a pointer to a live therapist or crisis line. A journal goes to `dreams/journal.md` only when asked. Prompt.kt routes a dream to `use_skill dreams`.
+
 v0.80.0. Free DeepSeek web bridge (Tsuev/opencode-deepseek), plus sound and a real player.
 - The bridge runs on a computer (Python, Playwright login, `python app.py`, port 8000) and is an OpenAI-compatible host. Settings > Models > "Add free DeepSeek web bridge" adds `ModelCatalog.webBridge()` (id `deepseek-web`, `keyless = true`, models `deepseek-chat` and `deepseek-expert`, 64K context, 8K output, no reasoning, no vision). "Check" calls `GET /v1/models`. The phone reaches it by `adb reverse tcp:8000 tcp:8000` with 127.0.0.1, or by `HOST=0.0.0.0` and the LAN address. It is never the default model.
 - `ModelProvider.ready` (key or keyless) replaces the key checks. `DeepSeekBackend` reads an `error` frame inside the SSE stream (the bridge sends errors after HTTP 200); `login_required` is not retried and tells the user to run `python -m deepseek.auth`. An unreachable keyless host gets the start hint.

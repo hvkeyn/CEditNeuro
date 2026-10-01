@@ -74,6 +74,18 @@ class SkillWiringTest {
     }
 
     @Test
+    fun theDreamSkillReadsTheWayJungDid() {
+        val dreams = StarterSkills.skills.getValue("dreams")
+        listOf("Carl Jung", "subject level", "object level", "Amplify", "Shadow", "compensation", "emotional background", "examples", "not a diagnosis", "crisis line")
+            .forEach { assertTrue("dreams lacks $it", dreams.contains(it, ignoreCase = true)) }
+        assertTrue(buildSystemPrompt().contains("use_skill dreams"))
+        val dir = Files.createTempDirectory("skills-dreams").toFile()
+        java.io.File(dir, ".starter-written").writeText("health\n")
+        StarterSkills.ensure(dir)
+        assertEquals(dreams, java.io.File(dir, "dreams.md").readText())
+    }
+
+    @Test
     fun oldPhoneSkillsGainTheirFixes() {
         val dir = Files.createTempDirectory("skills-wiring").toFile()
         java.io.File(dir, "frontend-design.md").writeText("# Design\n2. call design_system with that name.\n")
