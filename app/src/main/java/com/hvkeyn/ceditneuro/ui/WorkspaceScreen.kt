@@ -959,7 +959,28 @@ private fun ProjectTitleMenu(
     onToggleFiles: () -> Unit,
     onShare: () -> Unit,
 ) {
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+    FitDropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        DropdownMenuItem(
+            text = { Text("Choose folder") },
+            onClick = {
+                onDismiss()
+                onChooseFolder()
+            },
+        )
+        DropdownMenuItem(
+            text = { Text("Share this folder") },
+            onClick = {
+                onDismiss()
+                onShare()
+            },
+        )
+        DropdownMenuItem(
+            text = { Text(if (filesOpen) "Hide files" else "Show files") },
+            onClick = {
+                onDismiss()
+                onToggleFiles()
+            },
+        )
         if (state.recentProjects.isEmpty()) {
             DropdownMenuItem(
                 text = { Text("No saved projects") },
@@ -1005,27 +1026,6 @@ private fun ProjectTitleMenu(
                 },
             )
         }
-        DropdownMenuItem(
-            text = { Text("Choose folder") },
-            onClick = {
-                onDismiss()
-                onChooseFolder()
-            },
-        )
-        DropdownMenuItem(
-            text = { Text("Share this folder") },
-            onClick = {
-                onDismiss()
-                onShare()
-            },
-        )
-        DropdownMenuItem(
-            text = { Text(if (filesOpen) "Hide files" else "Show files") },
-            onClick = {
-                onDismiss()
-                onToggleFiles()
-            },
-        )
     }
 }
 

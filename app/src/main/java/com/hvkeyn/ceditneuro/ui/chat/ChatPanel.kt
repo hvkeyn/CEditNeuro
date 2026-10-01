@@ -100,6 +100,7 @@ import com.hvkeyn.ceditneuro.agent.SkillEntry
 import com.hvkeyn.ceditneuro.agent.agentBars
 import com.hvkeyn.ceditneuro.data.AgentSettings
 import com.hvkeyn.ceditneuro.ui.AgentActivity
+import com.hvkeyn.ceditneuro.ui.FitDropdownMenu
 import com.hvkeyn.ceditneuro.ui.ChatEntry
 import com.hvkeyn.ceditneuro.ui.ChatRole
 import com.hvkeyn.ceditneuro.ui.WorkspaceUiState
@@ -618,7 +619,7 @@ private fun AgentToolbar(
         ) {
             Box {
                 Pill(text = settings.modelLabel(), onClick = { modelOpen = true }, maxWidth = if (compact) 200.dp else 280.dp, compact = compact)
-                DropdownMenu(expanded = modelOpen, onDismissRequest = { modelOpen = false }) {
+                FitDropdownMenu(expanded = modelOpen, onDismissRequest = { modelOpen = false }) {
                     settings.providers.forEach { provider ->
                         Text(
                             text = provider.name,
@@ -668,7 +669,7 @@ private fun AgentToolbar(
                     compact = compact,
                     onClick = { skillList = onListSkills(); skillsOpen = true },
                 )
-                DropdownMenu(expanded = skillsOpen, onDismissRequest = { skillsOpen = false }) {
+                FitDropdownMenu(expanded = skillsOpen, onDismissRequest = { skillsOpen = false }) {
                     Text(
                         if (skillList.isEmpty()) "No skills yet. Add one in Settings, or ask the agent to save_skill."
                         else "Tick any skills to keep them on. The agent also turns on every skill that fits the task.",

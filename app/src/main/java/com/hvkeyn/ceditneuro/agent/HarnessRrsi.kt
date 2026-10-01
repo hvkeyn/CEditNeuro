@@ -146,6 +146,7 @@ class HarnessBook(private val root: File, private val weights: HarnessRrsi.Weigh
     private val dir get() = File(root, ".ceditneuro/harness")
     private val frontierFile get() = File(dir, "frontier.json")
     private val historyFile get() = File(dir, "history.jsonl")
+    private val doctorFile get() = File(dir, "doctor.json")
 
     data class Frontier(
         val round: Int,
@@ -154,6 +155,8 @@ class HarnessBook(private val root: File, private val weights: HarnessRrsi.Weigh
         val star: Double,
         val roundEdits: Int,
         val trajectory: List<Double>,
+        val doctorStamp: String = "",
+        val doctorSummary: String = "",
     )
 
     fun status(): String {
@@ -179,7 +182,35 @@ class HarnessBook(private val root: File, private val weights: HarnessRrsi.Weigh
                 append("STALL: put the next edit on an untried component: ${untried.joinToString(", ")}\n")
             }
             if (recent.isNotBlank()) append("recent:\n$recent\n")
-            append("A harness edit is kept only when action=judge says admissible. The model is not trained.")
+            val doctor = readDoctor()
+            if (doctor == null) {
+                append("doctor: none. Press Doctor. The score comes from that report.\n")
+            } else if (!frontierFile.isFile || frontier.doctorStamp == doctor.stamp) {
+                append("doctor: this report is the baseline. score ${doctor.score} cost ${doctor.cost}\n")
+                append(doctor.summary.take(600)).append('\n')
+            } else {
+                append("doctor: new report. score ${doctor.score} (incumbent ${frontier.score}) cost ${doctor.cost}\n")
+                append(doctor.summary.take(600)).append('\n')
+            }
+            append("A harness edit is kept only when action=judge says admissible. Pass no score. The model is not trained.")
+        }
+    }
+
+    fun noteDoctor(measure: com.hvkeyn.ceditneuro.agent.AgentDoctor.Measure) {
+        dir.mkdirs()
+        doctorFile.writeText(
+            buildJsonObject {
+                put("score", measure.score)
+                put("cost", measure.cost)
+                put("stamp", measure.stamp)
+                put("summary", measure.summary.take(2_000))
+            }.toString(),
+            Charsets.UTF_8,
+        )
+        if (!frontierFile.isFile) {
+            writeFrontier(
+                Frontier(0, measure.score, measure.cost, measure.score, 0, listOf(measure.score), measure.stamp, measure.summary),
+            )
         }
     }
 
@@ -192,10 +223,6 @@ class HarnessBook(private val root: File, private val weights: HarnessRrsi.Weigh
         component: String,
         hypothesis: String,
         text: String,
-        score: Double,
-        cost: Double,
-        baseScore: Double?,
-        baseCost: Double?,
         edits: Int,
     ): Pair<Boolean, String> {
         val name = component.trim().lowercase()
@@ -204,17 +231,22 @@ class HarnessBook(private val root: File, private val weights: HarnessRrsi.Weigh
         }
         if (hypothesis.isBlank()) return false to "A hypothesis is required, so a failed idea is not tried again."
         if (edits < 1) return false to "edits must be at least 1."
+        val doctor = readDoctor()
+            ?: return false to "Press Doctor first. The score comes from that report, not from a number in the chat."
+        var frontier = readFrontier()
+        if (!frontierFile.isFile) {
+            frontier = Frontier(0, doctor.score, doctor.cost, doctor.score, 0, listOf(doctor.score), doctor.stamp, doctor.summary)
+        }
+        if (doctor.stamp == frontier.doctorStamp) {
+            return false to "This Doctor report is already the baseline. Change the harness, let a run finish, then press Doctor again."
+        }
+        if (!mentions(hypothesis + "\n" + text, frontier.doctorSummary)) {
+            return false to "Name a failure from the Doctor report in the hypothesis. Do not invent a score."
+        }
         val leak = HarnessRrsi.leak(text + "\n" + hypothesis)
         if (leak != null) {
             append(name, hypothesis, null, null, accepted = false, outcome = "CRITIC", edits)
             return false to "leak: $leak. This draft is not kept."
-        }
-        var frontier = readFrontier()
-        if (!frontierFile.isFile) {
-            if (baseScore == null || baseCost == null) {
-                return false to "No incumbent yet. Pass base_score and base_cost from a measurement taken before this edit."
-            }
-            frontier = Frontier(0, baseScore, baseCost, baseScore, 0, listOf(baseScore))
         }
         val budget = budgetFor(frontier)
         if (frontier.roundEdits + edits > budget) {
@@ -222,7 +254,7 @@ class HarnessBook(private val root: File, private val weights: HarnessRrsi.Weigh
         }
         val counts = acceptedCounts(readHistory())
         val verdict = HarnessRrsi.judge(
-            score, cost, frontier.score, frontier.cost, frontier.star, listOf(name), counts, weights,
+            doctor.score, doctor.cost, frontier.score, frontier.cost, frontier.star, listOf(name), counts, weights,
         )
         append(
             name,
@@ -236,15 +268,17 @@ class HarnessBook(private val root: File, private val weights: HarnessRrsi.Weigh
         var nextRound = frontier.round
         var used = frontier.roundEdits + edits
         var trajectory = frontier.trajectory
-        val keptScore = if (verdict.admissible) score else frontier.score
-        val keptCost = if (verdict.admissible) cost else frontier.cost
-        val star = if (verdict.admissible) maxOf(frontier.star, score) else frontier.star
+        val keptScore = if (verdict.admissible) doctor.score else frontier.score
+        val keptCost = if (verdict.admissible) doctor.cost else frontier.cost
+        val star = if (verdict.admissible) maxOf(frontier.star, doctor.score) else frontier.star
+        val stamp = if (verdict.admissible) doctor.stamp else frontier.doctorStamp
+        val summary = if (verdict.admissible) doctor.summary else frontier.doctorSummary
         if (used >= budget) {
             nextRound += 1
             used = 0
             trajectory = trajectory + keptScore
         }
-        writeFrontier(Frontier(nextRound, keptScore, keptCost, star, used, trajectory))
+        writeFrontier(Frontier(nextRound, keptScore, keptCost, star, used, trajectory, stamp, summary))
         val line = if (verdict.admissible) {
             "admissible. ${verdict.reason}. The draft may be saved. Do not add a special case for one task."
         } else {
@@ -337,6 +371,8 @@ class HarnessBook(private val root: File, private val weights: HarnessRrsi.Weigh
             star = (obj["S_star"] as? JsonPrimitive)?.doubleOrNull ?: 0.0,
             roundEdits = (obj["round_edits"] as? JsonPrimitive)?.intOrNull ?: 0,
             trajectory = trajectory,
+            doctorStamp = (obj["doctor_stamp"] as? JsonPrimitive)?.content.orEmpty(),
+            doctorSummary = (obj["doctor_summary"] as? JsonPrimitive)?.content.orEmpty(),
         )
     }
 
@@ -348,10 +384,34 @@ class HarnessBook(private val root: File, private val weights: HarnessRrsi.Weigh
             put("C", frontier.cost)
             put("S_star", frontier.star)
             put("round_edits", frontier.roundEdits)
+            put("doctor_stamp", frontier.doctorStamp)
+            put("doctor_summary", frontier.doctorSummary.take(2_000))
             put("trajectory", kotlinx.serialization.json.buildJsonArray {
                 frontier.trajectory.forEach { add(JsonPrimitive(it)) }
             })
         }.toString()
         frontierFile.writeText(line, Charsets.UTF_8)
+    }
+
+    private data class DoctorNote(val score: Double, val cost: Double, val stamp: String, val summary: String)
+
+    private fun readDoctor(): DoctorNote? {
+        if (!doctorFile.isFile) return null
+        val obj = runCatching { json.parseToJsonElement(doctorFile.readText(Charsets.UTF_8)) as JsonObject }.getOrNull()
+            ?: return null
+        val stamp = (obj["stamp"] as? JsonPrimitive)?.content ?: return null
+        return DoctorNote(
+            score = (obj["score"] as? JsonPrimitive)?.doubleOrNull ?: return null,
+            cost = (obj["cost"] as? JsonPrimitive)?.doubleOrNull ?: 1.0,
+            stamp = stamp,
+            summary = (obj["summary"] as? JsonPrimitive)?.content.orEmpty(),
+        )
+    }
+
+    private fun mentions(text: String, summary: String): Boolean {
+        val words = summary.lowercase().split(Regex("[^a-z0-9_]+")).filter { it.length >= 5 }.toSet()
+        if (words.isEmpty()) return false
+        val body = text.lowercase()
+        return words.any { it in body }
     }
 }

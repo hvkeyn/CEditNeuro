@@ -15,8 +15,8 @@ android {
         // API 29+ forbids executing a program this app just wrote. API 28 stays in the
         // compatibility domain that can run compilers installed into the app's private files.
         targetSdk = 28
-        versionCode = 87
-        versionName = "0.85.0"
+        versionCode = 88
+        versionName = "0.86.0"
     }
 
     buildTypes {
@@ -173,15 +173,25 @@ fun pageAlignApk(apk: File) {
         ?.filter { it.isDirectory }
         ?.maxByOrNull { it.name }
         ?: error("Android build-tools not found")
+    val windows = System.getProperty("os.name").contains("Windows", ignoreCase = true)
+    fun sdkBin(name: String): String {
+        val file = if (windows) {
+            tools.resolve(if (name == "apksigner") "apksigner.bat" else "$name.exe")
+        } else {
+            tools.resolve(name)
+        }
+        if (!file.isFile) error("Missing ${file.absolutePath}")
+        return file.absolutePath
+    }
     val aligned = File(apk.parentFile, apk.nameWithoutExtension + "-16k.apk")
     exec {
-        commandLine(tools.resolve("zipalign.exe").absolutePath, "-f", "-P", "16", "4", apk.absolutePath, aligned.absolutePath)
+        commandLine(sdkBin("zipalign"), "-f", "-P", "16", "4", apk.absolutePath, aligned.absolutePath)
     }
     if (!apk.delete() || !aligned.renameTo(apk)) error("Could not replace ${apk.name}")
     val signing = android.signingConfigs.getByName("debug")
     exec {
         commandLine(
-            tools.resolve("apksigner.bat").absolutePath,
+            sdkBin("apksigner"),
             "sign",
             "--ks", (signing.storeFile ?: File(System.getProperty("user.home"), ".android/debug.keystore")).absolutePath,
             "--ks-pass", "pass:${signing.storePassword ?: "android"}",
