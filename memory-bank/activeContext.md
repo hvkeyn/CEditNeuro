@@ -1,6 +1,8 @@
 # Active context
 
-Current: v0.78.0. A failed call stays failed. A guessed `research_run` locator is not tried again. A reference miss is final for that query. An HTTP 522 or a rejected certificate blocks that host. The shell refuses a heredoc, a `timeout` wrapper, and a pipe through `sed`. The same refusal twice ends the turn.
+v0.79.0. The app is the HyperFrames runtime. `video/Composition.hosted()` puts the registry and a fixed viewport before page scripts and appends a harness (`__hfSize`, `__hfInfo`, `__hfFrame`, `__hfPending`, play bar). The editor preview plays a composition, and "Render MP4" or the agent tool `render_video` (group `video`) draws each frame in an offscreen-sized WebView and encodes it with MediaCodec (`Mp4Encoder`, no sound track). The resulting MP4 opens in a video tab. A change is edit_file and then render again. The render viewport must be the view size in CSS px (out px / density), or the stage is cropped to its top-left corner. The phone check hook is the `cedit_render` extra on `files/render/index.html`.
+
+v0.78.0. A failed call stays failed. A guessed `research_run` locator is not tried again. A reference miss is final for that query. An HTTP 522 or a rejected certificate blocks that host. The shell refuses a heredoc, a `timeout` wrapper, and a pipe through `sed`. The same refusal twice ends the turn.
 
 v0.77.0. A video or motion graphic uses `hyperframes`: one HTML composition, timing only from the printed hyperframes-core page. This phone does not install a renderer and does not claim an MP4 was encoded. Reader pages still end on the last measured line. A build still counts only after BUILD SUCCESSFUL, install, and the same screen check.
 

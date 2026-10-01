@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Visibility
@@ -29,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -65,6 +67,7 @@ fun EditorPane(
     modifier: Modifier = Modifier,
     onRun: () -> Unit = {},
     onStop: () -> Unit = {},
+    onRender: (String) -> Unit = {},
 ) {
     val activePath = state.activePath
     if (activePath == null || state.openFiles.isEmpty()) {
@@ -81,6 +84,9 @@ fun EditorPane(
             EditorTabs(state = state, onSelect = onSelectTab, onClose = onCloseTab)
         }
         if (runnable || kind == "svg" || kind == "html") {
+            val composition = kind == "html" &&
+                com.hvkeyn.ceditneuro.video.Composition.isComposition(contentProvider(activePath))
+            val rendering by com.hvkeyn.ceditneuro.video.VideoRenderHub.job.collectAsState()
             FileActions(
                 runnable = runnable,
                 running = state.shellRunning,
@@ -89,6 +95,9 @@ fun EditorPane(
                 onRun = onRun,
                 onStop = onStop,
                 onTogglePreview = { previewing = !previewing },
+                canRender = composition,
+                rendering = rendering != null,
+                onRender = { onRender(activePath) },
             )
         }
         val body = Modifier
@@ -96,6 +105,7 @@ fun EditorPane(
             .weight(1f)
         when {
             kind == "image" && file != null -> ImagePreview(file, body)
+            kind == "video" && file != null -> VideoPreview(file, body)
             kind != null && previewing -> {
                 val markup = contentProvider(activePath)
                 ExpandableMarkup(kind, markup, file?.parentFile, body)
@@ -121,6 +131,9 @@ private fun FileActions(
     onRun: () -> Unit,
     onStop: () -> Unit,
     onTogglePreview: () -> Unit,
+    canRender: Boolean = false,
+    rendering: Boolean = false,
+    onRender: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier
@@ -152,6 +165,12 @@ private fun FileActions(
                     modifier = Modifier.size(18.dp),
                 )
                 Text(if (previewing) " Code" else " Preview")
+            }
+        }
+        if (canRender) {
+            TextButton(onClick = onRender, enabled = !rendering) {
+                Icon(Icons.Default.Movie, contentDescription = null, modifier = Modifier.size(18.dp))
+                Text(if (rendering) " Rendering" else " Render MP4")
             }
         }
     }

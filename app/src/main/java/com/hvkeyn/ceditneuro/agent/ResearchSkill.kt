@@ -346,14 +346,17 @@ object StarterSkills {
 
             Use this when the user wants a video, an animation, a motion graphic, a title card, a slideshow, or a HyperFrames composition. Switch it off when the task is not a video.
 
-            This phone writes the HTML composition. It does not install a package or a command-line renderer, and it does not encode an MP4. Say the file is the composition and the video was not encoded. Do not pretend a preview server or a render ran. If a page cannot be read, stop and ask the user to paste it.
+            This phone writes one HTML composition that plays when the file is opened, and render_video turns it into an MP4 with the phone's own encoder. Do not install a package, Node, FFmpeg, or a command-line renderer. Until render_video prints a path, say the video was not encoded. Do not pretend a preview server ran. If a page cannot be read, stop and ask the user to paste it.
 
             1. Name the piece in one sentence: the subject, the length in seconds, and the kind. A navigable deck is a slideshow. Captions on footage stay captions. A short unnarrated sting is motion. A site or product promo is a launch. A topic with no site is an explainer. Anything else is a general video.
             2. Before writing HTML, http_request https://raw.githubusercontent.com/heygen-com/hyperframes/main/skills/hyperframes-core/SKILL.md and follow only a step that page printed and this phone can do. Do not invent a timing attribute.
-            3. write_file one index.html in the project. One stage element carries data-composition-id, data-start of 0, data-width, and data-height. Each visible piece is class clip with data-start, data-duration, and data-track-index. Times are seconds. A timeline stays paused and is stored on window.__timelines under the composition id. Do not copy a company's product.
-            4. Media is a file the user already put in the project. Do not download a video and do not call an image generator. A missing file is named, not replaced with a stock URL.
-            5. The editor preview shows the html. Name the file in backticks. Do not say an MP4 exists.
-            6. When the file is written, call use_skill name=hyperframes scope=app on=false.
+            3. write_file one index.html in the project. The root is one div in the body, not inside a template. It carries data-composition-id, data-start of 0, data-width, data-height, and data-duration. Its CSS width and height stay 100 percent. html and body fill the window. Each scene is class clip with data-start, data-duration, and data-track-index. Times are seconds. One gsap.timeline stays paused. Do not tween visibility on a clip. Do not copy a company's product.
+            4. The page has to play when opened by itself. Before the timeline, remember whether window.__timelines already exists. Then set window.__timelines to that object or to a new one. Store the timeline on it under the composition id. If the registry was missing, set the root to its data width and height in pixels, scale the page into the window, hide each clip whose start and duration do not contain the playhead, and call play. If the registry already existed, do not play and do not hide clips. The runtime owns that.
+            5. Media is a file the user already put in the project. Do not download a video and do not call an image generator. A missing file is named, not replaced with a stock URL.
+            6. The editor preview plays the html with a play button and a time bar. Name the file in backticks.
+            7. When the user wants a video, a clip, or an MP4, call load_tools group=video, then render_video path=index.html. Quote the path, the size, and the frame count it printed. The MP4 has no sound track; say so when the composition has audio. Every element is drawn from the html, so a remote font or script must load, and a page that draws nothing renders black.
+            8. A change the user asks for is edit_file on the html, one span at a time, then render_video again. Do not rewrite the whole file for one change.
+            9. When the video is done, call use_skill name=hyperframes scope=app on=false.
         """.trimIndent() + "\n",
         "net-map" to """
             # Map a network from a dump
@@ -432,6 +435,7 @@ object StarterSkills {
         extendDebug(appDir)
         extendSecurity(appDir)
         extendVideo(appDir)
+        extendHyperframes(appDir)
         extendAndroidDebug(appDir)
         extendAndroidApp(appDir)
         extendAndroidApk(appDir)
@@ -497,6 +501,16 @@ object StarterSkills {
         val current = file.readText(Charsets.UTF_8)
         if (!current.contains("Do not read another app's private files")) return
         file.writeText(skills.getValue("security"), Charsets.UTF_8)
+    }
+
+    /** Phones that saved an earlier HyperFrames skill learn to play the file and render the MP4. */
+    private fun extendHyperframes(appDir: File) {
+        val file = File(appDir, "hyperframes.md")
+        if (!file.isFile) return
+        val current = file.readText(Charsets.UTF_8)
+        if (current.contains("render_video")) return
+        if (!current.contains("data-composition-id")) return
+        file.writeText(skills.getValue("hyperframes"), Charsets.UTF_8)
     }
 
     /** Phones that saved the first video skill also learn search, a channel, a playlist, and a batch of three. */

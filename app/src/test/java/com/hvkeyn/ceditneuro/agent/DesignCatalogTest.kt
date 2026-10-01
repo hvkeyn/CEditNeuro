@@ -35,6 +35,7 @@ class DesignCatalogTest {
         assertFalse(SkillAudit.check(video, "hyperframes").blocked)
         assertTrue(video.contains("skills/hyperframes-core/SKILL.md"))
         assertTrue(video.contains("was not encoded"))
+        assertTrue(video.contains("If the registry was missing"))
     }
 
     @Test
@@ -53,5 +54,18 @@ class DesignCatalogTest {
         assertTrue(saved.contains("no HyperFrames"))
         assertTrue(saved.contains("use_skill hyperframes"))
         assertTrue(saved.contains("ai-ui-design-google-ai-studio"))
+    }
+
+    @Test
+    fun anOldHyperframesSkillLearnsToPlay() {
+        val dir = java.nio.file.Files.createTempDirectory("hyperframes-skill").toFile()
+        val file = java.io.File(dir, "hyperframes.md")
+        file.writeText("# Make a video as HTML\ndata-composition-id\nwindow.__timelines\n")
+        java.io.File(dir, ".starter-written").writeText("hyperframes\n")
+        StarterSkills.ensure(dir)
+        val saved = file.readText()
+        assertTrue(saved.contains("If the registry was missing"))
+        assertTrue(saved.contains("render_video"))
+        assertTrue(saved.contains("was not encoded"))
     }
 }

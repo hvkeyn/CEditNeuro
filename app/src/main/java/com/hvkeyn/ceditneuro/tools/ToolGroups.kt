@@ -107,6 +107,9 @@ object ToolGroups {
         "debug" to listOf(
             "debug_case",
         ),
+        "video" to listOf(
+            "render_video",
+        ),
     )
 
     fun groupOf(toolName: String): String? =

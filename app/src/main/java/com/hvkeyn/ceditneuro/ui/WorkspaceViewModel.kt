@@ -726,7 +726,8 @@ class WorkspaceViewModel(
             _state.update { it.copy(activePath = path) }
             return
         }
-        if (com.hvkeyn.ceditneuro.ui.editor.previewKind(path) == "image") {
+        val binaryKind = com.hvkeyn.ceditneuro.ui.editor.previewKind(path)
+        if (binaryKind == "image" || binaryKind == "video") {
             _state.update { it.copy(openFiles = it.openFiles + OpenFile(path, ""), activePath = path) }
             return
         }
@@ -737,6 +738,30 @@ class WorkspaceViewModel(
         current?.buffers?.set(path, content)
         _state.update {
             it.copy(openFiles = it.openFiles + OpenFile(path, content), activePath = path)
+        }
+    }
+
+    /** Renders the open composition to an MP4 beside it, then opens that video. */
+    fun renderComposition(path: String) {
+        val project = current ?: return
+        val ws = workspace ?: return
+        val html = runCatching { ws.resolve(path) }.getOrNull() ?: return
+        val outPath = path.substringBeforeLast('.') + ".mp4"
+        val out = runCatching { ws.resolve(outPath) }.getOrNull() ?: return
+        viewModelScope.launch {
+            val outcome = com.hvkeyn.ceditneuro.video.VideoRenderHub.render(html, out, 30, 1280)
+            if (!outcome.ok) {
+                showMessage(outcome.text)
+                return@launch
+            }
+            refreshProjectTree(project, outPath)
+            if (current === project) {
+                _state.update { state ->
+                    state.copy(openFiles = state.openFiles.filterNot { it.path == outPath })
+                }
+                openFile(outPath)
+            }
+            showMessage("Saved $outPath")
         }
     }
 
@@ -2367,6 +2392,7 @@ class WorkspaceViewModel(
             "research_plot" -> "Drawing a chart"
             "research_run" -> "Running the study"
             "video_brief" -> "Reading a video"
+            "render_video" -> "Rendering a video"
             "calculate" -> "Calculating"
             "reference" -> "Checking a reference"
             "capture_dump" -> "Recording packets"
@@ -2943,6 +2969,11 @@ class WorkspaceViewModel(
             com.hvkeyn.ceditneuro.tools.OpenSettingsTool(appContext),
             com.hvkeyn.ceditneuro.tools.ClipboardTool(appContext),
             com.hvkeyn.ceditneuro.tools.OpenFileTool(appContext, ws),
+            com.hvkeyn.ceditneuro.tools.RenderVideoTool(ws) { path ->
+                if (project.epoch.get() != epochAtBuild) return@RenderVideoTool
+                refreshProjectTree(project, path)
+                if (current === project) openFile(path)
+            },
             SearchSessionsTool {
                 val saved = library.load(ws.root.canonicalPath)
                 val shown = if (current === project) _state.value else project.ui

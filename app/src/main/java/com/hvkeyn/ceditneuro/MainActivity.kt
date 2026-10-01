@@ -41,7 +41,10 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             CEditNeuroTheme {
-                WorkspaceScreen(app.workspaceModel)
+                androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier) {
+                    WorkspaceScreen(app.workspaceModel)
+                    com.hvkeyn.ceditneuro.video.RenderHost()
+                }
             }
         }
     }
@@ -61,6 +64,21 @@ class MainActivity : ComponentActivity() {
                     com.hvkeyn.ceditneuro.shizuku.ShizukuShell(applicationContext).exec("id", "/", 15)
                 }.getOrElse { "down ${it.message ?: "failed"}" }
                 java.io.File(dir, "shell-check.txt").writeText(text)
+            }
+            return
+        }
+        if (intent?.getBooleanExtra("cedit_render", false) == true) {
+            val dir = getExternalFilesDir(null) ?: return
+            val html = java.io.File(dir, "render/index.html")
+            val fps = intent.getIntExtra("fps", 30)
+            lifecycleScope.launch {
+                val outcome = com.hvkeyn.ceditneuro.video.VideoRenderHub.render(
+                    html,
+                    java.io.File(dir, "render/index.mp4"),
+                    fps,
+                    intent.getIntExtra("size", 1280),
+                )
+                java.io.File(dir, "render-check.txt").writeText((if (outcome.ok) "ok " else "error ") + outcome.text)
             }
             return
         }
