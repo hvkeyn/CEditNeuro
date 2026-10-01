@@ -3,6 +3,7 @@
 Released: v0.45.0 through v0.75.0 (`frontend-design` rejects a bland draft: one mood, two type faces, no empty chips; see activeContext.md). Unit tests include `DesignCatalogTest` and `VideoBriefTest`. Unit tests include `ResearchRunTest`. Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, `SkillLibraryTest`, `ChatLinkTest`, `WebAppPackTest`, `HealthRecordTest`, `SkillAuditTest`, and `ReaderPlaceTest`.
 
 Known gaps:
+- v0.78.0. Repeated tool failures stop: a guessed locator, a missed reference, a 522 or a rejected certificate, and a shell heredoc or sed pipe.
 - v0.77.0. A video is an HTML composition from the HyperFrames contract. The phone does not encode an MP4 or install a renderer.
 - `video-notes` ships in v0.71.0 with search, a channel, a playlist, and a batch of three. A live chat against a video was not run. `frontend-design` on the phone gains the surface steps when this build starts.
 - The reader finger fix is in this tree: left, right, center, swipe, and the volume key were checked on the phone before v0.69.0. A scheme page was not opened in that check.

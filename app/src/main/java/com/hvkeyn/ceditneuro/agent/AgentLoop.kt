@@ -73,6 +73,7 @@ class AgentLoop(
 
         var lengthContinues = 0
         var emptyContinues = 0
+        var repeatedRefusal = 0
         var batch = 0
 
         suspend fun remember() {
@@ -199,6 +200,14 @@ class AgentLoop(
                 emit(AgentEvent.ToolFinished(call.function.name, result))
                 messages += ChatMessage.tool(call.id, call.function.name, result.content)
                 remember()
+                if (result.isError && result.content.startsWith("This exact ")) {
+                    repeatedRefusal++
+                    if (repeatedRefusal >= 2) {
+                        remember()
+                        emit(AgentEvent.TurnFinished("repeat"))
+                        return@flow
+                    }
+                }
             }
             round++
         }
@@ -251,7 +260,7 @@ class AgentLoop(
         val rawArguments = call.function.arguments.ifBlank { "{}" }
         val signature = call.function.name + "\n" + rawArguments.trim()
         val keys = ToolTranscript.callKeys(call.function.name, rawArguments)
-        if (keys.any { it in failedCalls }) {
+        if (ToolTranscript.blocked(call.function.name, rawArguments, failedCalls)) {
             return ToolResult.error(
                 "This exact ${call.function.name} call already failed. " +
                     "Change the path, the arguments, or the tool. Do not repeat it.",
@@ -275,7 +284,11 @@ class AgentLoop(
             .getOrElse { error ->
                 ToolResult.error("Tool '${call.function.name}' failed: ${error.message ?: error::class.java.simpleName}")
             }
-        if (result.isError) failedCalls += keys
+        if (result.isError) {
+            failedCalls += ToolTranscript.failureKeys(call.function.name, rawArguments, result.content)
+        } else {
+            ToolTranscript.hostKey(call.function.name, rawArguments)?.let { failedCalls -= it }
+        }
         if (!readOnly) recentReads.clear() else if (!result.isError) recentReads += signature
         return result
     }

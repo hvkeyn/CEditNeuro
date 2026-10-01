@@ -163,6 +163,9 @@ class AgentNet(
             if (!name.equals("Content-Type", ignoreCase = true)) builder.header(name, value)
         }
         client().newCall(builder.build()).execute().use { response ->
+            if (response.code == 522) {
+                throw IOException("HTTP 522 for $url. That proxy failed. Do not call it again.")
+            }
             val bytes = response.body?.bytes() ?: ByteArray(0)
             if (bytes.size > maxBytes) {
                 throw IOException("Response is ${bytes.size} bytes, limit is $maxBytes.")

@@ -34,6 +34,9 @@ class DeviceShell(
         onOutput: ((String) -> Unit)? = null,
     ): ShellOutput {
         val timeout = timeoutSeconds.coerceIn(5, 900)
+        ShellShape.reject(command)?.let { reason ->
+            return ShellOutput(1, reason, timedOut = false)
+        }
         val directory = if (workDir.isDirectory) workDir else home
         if (isPlainFetch(command)) {
             val parsed = parseFetch(command)
