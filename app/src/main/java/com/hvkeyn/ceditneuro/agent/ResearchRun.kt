@@ -72,7 +72,11 @@ object ResearchRun {
             return SkillNote("source needs title, quote, and claim. The quote is words a tool printed.", error = true)
         }
         if (!locatorOk(locator)) {
-            return SkillNote("locator is a URL, a DOI, an arXiv id, or a project path that a tool printed.", error = true)
+            return SkillNote(
+                "locator is a URL, a DOI, an arXiv id, or a project path that a tool printed. " +
+                    "Do not guess another locator. Call reference or http_request, then copy the locator it printed.",
+                error = true,
+            )
         }
         val key = titleKey(title)
         val loc = locatorKey(locator)
@@ -209,6 +213,8 @@ object ResearchRun {
     private fun floor(tier: String) = if (tier == "full") 8 else 3
 
     private fun cap(tier: String) = if (tier == "full") 24 else 8
+
+    internal fun acceptableLocator(value: String): Boolean = locatorOk(value)
 
     private fun locatorOk(value: String): Boolean {
         val v = value.trim()

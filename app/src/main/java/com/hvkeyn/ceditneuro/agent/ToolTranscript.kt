@@ -1,5 +1,6 @@
 package com.hvkeyn.ceditneuro.agent
 
+import com.hvkeyn.ceditneuro.shell.ShellShape
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -95,17 +96,22 @@ object ToolTranscript {
      * command or URL drops the key, so a fixed run is allowed through.
      */
     fun failedCalls(messages: List<ChatMessage>): Set<String> {
-        val byId = HashMap<String, Set<String>>()
+        val byId = HashMap<String, Pair<Set<String>, String?>>()
         val state = LinkedHashMap<String, Boolean>()
         for (message in messages) {
             if (message.role == "assistant") {
                 message.toolCalls.orEmpty().forEach { call ->
-                    byId[call.id] = callKeys(call.function.name, call.function.arguments)
+                    byId[call.id] = callKeys(call.function.name, call.function.arguments) to
+                        hostKey(call.function.name, call.function.arguments)
                 }
             } else if (message.role == "tool") {
-                val keys = byId[message.toolCallId] ?: continue
-                val failed = isFailedToolResult(message.content.orEmpty())
-                keys.forEach { state[it] = failed }
+                val memory = byId[message.toolCallId] ?: continue
+                val content = message.content.orEmpty()
+                val failed = isFailedToolResult(content)
+                memory.first.forEach { state[it] = failed }
+                val host = memory.second
+                if (host != null && failed && hostFailure(content)) state[host] = true
+                else if (host != null && !failed) state[host] = false
             }
         }
         return state.filterValues { it }.keys
@@ -117,22 +123,54 @@ object ToolTranscript {
         commands.forEach { (command, output) ->
             val text = command.trim()
             if (text.isEmpty()) return@forEach
-            state["run_command\n$text"] = isFailedToolResult(output)
+            val failed = isFailedToolResult(output)
+            state["run_command\n$text"] = failed
+            val shape = ShellShape.shapeKey(text) ?: return@forEach
+            if (failed) state[shape] = true else if (state[shape] != true) state[shape] = false
         }
         return state
     }
 
+    fun blocked(name: String, arguments: String, failed: Set<String>): Boolean {
+        if (callKeys(name, arguments).any { it in failed }) return true
+        val host = hostKey(name, arguments) ?: return false
+        return host in failed
+    }
+
+    /** Keys to remember after a failed call. A certificate or a 522 blocks the host, not only that path. */
+    fun failureKeys(name: String, arguments: String, content: String): Set<String> {
+        val keys = callKeys(name, arguments).toMutableSet()
+        if (hostFailure(content)) hostKey(name, arguments)?.let { keys += it }
+        return keys
+    }
+
     fun callKeys(name: String, arguments: String): Set<String> {
         val exact = name + "\n" + arguments.trim()
-        val field = when (name) {
-            "run_command", "shizuku_exec" -> "command"
-            "http_request" -> "url"
-            else -> null
+        val keys = mutableSetOf(exact)
+        when (name) {
+            "run_command", "shizuku_exec" -> {
+                val command = argumentValue(arguments, "command") ?: return keys
+                if (command.isNotEmpty()) keys += "$name\n$command"
+                if (name == "run_command") ShellShape.shapeKey(command)?.let { keys += it }
+            }
+            "http_request" -> {
+                val url = argumentValue(arguments, "url") ?: return keys
+                val coarse = urlIdentity(url)
+                if (coarse.isNotEmpty()) keys += "$name\n$coarse"
+            }
+            "reference" -> {
+                val source = argumentValue(arguments, "source")?.lowercase().orEmpty()
+                val query = argumentValue(arguments, "query")?.trim()?.lowercase().orEmpty()
+                if (query.isNotEmpty()) keys += "reference\n$source\n$query"
+            }
+            "research_run" -> {
+                if (argumentValue(arguments, "action")?.equals("source", ignoreCase = true) != true) return keys
+                val locator = argumentValue(arguments, "locator").orEmpty().trim()
+                keys += "research_run\nsource\n${locator.lowercase()}"
+                if (!ResearchRun.acceptableLocator(locator)) keys += "research_run\nbad-locator"
+            }
         }
-        val value = field?.let { argumentValue(arguments, it) } ?: return setOf(exact)
-        val coarse = if (name == "http_request") urlIdentity(value) else value.trim()
-        if (coarse.isEmpty()) return setOf(exact)
-        return setOf(exact, "$name\n$coarse")
+        return keys
     }
 
     internal fun isFailedToolResult(text: String): Boolean {
@@ -147,8 +185,28 @@ object ToolTranscript {
             line.startsWith("this url already timed out") || line.startsWith("this exact ") ||
                 line.startsWith("the certificate or proxy") -> true
             "certificate chain was rejected" in line || "was already rejected" in line -> true
+            "chain validation" in line || "http 522" in line || "do not call the proxy" in line -> true
+            "locator is a url" in line || "do not repeat the same lookup" in line -> true
+            "do not use <<" in line || "do not pipe through sed" in line || "do not repeat the pipe" in line ||
+                "do not repeat this wrapper" in line -> true
             else -> false
         }
+    }
+
+    internal fun hostFailure(text: String): Boolean {
+        val line = text.lowercase()
+        return "chain validation" in line ||
+            "certificate chain was rejected" in line ||
+            "http 522" in line ||
+            "do not retry this host" in line ||
+            "do not call the proxy" in line ||
+            "was already rejected" in line
+    }
+
+    fun hostKey(name: String, arguments: String): String? {
+        if (name != "http_request") return null
+        val host = hostOf(argumentValue(arguments, "url") ?: return null) ?: return null
+        return "http_request\nhost\n$host"
     }
 
     private fun repairAssistant(message: ChatMessage): ChatMessage? {
@@ -174,6 +232,13 @@ object ToolTranscript {
     private fun urlIdentity(url: String): String {
         val noQuery = url.trim().substringBefore('?').trim()
         return noQuery.trimEnd('/')
+    }
+
+    private fun hostOf(url: String): String? {
+        val rest = url.trim().substringAfter("://", "")
+        if (rest.isEmpty()) return null
+        val host = rest.substringBefore('/').substringBefore('?').substringBefore(':').lowercase()
+        return host.takeIf { it.contains('.') }
     }
 
     private val json = Json { ignoreUnknownKeys = true }

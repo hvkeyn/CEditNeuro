@@ -1,6 +1,8 @@
 # Active context
 
-Current: v0.77.0. A video or motion graphic uses `hyperframes`: one HTML composition, timing only from the printed hyperframes-core page. This phone does not install a renderer and does not claim an MP4 was encoded. Reader pages still end on the last measured line. A build still counts only after BUILD SUCCESSFUL, install, and the same screen check.
+Current: v0.78.0. A failed call stays failed. A guessed `research_run` locator is not tried again. A reference miss is final for that query. An HTTP 522 or a rejected certificate blocks that host. The shell refuses a heredoc, a `timeout` wrapper, and a pipe through `sed`. The same refusal twice ends the turn.
+
+v0.77.0. A video or motion graphic uses `hyperframes`: one HTML composition, timing only from the printed hyperframes-core page. This phone does not install a renderer and does not claim an MP4 was encoded. Reader pages still end on the last measured line. A build still counts only after BUILD SUCCESSFUL, install, and the same screen check.
 
 `android-app`, `android-compose`, and `android-ui` are starter skills for writing an Android or Kotlin Multiplatform app on this phone. They keep UI, domain, and data apart, and they follow Compose, Navigation 3, and edge-to-edge. A specialized public page from `github.com/android/skills` is read with `http_request`. The Android CLI is not installed. Checking another app uses `android-apk` and does not copy its code.
 

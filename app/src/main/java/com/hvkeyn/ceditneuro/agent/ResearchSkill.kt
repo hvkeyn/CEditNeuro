@@ -23,7 +23,7 @@ object ResearchSkill {
 
         1. load_tools group=study. research_run action=open with the question copied from the user and tier=light or tier=full. light is a fact, a list, or a comparison. full is an argument that could be wrong. A request for a dissertation is still tier=full on this phone: one report, then stop. Do not promise tens of thousands of words or hundreds of sources.
         2. action=plan with the atomic questions separated by |.
-        3. Each source is action=source with title, locator, quote, and claim. The locator is a URL, a DOI, an arXiv id, or a project path that a tool printed in this run. reference searches wiki, arxiv, and doi. http_request reads one public page and only that page: a ClinicalTrials.gov study, an EDGAR filing, an Open Library book record, or a statistics table. Quote only words that tool returned. A second copy of the same title or the same locator is a reprint and does not count. light stops at 8 independent sources. full stops at 24. Do not fetch past the cap.
+        3. Each source is action=source with title, locator, quote, and claim. The locator is a URL, a DOI, an arXiv id, or a project path that a tool printed in this run. reference searches wiki, arxiv, and doi. http_request reads one public page and only that page: a ClinicalTrials.gov study, an EDGAR filing, an Open Library book record, or a statistics table. Quote only words that tool returned. A second copy of the same title or the same locator is a reprint and does not count. light stops at 8 independent sources. full stops at 24. Do not fetch past the cap. If action=source says the locator was not printed by a tool, stop calling action=source. Do not guess another locator. A reference result of Not found is final for that query.
         4. full only: action=tension names two sources that disagree, or text=none after those two were compared and they agree.
         5. action=draft writes the report once, in the user's language. Later changes are action=patch of one exact span. Do not write the report over from scratch.
         6. Critics, one at a time, action=critic. light needs name=cite. full also needs name=independence and name=gap. cite asks whether each quoted sentence is in that source. independence asks whether a reprint was counted twice. gap names the one source that would overturn the draft, or says none was found.
@@ -73,8 +73,16 @@ object ResearchSkill {
     /** Phones that saved the short research skill gain the deep run. A deleted file stays deleted. */
     private fun extendResearch(file: File) {
         if (!file.isFile) return
-        val current = file.readText(Charsets.UTF_8)
-        if (current.contains("research_run")) return
+        var current = file.readText(Charsets.UTF_8)
+        if (current.contains("research_run")) {
+            if (!current.contains("Do not guess another locator")) {
+                current = current.trimEnd() + "\n\n" +
+                    "If action=source says the locator was not printed by a tool, stop calling action=source. " +
+                    "Do not guess another locator. A reference result of Not found is final for that query.\n"
+                file.writeText(current, Charsets.UTF_8)
+            }
+            return
+        }
         if (!current.contains("research_log kind=question")) return
         val softened = current.replace(
             "Stay on this one agent. Do not start another agent and do not fetch a pile of papers.",

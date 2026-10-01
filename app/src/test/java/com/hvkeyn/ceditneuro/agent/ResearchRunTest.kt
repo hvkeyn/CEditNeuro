@@ -89,6 +89,26 @@ class ResearchRunTest {
         assertTrue(text.contains("research_run"))
         assertFalse(text.contains("fetch a pile of papers"))
         assertTrue(text.contains("does not count"))
+        assertTrue(text.contains("Do not guess another locator"))
+    }
+
+    @Test
+    fun aGuessedLocatorIsRejectedOnce() {
+        val root = Files.createTempDirectory("research-locator").toFile()
+        ResearchRun.apply(root, "open", mapOf("question" to "Where is the number?", "tier" to "light"))
+        ResearchRun.apply(root, "plan", mapOf("text" to "Which page? | Which number?"))
+        val rejected = ResearchRun.apply(root, "source", source(1) + mapOf("locator" to "the paper"))
+        assertTrue(rejected.error)
+        assertTrue(rejected.text.contains("Do not guess another locator"))
+    }
+
+    @Test
+    fun anExistingResearchSkillGainsTheLocatorStop() {
+        val dir = Files.createTempDirectory("research-skill-locator").toFile()
+        val file = java.io.File(dir, "research.md")
+        file.writeText("# Research\nresearch_run action=status\n")
+        ResearchSkill.ensure(dir)
+        assertTrue(file.readText().contains("Do not guess another locator"))
     }
 
     private fun source(n: Int): Map<String, String> = mapOf(
