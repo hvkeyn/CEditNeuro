@@ -1,5 +1,6 @@
 # System patterns
 
+- Native libraries are aligned for 16 KB pages after symbol stripping and again in the APK (`zipalign -P 16`, then a new v2/v3 signature). The manifest does not set `pageSizeCompat`.
 - `ui/WorkspaceViewModel.kt` holds all state (`WorkspaceUiState`, one slice per project via `editProject`). Background threads post to Main before `editProject`.
 - Tools implement `tools/Tool.kt`; registered in `buildAgentLoop` in the view model; grouped in `tools/ToolGroups.kt`; listed in `agent/Prompt.kt` and `tools/LoadToolsTool.kt`. A new tool touches all four plus `toolPhase` labels.
 - `web_to_app` (device group) packs the `webviewshell` APK: it replaces the fixed-length package id and home-screen name, writes the page into assets, and signs with `apksig` and a key kept in the app's files. The agent then calls `install_apk`. The shell does not clone another app or change TLS.

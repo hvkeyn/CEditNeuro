@@ -15,8 +15,8 @@ android {
         // API 29+ forbids executing a program this app just wrote. API 28 stays in the
         // compatibility domain that can run compilers installed into the app's private files.
         targetSdk = 28
-        versionCode = 82
-        versionName = "0.82.0"
+        versionCode = 85
+        versionName = "0.83.0"
     }
 
     buildTypes {
@@ -138,4 +138,57 @@ val packWebShell = tasks.register<Copy>("packWebShell") {
 afterEvaluate {
     tasks.named("preBuild").configure { dependsOn(packWebShell) }
     tasks.named("testDebugUnitTest").configure { dependsOn(packWebShell) }
+    listOf("debug", "release").forEach { variant ->
+        val variantName = variant.replaceFirstChar { it.uppercase() }
+        val stripTask = if (variant == "debug") "stripDebugDebugSymbols" else "stripReleaseDebugSymbols"
+        val alignTask = tasks.register("align${variantName}NativeLibs") {
+            dependsOn(stripTask)
+            val libs = layout.buildDirectory.dir("intermediates/stripped_native_libs/$variant/$stripTask/out")
+            inputs.dir(libs)
+            outputs.file(layout.buildDirectory.file("align16k/$variant.stamp"))
+            doLast {
+                exec {
+                    commandLine("python", rootProject.file("tools/align_elf_16k.py").absolutePath, libs.get().asFile.absolutePath)
+                }
+                layout.buildDirectory.file("align16k/$variant.stamp").get().asFile.apply {
+                    parentFile.mkdirs()
+                    writeText("16k")
+                }
+            }
+        }
+        tasks.named("package$variantName").configure {
+            dependsOn(alignTask)
+            doLast {
+                pageAlignApk(layout.buildDirectory.file("outputs/apk/$variant/app-$variant.apk").get().asFile)
+            }
+        }
+    }
 }
+
+// Tree-sitter ships 4 KB ELF alignment, and AGP 8.7 zip-aligns .so files to 4 KB.
+// Android 16 then shows the compatibility dialog on every cold start. Pad the LOAD
+// segments to 16 KB and zip-align the finished APK to the same page size.
+fun pageAlignApk(apk: File) {
+    val tools = android.sdkDirectory.resolve("build-tools").listFiles()
+        ?.filter { it.isDirectory }
+        ?.maxByOrNull { it.name }
+        ?: error("Android build-tools not found")
+    val aligned = File(apk.parentFile, apk.nameWithoutExtension + "-16k.apk")
+    exec {
+        commandLine(tools.resolve("zipalign.exe").absolutePath, "-f", "-P", "16", "4", apk.absolutePath, aligned.absolutePath)
+    }
+    if (!apk.delete() || !aligned.renameTo(apk)) error("Could not replace ${apk.name}")
+    val signing = android.signingConfigs.getByName("debug")
+    exec {
+        commandLine(
+            tools.resolve("apksigner.bat").absolutePath,
+            "sign",
+            "--ks", (signing.storeFile ?: File(System.getProperty("user.home"), ".android/debug.keystore")).absolutePath,
+            "--ks-pass", "pass:${signing.storePassword ?: "android"}",
+            "--key-pass", "pass:${signing.keyPassword ?: "android"}",
+            "--ks-key-alias", signing.keyAlias ?: "androiddebugkey",
+            apk.absolutePath,
+        )
+    }
+}
+
