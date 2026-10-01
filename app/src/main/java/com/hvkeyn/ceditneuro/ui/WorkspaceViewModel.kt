@@ -20,6 +20,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.hvkeyn.ceditneuro.agent.AgentEvent
 import com.hvkeyn.ceditneuro.agent.AgentDoctor
+import com.hvkeyn.ceditneuro.agent.HarnessBook
 import com.hvkeyn.ceditneuro.agent.AgentLoop
 import com.hvkeyn.ceditneuro.agent.ChatMessage
 import com.hvkeyn.ceditneuro.agent.ToolTranscript
@@ -3119,7 +3120,12 @@ class WorkspaceViewModel(
             val session = merged[root] ?: com.hvkeyn.ceditneuro.data.StoredSession()
             merged[root] = session.copy(conversation = project.conversation.toList())
         }
-        return AgentDoctor.report(merged)
+        return AgentDoctor.report(merged).also { _ ->
+            val root = _state.value.projectRoot
+            if (root != null) {
+                HarnessBook(File(root)).noteDoctor(AgentDoctor.measure(merged))
+            }
+        }
     }
 
     private fun showMessage(text: String) {

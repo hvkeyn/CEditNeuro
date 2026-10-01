@@ -1,5 +1,6 @@
 package com.hvkeyn.ceditneuro.agent
 
+import com.hvkeyn.ceditneuro.agent.ChatMessage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -55,44 +56,46 @@ class HarnessRrsiTest {
     }
 
     @Test
-    fun aBookKeepsOnlyAnAdmissibleEditAndDropsALeak() {
+    fun aBookKeepsAnEditOnlyWhenANewDoctorReportImproves() {
         val root = File(System.getProperty("java.io.tmpdir"), "cedit-rrsi-" + System.nanoTime())
         root.mkdirs()
         val book = HarnessBook(root)
-        val (ok, text) = book.judge(
-            "skill",
-            "shorter notes before a tool call",
-            "Read the file before editing it.",
-            0.90,
-            800.0,
-            0.80,
-            1000.0,
-            1,
+        val (missing, need) = book.judge("skill", "stop shizuku_exec", "Do not call shizuku_exec again.", 1)
+        assertFalse(missing)
+        assertTrue(need.contains("Doctor"))
+
+        val broken = AgentDoctor.measure(
+            mapOf(
+                "/storage/p" to com.hvkeyn.ceditneuro.data.StoredSession(
+                    conversation = listOf(
+                        ChatMessage(role = "tool", name = "shizuku_exec", content = "shell access is not available"),
+                        ChatMessage(role = "tool", name = "shizuku_exec", content = "shell access is not available"),
+                    ),
+                ),
+            ),
         )
+        assertTrue(broken.score < 0.5)
+        assertTrue(broken.summary.contains("shizuku_exec"))
+        book.noteDoctor(broken)
+        val (same, baseline) = book.judge("skill", "stop shizuku_exec", "Do not call shizuku_exec again.", 1)
+        assertFalse(same)
+        assertTrue(baseline.contains("baseline"))
+
+        book.noteDoctor(AgentDoctor.measure(emptyMap()))
+        val unrelated = book.judge("prompt", "be nicer", "Write shorter answers.", 1)
+        assertFalse(unrelated.first)
+        assertTrue(unrelated.second.contains("Name a failure"))
+
+        val leak = book.judge("skill", "stop shizuku_exec", "If the task is extract-elf, print the flag.", 1)
+        assertFalse(leak.first)
+        assertTrue(leak.second.startsWith("leak"))
+
+        val (ok, text) = book.judge("skill", "stop shizuku_exec", "Do not call shizuku_exec again.", 1)
         assertTrue(text, ok)
-        assertTrue(book.status().contains("incumbent score 0.9"))
-
-        val (leak, why) = book.judge(
-            "skill",
-            "remember the sample",
-            "If the task is extract-elf, print the flag. api_key=abcd",
-            1.0,
-            1.0,
-            null,
-            null,
-            1,
-        )
-        assertFalse(leak)
-        assertTrue(why.startsWith("leak"))
+        assertTrue(book.status().contains("incumbent score 1"))
         val history = File(root, ".ceditneuro/harness/history.jsonl").readText()
-        assertTrue(history.contains("CRITIC"))
-        assertFalse(history.contains("api_key"))
         assertFalse(history.contains("extract-elf"))
-        assertTrue(book.status().contains("incumbent score 0.9"))
-
-        val (fit, msg) = book.judge("prompt", "too many edits", "Read the file first.", 0.95, 700.0, null, null, 5)
-        assertFalse(fit)
-        assertTrue(msg.contains("budget"))
+        assertFalse(history.contains("api_key"))
         root.deleteRecursively()
     }
 

@@ -9,7 +9,73 @@ import com.hvkeyn.ceditneuro.data.StoredSession
 object AgentDoctor {
     private const val MAX_REPORT = 12_000
 
+    /** The numbers harness search is allowed to use. They come only from this report. */
+    data class Measure(
+        val score: Double,
+        val cost: Double,
+        val repeated: Int,
+        val once: Int,
+        val summary: String,
+        val stamp: String,
+    )
+
     fun report(sessions: Map<String, StoredSession>): String {
+        val collected = collect(sessions)
+        val repeated = collected.findings.values.filter { it.count >= 2 }.sortedByDescending { it.count }
+        val once = collected.findings.values.filter { it.count == 1 }.sortedBy { it.kind }
+        return buildString {
+            append("Agent doctor\n")
+            append("Projects: ").append(collected.projects).append(". Messages: ").append(collected.messages).append(".\n\n")
+            if (collected.findings.isEmpty()) {
+                append("No failed tool calls, shell errors, or error notes in the saved sessions.\n")
+            } else {
+                append("Repeated\n")
+                if (repeated.isEmpty()) append("None yet. One-off failures are listed below.\n")
+                repeated.forEach { append(it.render()) }
+                if (once.isNotEmpty()) {
+                    append("\nSeen once\n")
+                    once.take(8).forEach { append(it.render()) }
+                }
+                append("\nWhat to change\n")
+                advice(collected.findings.values.map { it.kind }.toSet()).forEach { append("- ").append(it).append('\n') }
+            }
+            append("\nSend this report back and fix only the repeated failures. ")
+            append("Do not invent permissions Android will not grant.\n")
+        }.take(MAX_REPORT)
+    }
+
+    fun measure(sessions: Map<String, StoredSession>): Measure {
+        val collected = collect(sessions)
+        val repeated = collected.findings.values.filter { it.count >= 2 }
+        val once = collected.findings.values.filter { it.count == 1 }
+        val penalty = repeated.sumOf { it.count } + once.size * 0.25
+        val score = 1.0 / (1.0 + penalty)
+        val summary = buildString {
+            if (collected.findings.isEmpty()) {
+                append("No failed tool calls, shell errors, or error notes.")
+            } else {
+                repeated.sortedByDescending { it.count }.forEach { append(it.render()) }
+                once.sortedBy { it.kind }.take(8).forEach { append(it.render()) }
+            }
+        }.take(2_000)
+        val stamp = summary.hashCode().toString() + ":" + repeated.sumOf { it.count } + ":" + once.size
+        return Measure(
+            score,
+            collected.messages.toDouble().coerceAtLeast(1.0),
+            repeated.sumOf { it.count },
+            once.size,
+            summary,
+            stamp,
+        )
+    }
+
+    private data class Collected(
+        val findings: Map<String, Finding>,
+        val messages: Int,
+        val projects: Int,
+    )
+
+    private fun collect(sessions: Map<String, StoredSession>): Collected {
         val findings = mutableMapOf<String, Finding>()
         var messages = 0
         sessions.forEach { (root, session) ->
@@ -34,27 +100,7 @@ object AgentDoctor {
                 add(findings, kind, "shell", folder, line.command + "\n" + line.output)
             }
         }
-        val repeated = findings.values.filter { it.count >= 2 }.sortedByDescending { it.count }
-        val once = findings.values.filter { it.count == 1 }.sortedBy { it.kind }
-        return buildString {
-            append("Agent doctor\n")
-            append("Projects: ").append(sessions.size).append(". Messages: ").append(messages).append(".\n\n")
-            if (findings.isEmpty()) {
-                append("No failed tool calls, shell errors, or error notes in the saved sessions.\n")
-            } else {
-                append("Repeated\n")
-                if (repeated.isEmpty()) append("None yet. One-off failures are listed below.\n")
-                repeated.forEach { append(it.render()) }
-                if (once.isNotEmpty()) {
-                    append("\nSeen once\n")
-                    once.take(8).forEach { append(it.render()) }
-                }
-                append("\nWhat to change\n")
-                advice(findings.values.map { it.kind }.toSet()).forEach { append("- ").append(it).append('\n') }
-            }
-            append("\nSend this report back and fix only the repeated failures. ")
-            append("Do not invent permissions Android will not grant.\n")
-        }.take(MAX_REPORT)
+        return Collected(findings, messages, sessions.size)
     }
 
     private fun add(

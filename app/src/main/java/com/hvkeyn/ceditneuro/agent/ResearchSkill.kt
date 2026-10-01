@@ -441,15 +441,14 @@ object StarterSkills {
         "rrsi" to """
             # Harness self-improvement
 
-            Use this when the user asks the agent to improve its own prompts, skills, tools, memory, or control notes. The model stays as it is. Only the harness around it changes. The edit space stays open. The search is regularized so a fixed chore is not memorized.
+            Use this when the user asks the agent to improve its own prompts, skills, tools, memory, or control notes. The model stays as it is. Only the harness around it changes. The measurement is the Doctor report, not a score you invent.
 
-            1. load_tools group=harness. harness_rrsi action=status. Quote the round, the budget, the incumbent score, untried components, and anything it says to prune.
-            2. One hypothesis names one component: prompt, control_flow, config, output_plumbing, context_mgmt, client_tool, skill, memory, or subagent. Do not bundle more edits than the budget status printed.
-            3. Measure a before and an after on work that is not copied into the harness text. score is that fraction from 0 to 1. cost is tokens, or characters of the reply when tokens are unknown. Do not invent a score the run did not produce.
-            4. harness_rrsi action=screen on the draft. If it says leak, rewrite. A draft that names one task, one expected answer, a hidden test, or a benchmark suite is a leak.
-            5. harness_rrsi action=judge with the component, the hypothesis, the draft, score, cost, and base_score plus base_cost only when status has no incumbent yet. Save the draft only when the tool says admissible. A reject is final for that hypothesis.
-            6. A component listed under prune is removed: delete_skill or drop that note. Do not add it back in the same round. A stall line means the next edit goes on an untried component.
-            7. The model weights are not trained. Do not claim a benchmark number this phone did not measure. When the harness edit is done, use_skill name=rrsi scope=app on=false.
+            1. Ask the user to press Doctor if status has no report. load_tools group=harness. harness_rrsi action=status. Quote the repeated failures, the budget, and whether this report is the baseline or a new measurement.
+            2. One hypothesis names one component and one failure printed in the baseline report: prompt, control_flow, config, output_plumbing, context_mgmt, client_tool, skill, memory, or subagent. Do not bundle more edits than the budget.
+            3. harness_rrsi action=screen on the draft. If it says leak, rewrite. A draft that names one task, one expected answer, a hidden test, or a benchmark suite is a leak.
+            4. Change the harness. Let a run finish. Ask the user to press Doctor again. Then harness_rrsi action=judge. Do not pass a score. Judge reads the new Doctor report. Save the draft only when the tool says admissible. A reject is final for that hypothesis.
+            5. A component listed under prune is removed: delete_skill or drop that note. Do not add it back in the same round. A stall line means the next edit goes on an untried component.
+            6. The model weights are not trained. Do not claim a benchmark number this phone did not measure. When the harness edit is done, use_skill name=rrsi scope=app on=false.
         """.trimIndent() + "\n",
     )
 
@@ -479,6 +478,7 @@ object StarterSkills {
         extendAndroidApp(appDir)
         extendAndroidApk(appDir)
         extendSystematic(appDir)
+        extendRrsi(appDir)
     }
 
     /** Phones that saved an older android-app skill learn the build and the screen check. */
@@ -521,6 +521,16 @@ object StarterSkills {
             current.trimEnd() + "\n\nAn Android screen uses android-debug, and the verify check is that same screen, not only a unit test.\n",
             Charsets.UTF_8,
         )
+    }
+
+    /** Phones that already saved rrsi learn to measure from the Doctor button. */
+    private fun extendRrsi(appDir: File) {
+        val file = File(appDir, "rrsi.md")
+        if (!file.isFile) return
+        val current = file.readText(Charsets.UTF_8)
+        if (current.contains("Press Doctor") || current.contains("press Doctor")) return
+        if (!current.contains("harness_rrsi")) return
+        file.writeText(skills.getValue("rrsi"), Charsets.UTF_8)
     }
 
     /** Phones that saved the short debug skill learn to hand a real failure to the full case. */
