@@ -1,6 +1,6 @@
 # Active context
 
-Current: v0.76.0. Reader pages end on the last measured line that fits, so the next page continues and the progress line stays under the text. `android-app` treats a build as done only after BUILD SUCCESSFUL and `install_apk`. `android-debug` checks that screen with one dump, one tap on a printed row, and the dump again. A unit test is not the screen. Without Shizuku or root the screen check is reported as not run.
+Current: v0.77.0. A video or motion graphic uses `hyperframes`: one HTML composition, timing only from the printed hyperframes-core page. This phone does not install a renderer and does not claim an MP4 was encoded. Reader pages still end on the last measured line. A build still counts only after BUILD SUCCESSFUL, install, and the same screen check.
 
 `android-app`, `android-compose`, and `android-ui` are starter skills for writing an Android or Kotlin Multiplatform app on this phone. They keep UI, domain, and data apart, and they follow Compose, Navigation 3, and edge-to-edge. A specialized public page from `github.com/android/skills` is read with `http_request`. The Android CLI is not installed. Checking another app uses `android-apk` and does not copy its code.
 
