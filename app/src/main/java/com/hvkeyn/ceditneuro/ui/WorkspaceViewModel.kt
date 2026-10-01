@@ -314,6 +314,10 @@ class WorkspaceViewModel(
     private var current: LiveProject? = null
     private val deviceShell = DeviceShell(appContext, { settingsStore.current.networkEnabled }) { settingsStore.current.proxy }
     private val shizukuShell = ShizukuShell(appContext)
+    private val webBackend by lazy {
+        com.hvkeyn.ceditneuro.agent.deepseek.web.DeepSeekWebBackend(appContext, { settingsStore.current })
+    }
+    private val backend by lazy { DeepSeekBackend(settingsProvider = { settingsStore.current }, web = webBackend) }
     private val agentNet = AgentNet { settingsStore.current.proxy }
     private val execMutex = Mutex()
     private var execWaiter: CompletableDeferred<Boolean>? = null
@@ -1026,7 +1030,7 @@ class WorkspaceViewModel(
                 )
             }
             runCatching {
-                com.hvkeyn.ceditneuro.agent.deepseek.DeepSeekBackend { settingsStore.current }
+                backend
                     .complete(messages, emptyList())
                     .collect { chunk ->
                         if (chunk is com.hvkeyn.ceditneuro.agent.BackendChunk.Text) {
@@ -3013,7 +3017,7 @@ class WorkspaceViewModel(
 
         toolSession.present = tools.map { it.name }.toSet()
         return AgentLoop(
-            backend = DeepSeekBackend { settingsStore.current },
+            backend = backend,
             toolRegistry = ToolRegistry(tools),
             toolSession = toolSession,
             systemPrompt = buildSystemPrompt(),

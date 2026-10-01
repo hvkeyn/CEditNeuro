@@ -8,9 +8,11 @@ import com.hvkeyn.ceditneuro.agent.FunctionCall
 import com.hvkeyn.ceditneuro.agent.ToolCall
 import com.hvkeyn.ceditneuro.agent.ToolTranscript
 import com.hvkeyn.ceditneuro.data.AgentSettings
+import com.hvkeyn.ceditneuro.data.ModelCatalog
 import com.hvkeyn.ceditneuro.tools.Tool
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.serialization.json.Json
@@ -40,6 +42,8 @@ import java.util.concurrent.TimeUnit
 class DeepSeekBackend(
     private val client: OkHttpClient = defaultClient(),
     private val settingsProvider: () -> AgentSettings,
+    /** Serves [ModelCatalog.WEB_PHONE_ID], which speaks the web chat instead of an OpenAI API. */
+    private val web: AgentBackend? = null,
 ) : AgentBackend {
 
     private val json = Json {
@@ -52,6 +56,10 @@ class DeepSeekBackend(
         val settings = settingsProvider()
         val model = settings.model
         val provider = settings.provider
+        if (provider.id == ModelCatalog.WEB_PHONE_ID && web != null) {
+            emitAll(web.complete(messages, tools))
+            return@flow
+        }
         if (!provider.ready) {
             throw IOException("No API key for ${provider.name}. Add one in Settings.")
         }

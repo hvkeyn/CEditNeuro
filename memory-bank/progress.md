@@ -3,6 +3,7 @@
 Released: v0.45.0 through v0.75.0 (`frontend-design` rejects a bland draft: one mood, two type faces, no empty chips; see activeContext.md). Unit tests include `DesignCatalogTest` and `VideoBriefTest`. Unit tests include `ResearchRunTest`. Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, `SkillLibraryTest`, `ChatLinkTest`, `WebAppPackTest`, `HealthRecordTest`, `SkillAuditTest`, and `ReaderPlaceTest`.
 
 Known gaps:
+- v0.82.0. DeepSeek Web (on this phone): sign-in in a WebView, PoW, SSE, emulated tools, all on the phone. Checked live with the user's own sign-in (Check plus a one-tool agent task). Tests: `WebPhoneTest` (PoW vectors, tool parsing, truncation, prompt, stream, provider). Not yet seen: the silent token refresh after expiry, and whether `chat_session/delete` really removes the web chats.
 - v0.81.0. The `dreams` skill is written to the phone on start (checked); a live dream chat was not run.
 - v0.80.0. The free DeepSeek web bridge is a keyless provider with a 64K context budget; checked against the real bridge server with a fake web client, not with a real DeepSeek web account. Sound tools (`sound_effect`, `make_music`, `voiceover`), the AAC mix in `render_video`, and player controls in both previews were checked on the phone. Tests: `AudioTest`, `WebBridgeTest`.
 - v0.79.0. A HyperFrames composition plays in the editor and renders to an MP4 on the phone (Render MP4 button and `render_video`); the MP4 plays in a video tab. No audio track yet.
