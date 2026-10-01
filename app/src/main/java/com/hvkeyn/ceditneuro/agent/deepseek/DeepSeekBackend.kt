@@ -44,6 +44,8 @@ class DeepSeekBackend(
     private val settingsProvider: () -> AgentSettings,
     /** Serves [ModelCatalog.WEB_PHONE_ID], which speaks the web chat instead of an OpenAI API. */
     private val web: AgentBackend? = null,
+    /** Serves [ModelCatalog.QWEN_PHONE_ID], the on-phone Qwen web chat. */
+    private val qwen: AgentBackend? = null,
 ) : AgentBackend {
 
     private val json = Json {
@@ -58,6 +60,10 @@ class DeepSeekBackend(
         val provider = settings.provider
         if (provider.id == ModelCatalog.WEB_PHONE_ID && web != null) {
             emitAll(web.complete(messages, tools))
+            return@flow
+        }
+        if (provider.id == ModelCatalog.QWEN_PHONE_ID && qwen != null) {
+            emitAll(qwen.complete(messages, tools))
             return@flow
         }
         if (!provider.ready) {

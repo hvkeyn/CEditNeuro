@@ -135,6 +135,11 @@ fun SettingsDialog(
                                 draft = draft.copy(providers = draft.providers + ModelCatalog.webPhone())
                             }) { Text("Add free DeepSeek web (on this phone)") }
                         }
+                        if (draft.providers.none { it.id == ModelCatalog.QWEN_PHONE_ID }) {
+                            TextButton(onClick = {
+                                draft = draft.copy(providers = draft.providers + ModelCatalog.qwenPhone())
+                            }) { Text("Add free Qwen web (on this phone)") }
+                        }
                         if (draft.providers.none { it.id == ModelCatalog.WEB_BRIDGE_ID }) {
                             TextButton(onClick = {
                                 draft = draft.copy(providers = draft.providers + ModelCatalog.webBridge())
@@ -527,7 +532,7 @@ private fun ProviderCard(
                 TextButton(onClick = onRemove) { Text("Remove") }
             }
         }
-        if (provider.id != ModelCatalog.WEB_PHONE_ID) {
+        if (provider.id != ModelCatalog.WEB_PHONE_ID && provider.id != ModelCatalog.QWEN_PHONE_ID) {
             OutlinedTextField(
                 value = provider.apiUrl,
                 onValueChange = { onChange(provider.copy(apiUrl = it)) },
@@ -538,6 +543,8 @@ private fun ProviderCard(
         }
         if (provider.id == ModelCatalog.WEB_PHONE_ID) {
             WebPhoneLine()
+        } else if (provider.id == ModelCatalog.QWEN_PHONE_ID) {
+            QwenPhoneLine()
         } else if (provider.keyless) {
             Text(
                 text = "No key and no payment: the bridge on your computer talks to the free DeepSeek web chat with your account. " +

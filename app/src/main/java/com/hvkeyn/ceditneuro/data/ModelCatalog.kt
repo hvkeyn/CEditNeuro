@@ -109,6 +109,40 @@ object ModelCatalog {
         models = webModels(),
     )
 
+    const val QWEN_PHONE_ID = "qwen-web-phone"
+    const val QWEN_PHONE_URL = "https://chat.qwen.ai"
+
+    /**
+     * The free Qwen web chat spoken directly from the phone: the user signs in once in an
+     * in-app page and no computer or bridge is needed. Tool calls are read from the reply text.
+     */
+    fun qwenPhone(): ModelProvider = ModelProvider(
+        id = QWEN_PHONE_ID,
+        name = "Qwen Web (on this phone)",
+        apiUrl = QWEN_PHONE_URL,
+        keyless = true,
+        models = listOf(
+            CatalogModel(
+                name = "qwen3.8-max",
+                displayName = "Qwen Web Max",
+                maxContextTokens = 64_000,
+                maxOutputTokens = 8_192,
+            ),
+            CatalogModel(
+                name = "qwen3.7-plus",
+                displayName = "Qwen Web Plus",
+                maxContextTokens = 64_000,
+                maxOutputTokens = 8_192,
+            ),
+            CatalogModel(
+                name = "qwen3-coder-plus",
+                displayName = "Qwen Web Coder",
+                maxContextTokens = 64_000,
+                maxOutputTokens = 8_192,
+            ),
+        ),
+    )
+
     private fun webModels(): List<CatalogModel> = listOf(
             CatalogModel(
                 name = "deepseek-chat",

@@ -40,6 +40,8 @@ object AgentDoctor {
                 advice(collected.findings.values.map { it.kind }.toSet()).forEach { append("- ").append(it).append('\n') }
             }
             append("\nSend this report back and fix only the repeated failures. ")
+            append("The score counts tool failures and the same problem showing up again in the chats and texts. ")
+            append("One sentence is not a rule. Do not special-case a task, a chat, or a wording. ")
             append("Do not invent permissions Android will not grant.\n")
         }.take(MAX_REPORT)
     }
@@ -80,20 +82,38 @@ object AgentDoctor {
         var messages = 0
         sessions.forEach { (root, session) ->
             val folder = root.substringAfterLast('/').ifBlank { root }
+            val seen = mutableSetOf<String>()
+            val asks = mutableListOf<String>()
             session.conversation.forEach { message ->
                 messages++
-                if (message.role != "tool") return@forEach
-                val text = message.content.orEmpty()
-                val kind = kindOf(text) ?: return@forEach
-                add(findings, kind, message.name ?: "tool", folder, text)
+                when (message.role) {
+                    "tool" -> {
+                        val text = message.content.orEmpty()
+                        val kind = kindOf(text) ?: return@forEach
+                        add(findings, kind, message.name ?: "tool", folder, text)
+                    }
+                    "user" -> noteUser(message.content.orEmpty(), folder, findings, seen, asks)
+                    "assistant" -> noteAssistant(message.content.orEmpty(), folder, findings, seen)
+                }
             }
             session.chat.forEach { entry ->
-                if (entry.role != "Error") return@forEach
-                if (entry.text.startsWith("Link closed.")) return@forEach
-                if (entry.text.startsWith("Stopped by the user.")) return@forEach
-                if ("schema is loaded now" in entry.text) return@forEach
-                val kind = kindOf(entry.text) ?: "error"
-                add(findings, kind, entry.toolName ?: "chat", folder, entry.text)
+                when (entry.role) {
+                    "Error" -> {
+                        if (entry.text.startsWith("Link closed.")) return@forEach
+                        if (entry.text.startsWith("Stopped by the user.")) return@forEach
+                        if ("schema is loaded now" in entry.text) return@forEach
+                        val kind = if (unanswered(entry.text)) "unanswered" else kindOf(entry.text) ?: "error"
+                        val sample = if (kind == "unanswered") UNANSWERED_SAMPLE else entry.text
+                        add(findings, kind, entry.toolName ?: "chat", folder, sample)
+                    }
+                    "User" -> noteUser(entry.text, folder, findings, seen, asks)
+                    "Assistant" -> noteAssistant(entry.text, folder, findings, seen)
+                }
+            }
+            asks.groupingBy { it }.eachCount().filter { it.value >= 2 }.forEach { (_, count) ->
+                repeat(count) {
+                    add(findings, "repeated ask", "chat", folder, "The same request was sent again.")
+                }
             }
             session.shell.forEach { line ->
                 val kind = kindOf(line.output) ?: return@forEach
@@ -185,9 +205,55 @@ object AgentDoctor {
         if ("run stopped" in kinds) {
             lines += "A stopped run can be continued. Do not resend the same long task from the start."
         }
+        if ("user correction" in kinds) {
+            lines += "A repeated correction means the reply missed the request. Change the prompt or the skill for that kind of miss. Do not quote one sentence as a rule."
+        }
+        if ("repeated ask" in kinds) {
+            lines += "The same request came back. Change the harness so the next run finishes that kind of request. Do not special-case the wording."
+        }
+        if ("unanswered" in kinds) {
+            lines += "An empty or busy reply is a stall. Say that once and stop. Do not retry the same call."
+        }
         if (lines.isEmpty()) lines += "No setup change suggested. Fix the single failure in the project that produced it."
         return lines
     }
+
+    private fun noteUser(
+        text: String,
+        folder: String,
+        findings: MutableMap<String, Finding>,
+        seen: MutableSet<String>,
+        asks: MutableList<String>,
+    ) {
+        val norm = text.trim().lowercase().replace(Regex("\\s+"), " ")
+        if (norm.length >= 20) asks += norm
+        if (!seen.add("user:$norm")) return
+        if (correction(norm)) add(findings, "user correction", "chat", folder, "The user rejected the reply.")
+    }
+
+    private fun noteAssistant(
+        text: String,
+        folder: String,
+        findings: MutableMap<String, Finding>,
+        seen: MutableSet<String>,
+    ) {
+        val norm = text.trim().lowercase().replace(Regex("\\s+"), " ")
+        if (!seen.add("assistant:$norm")) return
+        if (unanswered(text)) add(findings, "unanswered", "chat", folder, UNANSWERED_SAMPLE)
+    }
+
+    private fun correction(text: String): Boolean =
+        Regex(
+            """^(нет|не то|не так|неправильно|ошибка|переделай|исправь|заново|опять|wrong|not that|incorrect|try again|that's wrong)\b""",
+            RegexOption.IGNORE_CASE,
+        ).containsMatchIn(text)
+
+    private fun unanswered(text: String): Boolean {
+        val line = text.lowercase()
+        return listOf("did not answer", "overloaded", "rate-limited", "не отвечает", "перегруж").any { it in line }
+    }
+
+    private const val UNANSWERED_SAMPLE = "The reply was empty or said the model was busy."
 
     private data class Finding(
         val kind: String,

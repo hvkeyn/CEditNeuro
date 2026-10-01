@@ -318,7 +318,12 @@ class WorkspaceViewModel(
     private val webBackend by lazy {
         com.hvkeyn.ceditneuro.agent.deepseek.web.DeepSeekWebBackend(appContext, { settingsStore.current })
     }
-    private val backend by lazy { DeepSeekBackend(settingsProvider = { settingsStore.current }, web = webBackend) }
+    private val qwenBackend by lazy {
+        com.hvkeyn.ceditneuro.agent.qwen.web.QwenWebBackend(appContext, { settingsStore.current })
+    }
+    private val backend by lazy {
+        DeepSeekBackend(settingsProvider = { settingsStore.current }, web = webBackend, qwen = qwenBackend)
+    }
     private val agentNet = AgentNet { settingsStore.current.proxy }
     private val execMutex = Mutex()
     private var execWaiter: CompletableDeferred<Boolean>? = null
