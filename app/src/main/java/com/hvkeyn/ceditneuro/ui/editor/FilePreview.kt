@@ -51,46 +51,6 @@ fun previewKind(path: String): String? = when (path.substringAfterLast('.', "").
     else -> null
 }
 
-/** A finished video plays in place with the system controls. It loops until the tab closes. */
-@Composable
-fun VideoPreview(file: File, modifier: Modifier = Modifier) {
-    AndroidView(
-        modifier = modifier.fillMaxSize().background(Color.Black),
-        factory = { context ->
-            android.widget.FrameLayout(context).apply {
-                setBackgroundColor(android.graphics.Color.BLACK)
-                val video = android.widget.VideoView(context)
-                val controls = android.widget.MediaController(context)
-                controls.setAnchorView(video)
-                video.setMediaController(controls)
-                video.setOnPreparedListener { player ->
-                    player.isLooping = true
-                    video.start()
-                }
-                video.setOnErrorListener { _, _, _ -> true }
-                addView(
-                    video,
-                    android.widget.FrameLayout.LayoutParams(
-                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
-                        android.view.Gravity.CENTER,
-                    ),
-                )
-                tag = video
-            }
-        },
-        update = { frame ->
-            val video = frame.tag as android.widget.VideoView
-            val key = file.path + "@" + file.lastModified()
-            if (video.tag != key) {
-                video.tag = key
-                video.setVideoPath(file.absolutePath)
-            }
-        },
-        onRelease = { frame -> (frame.tag as? android.widget.VideoView)?.stopPlayback() },
-    )
-}
-
 /** Height divided by width, so a scheme can use the full pane width without cropping. */
 internal fun svgAspect(markup: String): Float {
     val width = Regex("""\bwidth\s*=\s*"([\d.]+)""").find(markup)?.groupValues?.get(1)?.toFloatOrNull()

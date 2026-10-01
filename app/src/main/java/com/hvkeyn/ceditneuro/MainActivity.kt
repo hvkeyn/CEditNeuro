@@ -82,6 +82,30 @@ class MainActivity : ComponentActivity() {
             }
             return
         }
+        if (intent?.getBooleanExtra("cedit_sound", false) == true) {
+            val dir = getExternalFilesDir(null) ?: return
+            val ws = com.hvkeyn.ceditneuro.workspace.Workspace(java.io.File(dir, "render").apply { mkdirs() })
+            val prompt = intent.getStringExtra("prompt") ?: "cinematic"
+            val line = intent.getStringExtra("line")
+            lifecycleScope.launch {
+                fun args(vararg pairs: Pair<String, String>) = kotlinx.serialization.json.buildJsonObject {
+                    for ((k, v) in pairs) put(k, kotlinx.serialization.json.JsonPrimitive(v))
+                }
+                val report = StringBuilder()
+                val started = System.currentTimeMillis()
+                val music = com.hvkeyn.ceditneuro.tools.MakeMusicTool(ws).execute(args("prompt" to prompt, "for" to "index.html"))
+                report.append(if (music.isError) "error " else "ok ").append(music.content)
+                    .append(" [").append(System.currentTimeMillis() - started).append(" ms]\n")
+                val sfx = com.hvkeyn.ceditneuro.tools.SoundEffectTool(applicationContext, ws).execute(args("name" to "whoosh cinematic", "at" to "6"))
+                report.append(if (sfx.isError) "error " else "ok ").append(sfx.content).append('\n')
+                if (line != null) {
+                    val vo = com.hvkeyn.ceditneuro.tools.VoiceoverTool(applicationContext, ws).execute(args("text" to line, "at" to "1"))
+                    report.append(if (vo.isError) "error " else "ok ").append(vo.content).append('\n')
+                }
+                java.io.File(dir, "sound-check.txt").writeText(report.toString())
+            }
+            return
+        }
         if (intent?.getBooleanExtra("cedit_audit", false) == true) {
             val dir = getExternalFilesDir(null) ?: return
             val sweep = intent.getBooleanExtra("sweep", false)

@@ -3,6 +3,7 @@ package com.hvkeyn.ceditneuro.agent.deepseek
 import com.hvkeyn.ceditneuro.agent.AgentBackend
 import com.hvkeyn.ceditneuro.agent.BackendChunk
 import com.hvkeyn.ceditneuro.agent.ChatMessage
+import com.hvkeyn.ceditneuro.agent.ContextBudget
 import com.hvkeyn.ceditneuro.agent.FunctionCall
 import com.hvkeyn.ceditneuro.agent.ToolCall
 import com.hvkeyn.ceditneuro.agent.ToolTranscript
@@ -50,11 +51,19 @@ class DeepSeekBackend(
     override fun complete(messages: List<ChatMessage>, tools: List<Tool>): Flow<BackendChunk> = flow {
         val settings = settingsProvider()
         val model = settings.model
-        if (settings.apiKey.isBlank()) {
-            throw IOException("No API key for ${settings.provider.name}. Add one in Settings.")
+        val provider = settings.provider
+        if (!provider.ready) {
+            throw IOException("No API key for ${provider.name}. Add one in Settings.")
         }
 
-        val safeMessages = ToolTranscript.seal(messages)
+        val sentTools = tools.takeIf { it.isNotEmpty() && model.supportsTools }.orEmpty()
+        val toolChars = sentTools.sumOf { it.name.length + it.description.length + it.parameters.toString().length + 40 }
+        val safeMessages = ContextBudget.fit(
+            ToolTranscript.seal(messages),
+            contextTokens = model.maxContextTokens,
+            reserveTokens = model.maxOutputTokens,
+            fixedChars = toolChars,
+        )
         val payload = buildJsonObject {
             put("model", model.name)
             put("stream", true)
@@ -90,9 +99,9 @@ class DeepSeekBackend(
             if (settings.baseUrl.contains("deepseek.com", ignoreCase = true)) {
                 putJsonObject("stream_options") { put("include_usage", true) }
             }
-            if (tools.isNotEmpty() && model.supportsTools) {
+            if (sentTools.isNotEmpty()) {
                 put("tools", buildJsonArray {
-                    tools.forEach { tool ->
+                    sentTools.forEach { tool ->
                         add(buildJsonObject {
                             put("type", "function")
                             putJsonObject("function") {
@@ -108,16 +117,23 @@ class DeepSeekBackend(
 
         val request = Request.Builder()
             .url(chatCompletionsUrl(settings.baseUrl))
-            .header("Authorization", "Bearer ${settings.apiKey}")
+            .header("Authorization", "Bearer ${settings.apiKey.ifBlank { "unused" }}")
             .header("Content-Type", "application/json")
             .header("Accept", "text/event-stream")
             .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
             .build()
 
-        client.newCall(request).execute().use { response ->
+        val call = try {
+            client.newCall(request).execute()
+        } catch (error: IOException) {
+            if (!provider.keyless) throw error
+            throw IOException(bridgeUnreachable(settings.baseUrl, error), error)
+        }
+        call.use { response ->
             if (!response.isSuccessful) {
                 val body = response.body?.string().orEmpty()
-                throw IOException("${settings.provider.name} request failed: HTTP ${response.code} ${body.take(500)}")
+                val hint = if (provider.keyless) bridgeHint(response.code, body) else ""
+                throw IOException("${provider.name} request failed: HTTP ${response.code} ${body.take(500)}$hint")
             }
 
             val source = response.body?.source()
@@ -137,6 +153,11 @@ class DeepSeekBackend(
 
                 val frame = runCatching { json.parseToJsonElement(data) as? JsonObject }.getOrNull()
                     ?: continue
+                streamError(frame)?.let { (type, message) ->
+                    val text = message.take(500).trim().trimEnd('.')
+                    val hint = if (type == "login_required") " $LOGIN_HINT" else ""
+                    throw IOException("${provider.name} error ($type): $text.$hint")
+                }
                 cacheNote = cacheNote(frame) ?: cacheNote
                 val choices = frame["choices"] as? JsonArray ?: continue
                 val choice = choices.firstOrNull() as? JsonObject ?: continue
@@ -170,6 +191,31 @@ class DeepSeekBackend(
         private const val SSE_DONE = "[DONE]"
 
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+
+        const val LOGIN_HINT = "Sign in again on the bridge computer: python -m deepseek.auth, then restart python app.py."
+
+        /** An OpenAI-style error sent inside the stream, as the web bridge does after HTTP 200. */
+        fun streamError(frame: JsonObject): Pair<String, String>? {
+            val error = frame["error"] ?: return null
+            val body = error as? JsonObject
+            val message = (body?.get("message") as? JsonPrimitive)?.contentOrNull
+                ?: (error as? JsonPrimitive)?.contentOrNull
+                ?: error.toString()
+            val type = (body?.get("type") as? JsonPrimitive)?.contentOrNull ?: "error"
+            return type to message
+        }
+
+        fun bridgeUnreachable(apiUrl: String, error: IOException): String =
+            "Cannot reach the DeepSeek web bridge at ${apiUrl.trim()} (${error.message ?: error.javaClass.simpleName}). " +
+                "Start it on the computer with python app.py. For the phone, either run adb reverse tcp:8000 tcp:8000 " +
+                "and keep 127.0.0.1, or start it with HOST=0.0.0.0 and put the computer's LAN address in the API URL."
+
+        fun bridgeHint(code: Int, body: String): String = when {
+            code == 503 || "login_required" in body -> " $LOGIN_HINT"
+            code == 429 -> " The bridge allows RATE_LIMIT_PER_MINUTE requests a minute (30 by default); wait or raise it."
+            code == 404 && "model" in body -> " The bridge knows deepseek-chat and deepseek-expert."
+            else -> ""
+        }
 
         fun cacheNote(frame: JsonObject): String? {
             val usage = frame["usage"] as? JsonObject ?: return null

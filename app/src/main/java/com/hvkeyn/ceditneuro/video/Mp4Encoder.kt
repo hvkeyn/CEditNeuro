@@ -7,16 +7,23 @@ import android.media.MediaFormat
 import android.media.MediaMuxer
 import java.io.File
 
-/** H.264 in an MP4 through the phone's own encoder. One frame in, written at its own timestamp. */
+/**
+ * H.264 in an MP4 through the phone's own encoder. One frame in, written at its own timestamp.
+ * An already encoded AAC track is interleaved by timestamp.
+ */
 class Mp4Encoder(
     private val out: File,
     private val width: Int,
     private val height: Int,
     private val fps: Int,
+    private val audio: AudioMix.Encoded? = null,
 ) {
     private val codec: MediaCodec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
     private val muxer: MediaMuxer
     private var track = -1
+    private var audioTrack = -1
+    private var audioNext = 0
+    private val audioInfo = MediaCodec.BufferInfo()
     private var started = false
     private val info = MediaCodec.BufferInfo()
     private val pixels = IntArray(width * height)
@@ -60,7 +67,18 @@ class Mp4Encoder(
         } while (index < 0)
         codec.queueInputBuffer(index, 0, 0, frames * 1_000_000L / fps, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
         drain(true)
+        writeAudio(Long.MAX_VALUE)
         release()
+    }
+
+    private fun writeAudio(upTo: Long) {
+        val encoded = audio ?: return
+        if (!started || audioTrack < 0) return
+        while (audioNext < encoded.samples.size && encoded.samples[audioNext].pts <= upTo) {
+            val sample = encoded.samples[audioNext++]
+            audioInfo.set(0, sample.data.size, sample.pts, sample.flags)
+            muxer.writeSampleData(audioTrack, java.nio.ByteBuffer.wrap(sample.data), audioInfo)
+        }
     }
 
     fun release() {
@@ -77,6 +95,7 @@ class Mp4Encoder(
                 index == MediaCodec.INFO_TRY_AGAIN_LATER -> if (!end) return
                 index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                     track = muxer.addTrack(codec.outputFormat)
+                    if (audio != null) audioTrack = muxer.addTrack(audio.format)
                     muxer.start()
                     started = true
                 }
@@ -87,6 +106,7 @@ class Mp4Encoder(
                         buffer.position(info.offset)
                         buffer.limit(info.offset + info.size)
                         muxer.writeSampleData(track, buffer, info)
+                        writeAudio(info.presentationTimeUs)
                     }
                     codec.releaseOutputBuffer(index, false)
                     if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) return

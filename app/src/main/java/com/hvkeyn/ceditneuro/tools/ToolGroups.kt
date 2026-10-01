@@ -109,6 +109,9 @@ object ToolGroups {
         ),
         "video" to listOf(
             "render_video",
+            "sound_effect",
+            "make_music",
+            "voiceover",
         ),
     )
 

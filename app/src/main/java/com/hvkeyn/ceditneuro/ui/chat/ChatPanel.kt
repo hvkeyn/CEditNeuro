@@ -702,7 +702,7 @@ private fun AgentToolbar(
                 Icon(Icons.Default.Close, contentDescription = "Hide chat", modifier = Modifier.size(18.dp))
             }
         }
-        if (settings.apiKey.isBlank()) {
+        if (!settings.ready) {
             Text(
                 text = "No API key. Add one in Settings.",
                 style = MaterialTheme.typography.labelSmall,

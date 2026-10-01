@@ -454,10 +454,10 @@ class WorkspaceViewModel(
         activeProfileName = profiles.activeName()
         if (library.roots().isNotEmpty()) return
         val settings = settingsStore.current
-        val configured = settings.providers.any { it.apiKey.isNotBlank() } || settings.remotes.isNotEmpty()
+        val configured = settings.providers.any { it.ready } || settings.remotes.isNotEmpty()
         if (configured) return
         val profile = profiles.readActive() ?: return
-        val useful = profile.settings.providers.any { it.apiKey.isNotBlank() } ||
+        val useful = profile.settings.providers.any { it.ready } ||
             profile.settings.remotes.isNotEmpty() ||
             profile.roots.isNotEmpty()
         if (!useful) return
@@ -2393,6 +2393,9 @@ class WorkspaceViewModel(
             "research_run" -> "Running the study"
             "video_brief" -> "Reading a video"
             "render_video" -> "Rendering a video"
+            "sound_effect" -> "Adding a sound effect"
+            "make_music" -> "Making music"
+            "voiceover" -> "Recording a voiceover"
             "calculate" -> "Calculating"
             "reference" -> "Checking a reference"
             "capture_dump" -> "Recording packets"
@@ -2973,6 +2976,15 @@ class WorkspaceViewModel(
                 if (project.epoch.get() != epochAtBuild) return@RenderVideoTool
                 refreshProjectTree(project, path)
                 if (current === project) openFile(path)
+            },
+            com.hvkeyn.ceditneuro.tools.SoundEffectTool(appContext, ws) { path ->
+                if (project.epoch.get() == epochAtBuild) refreshProjectTree(project, path)
+            },
+            com.hvkeyn.ceditneuro.tools.MakeMusicTool(ws) { path ->
+                if (project.epoch.get() == epochAtBuild) refreshProjectTree(project, path)
+            },
+            com.hvkeyn.ceditneuro.tools.VoiceoverTool(appContext, ws) { path ->
+                if (project.epoch.get() == epochAtBuild) refreshProjectTree(project, path)
             },
             SearchSessionsTool {
                 val saved = library.load(ws.root.canonicalPath)

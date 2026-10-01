@@ -35,7 +35,11 @@ data class ModelProvider(
     val apiKey: String = "",
     val builtin: Boolean = false,
     val models: List<CatalogModel> = emptyList(),
-)
+    /** A local bridge that ignores Authorization, so no key is asked for. */
+    val keyless: Boolean = false,
+) {
+    val ready: Boolean get() = keyless || apiKey.isNotBlank()
+}
 
 /**
  * Built-in models copied from the local Zed config for DeepSeek Flash.
@@ -71,6 +75,34 @@ object ModelCatalog {
                 maxOutputTokens = 32_000,
                 supportsTools = true,
                 supportsReasoning = true,
+            ),
+        ),
+    )
+
+    const val WEB_BRIDGE_ID = "deepseek-web"
+    const val WEB_BRIDGE_URL = "http://127.0.0.1:8000/v1"
+
+    /**
+     * Tsuev/opencode-deepseek: an OpenAI-compatible bridge to the free DeepSeek web chat,
+     * run on a computer. Tool calls are emulated in text and the context is about 64K.
+     */
+    fun webBridge(): ModelProvider = ModelProvider(
+        id = WEB_BRIDGE_ID,
+        name = "DeepSeek Web (free bridge)",
+        apiUrl = WEB_BRIDGE_URL,
+        keyless = true,
+        models = listOf(
+            CatalogModel(
+                name = "deepseek-chat",
+                displayName = "DeepSeek Web Instant",
+                maxContextTokens = 64_000,
+                maxOutputTokens = 8_192,
+            ),
+            CatalogModel(
+                name = "deepseek-expert",
+                displayName = "DeepSeek Web Expert",
+                maxContextTokens = 64_000,
+                maxOutputTokens = 8_192,
             ),
         ),
     )

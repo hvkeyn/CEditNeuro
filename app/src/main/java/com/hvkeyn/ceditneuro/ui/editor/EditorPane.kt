@@ -108,7 +108,11 @@ fun EditorPane(
             kind == "video" && file != null -> VideoPreview(file, body)
             kind != null && previewing -> {
                 val markup = contentProvider(activePath)
-                ExpandableMarkup(kind, markup, file?.parentFile, body)
+                if (kind == "html" && com.hvkeyn.ceditneuro.video.Composition.isComposition(markup)) {
+                    CompositionPreview(markup, file?.parentFile, body)
+                } else {
+                    ExpandableMarkup(kind, markup, file?.parentFile, body)
+                }
             }
             else -> CodeEditorHost(
                 activePath = activePath,

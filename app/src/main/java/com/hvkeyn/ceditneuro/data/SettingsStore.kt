@@ -50,6 +50,7 @@ data class AgentSettings(
 
     val apiKey: String get() = provider.apiKey
     val baseUrl: String get() = provider.apiUrl
+    val ready: Boolean get() = provider.ready
 
     fun modelLabel(): String = model.displayName.ifBlank { model.name }
 
