@@ -86,6 +86,8 @@ object HarnessRrsi {
             "if the task" to "special-cases one task",
             "if the prompt" to "special-cases one prompt",
             "if the user says" to "special-cases one utterance",
+            "if the chat" to "special-cases one chat",
+            "the user wrote" to "special-cases one utterance",
             "hidden test" to "mentions a hidden test",
             "expected answer" to "hardcodes an expected answer",
             "expected output" to "hardcodes an expected output",

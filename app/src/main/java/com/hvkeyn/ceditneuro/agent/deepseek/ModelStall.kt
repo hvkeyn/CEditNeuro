@@ -30,6 +30,7 @@ object ModelStall {
 
     fun explain(error: IOException): IOException {
         if (!isStall(error) || error.message == MESSAGE) return error
+        if (error.message.orEmpty().contains("Qwen")) return error
         return IOException(MESSAGE, error)
     }
 

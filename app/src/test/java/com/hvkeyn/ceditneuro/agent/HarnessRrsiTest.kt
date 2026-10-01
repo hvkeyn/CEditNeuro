@@ -1,6 +1,7 @@
 package com.hvkeyn.ceditneuro.agent
 
-import com.hvkeyn.ceditneuro.agent.ChatMessage
+import com.hvkeyn.ceditneuro.data.StoredChat
+import com.hvkeyn.ceditneuro.data.StoredSession
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -51,6 +52,7 @@ class HarnessRrsiTest {
     @Test
     fun theCriticRejectsAMemorizedTaskAndAKey() {
         assertEquals("special-cases one task", HarnessRrsi.leak("If the task is extract-elf, print the flag."))
+        assertEquals("special-cases one chat", HarnessRrsi.leak("If the chat says pong, answer pong."))
         assertEquals("looks like a key", HarnessRrsi.leak("api_key=abcd"))
         assertNull(HarnessRrsi.leak("Read the file before editing it."))
     }
@@ -97,6 +99,29 @@ class HarnessRrsiTest {
         assertFalse(history.contains("extract-elf"))
         assertFalse(history.contains("api_key"))
         root.deleteRecursively()
+    }
+
+    @Test
+    fun chatsAndTextsCountRepeatedProblemsWithoutQuotingThem() {
+        val ask = "Translate the chapter and keep the names"
+        val session = StoredSession(
+            chat = listOf(
+                StoredChat(1, "User", ask),
+                StoredChat(2, "Assistant", "Done."),
+                StoredChat(3, "User", "нет"),
+                StoredChat(4, "User", ask),
+                StoredChat(5, "Error", "Qwen did not answer. It may be overloaded. Try again in a moment."),
+            ),
+            conversation = listOf(ChatMessage.user("нет")),
+        )
+        val measure = AgentDoctor.measure(mapOf("/storage/p" to session))
+        assertTrue(measure.summary.contains("user correction"))
+        assertTrue(measure.summary.contains("repeated ask"))
+        assertTrue(measure.summary.contains("unanswered"))
+        assertTrue(measure.score < 1.0)
+        assertFalse(measure.summary.contains("Translate the chapter"))
+        assertEquals(2, measure.repeated)
+        assertEquals(2, measure.once)
     }
 
     @Test

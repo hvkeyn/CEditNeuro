@@ -37,41 +37,61 @@ object WebPrompt {
         "If they give you what the user asked for, reply to the user now in plain text with no tool_calls block. " +
         "Never repeat a call that already returned; call another tool only for the next step that is still missing."
 
-    fun prompt(messages: List<ChatMessage>, tools: List<Tool>): String {
+    const val AFTER_TOOLS_XML = "The tool_response blocks above are the answers to your earlier calls; they already happened. " +
+        "If they give you what the user asked for, reply to the user now in plain text with no tool_call block. " +
+        "Never repeat a call that already returned; call another tool only for the next step that is still missing."
+
+    fun prompt(messages: List<ChatMessage>, tools: List<Tool>, xml: Boolean = false): String {
         val system = messages.filter { it.role == "system" }.mapNotNull { it.content?.takeIf(String::isNotBlank) }
         val convo = messages.filter { it.role != "system" }
-        val instructions = toolInstructions(tools)
+        val instructions = toolInstructions(tools, xml)
         if (system.isEmpty() && instructions.isEmpty() && convo.size == 1 && convo[0].role == "user") {
             return convo[0].content.orEmpty()
         }
         val lines = mutableListOf<String>()
         if (system.isNotEmpty()) lines += "System: " + system.joinToString("\n\n")
-        convo.forEach { lines += render(it) }
+        convo.forEach { lines += render(it, xml) }
         if (instructions.isNotEmpty()) lines += instructions
-        if (convo.lastOrNull()?.role == "tool") lines += AFTER_TOOLS
+        if (convo.lastOrNull()?.role == "tool") lines += if (xml) AFTER_TOOLS_XML else AFTER_TOOLS
         lines += "Assistant:"
         return lines.joinToString("\n\n")
     }
 
-    private fun render(message: ChatMessage): String {
+    private fun render(message: ChatMessage, xml: Boolean): String {
         val content = message.content.orEmpty()
         return when (message.role) {
             "assistant" -> {
                 val calls = message.toolCalls.orEmpty()
                 if (calls.isEmpty()) "Assistant: $content"
-                else {
+                else if (xml) {
+                    val blocks = calls.joinToString("\n") { call ->
+                        val args = runCatching { json.parseToJsonElement(call.function.arguments) }.getOrElse {
+                            JsonPrimitive(call.function.arguments)
+                        }
+                        "<tool_call>\n" + buildJsonObject {
+                            put("name", call.function.name)
+                            put("arguments", args)
+                        } + "\n</tool_call>"
+                    }
+                    "Assistant: " + listOf(content, blocks).filter { it.isNotBlank() }.joinToString("\n")
+                } else {
                     val called = "[called tools: " + calls.joinToString(", ") { it.function.name + "(" + it.function.arguments + ")" } + "]"
                     "Assistant: " + if (content.isBlank()) called else "$content $called"
                 }
             }
-            "tool" -> "Tool result (${message.name ?: "tool"}): $content"
+            "tool" -> if (xml) {
+                "User: <tool_response name=\"${message.name ?: "tool"}\">\n$content\n</tool_response>"
+            } else {
+                "Tool result (${message.name ?: "tool"}): $content"
+            }
             "user" -> "User: $content"
             else -> message.role.replaceFirstChar { it.uppercase() } + ": " + content
         }
     }
 
-    fun toolInstructions(tools: List<Tool>): String {
+    fun toolInstructions(tools: List<Tool>, xml: Boolean = false): String {
         if (tools.isEmpty()) return ""
+        if (xml) return xmlInstructions(tools)
         val rendered = tools.joinToString("\n") { tool ->
             buildJsonObject {
                 put("name", tool.name)
@@ -95,14 +115,40 @@ object WebPrompt {
             "REMINDER: if you still need to perform an action, respond with the fenced ```tool_calls block now, as your entire reply — no other text."
     }
 
+    /** Qwen's web chat follows `<tool_call>` JSON. A fenced `tool_calls` block is still accepted by [parse]. */
+    private fun xmlInstructions(tools: List<Tool>): String {
+        val rendered = tools.joinToString("\n") { tool ->
+            buildJsonObject {
+                put("name", tool.name)
+                put("description", tool.description)
+                put("parameters", tool.parameters)
+            }.toString()
+        }
+        val example = tools.first().name
+        return "You can call functions (tools). Available tools, given as JSON Schema:\n\n" +
+            rendered + "\n\n" +
+            "To call a tool, your ENTIRE reply must be one or more blocks in exactly this form and nothing else:\n\n" +
+            "<tool_call>\n{\"name\": \"<tool_name>\", \"arguments\": {<arguments>}}\n</tool_call>\n\n" +
+            "Hard rules:\n" +
+            "- The tool_call block must be the WHOLE reply. Never write any text, plan, explanation, or reasoning before or after it.\n" +
+            "- Never describe the action you are about to take — perform it by emitting the block.\n" +
+            "- Use the exact tool name and an arguments object matching that tool's schema. Several calls are several blocks in a row.\n" +
+            "- A fenced ```tool_calls array is also accepted, as the whole reply.\n" +
+            "- Only if no tool is needed, answer normally in plain text and do NOT emit a tool_call block.\n\n" +
+            "Example — to use the `$example` tool, reply with exactly:\n\n" +
+            "<tool_call>\n{\"name\": \"$example\", \"arguments\": {}}\n</tool_call>"
+    }
+
     /** Splits a reply into the visible text and the tool calls, or null calls for plain text. */
     fun parse(text: String, names: Set<String>): Pair<String, List<ToolCall>?> {
         if (text.isBlank()) return text to null
         FENCE.findAll(text).map { it.groupValues[1] }.toList().asReversed().forEach { block ->
             coerce(block, names)?.let { return FENCE.replace(text, "").trim() to it }
         }
-        XML_BLOCK.findAll(text).forEach { match ->
-            xmlCalls(match.groupValues[2], names)?.let { return XML_BLOCK.replace(text, "").trim() to it }
+        val xml = XML_BLOCK.findAll(text).toList()
+        if (xml.isNotEmpty()) {
+            val calls = xml.flatMap { xmlCalls(it.groupValues[2], names).orEmpty() }
+            if (calls.isNotEmpty()) return XML_BLOCK.replace(text, "").trim() to calls
         }
         dsml(text, names)?.let { (calls, start, end) ->
             return DSML_TOKEN.replace(text.substring(0, start) + text.substring(end), "").trim() to calls
