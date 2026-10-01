@@ -91,7 +91,25 @@ object ModelCatalog {
         name = "DeepSeek Web (free bridge)",
         apiUrl = WEB_BRIDGE_URL,
         keyless = true,
-        models = listOf(
+        models = webModels(),
+    )
+
+    const val WEB_PHONE_ID = "deepseek-web-phone"
+    const val WEB_PHONE_URL = "https://chat.deepseek.com"
+
+    /**
+     * The same free web chat spoken directly from the phone: the user signs in once in an
+     * in-app page and no computer or bridge is needed.
+     */
+    fun webPhone(): ModelProvider = ModelProvider(
+        id = WEB_PHONE_ID,
+        name = "DeepSeek Web (on this phone)",
+        apiUrl = WEB_PHONE_URL,
+        keyless = true,
+        models = webModels(),
+    )
+
+    private fun webModels(): List<CatalogModel> = listOf(
             CatalogModel(
                 name = "deepseek-chat",
                 displayName = "DeepSeek Web Instant",
@@ -104,7 +122,6 @@ object ModelCatalog {
                 maxContextTokens = 64_000,
                 maxOutputTokens = 8_192,
             ),
-        ),
     )
 
     /** Keeps a saved API key and any extra models, and refreshes the built-in catalog. */

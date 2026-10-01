@@ -130,10 +130,15 @@ fun SettingsDialog(
                                 },
                             )
                         }
+                        if (draft.providers.none { it.id == ModelCatalog.WEB_PHONE_ID }) {
+                            TextButton(onClick = {
+                                draft = draft.copy(providers = draft.providers + ModelCatalog.webPhone())
+                            }) { Text("Add free DeepSeek web (on this phone)") }
+                        }
                         if (draft.providers.none { it.id == ModelCatalog.WEB_BRIDGE_ID }) {
                             TextButton(onClick = {
                                 draft = draft.copy(providers = draft.providers + ModelCatalog.webBridge())
-                            }) { Text("Add free DeepSeek web bridge") }
+                            }) { Text("Add free DeepSeek web bridge (computer)") }
                         }
                         AddProviderForm(
                             onAdd = { provider ->
@@ -522,14 +527,18 @@ private fun ProviderCard(
                 TextButton(onClick = onRemove) { Text("Remove") }
             }
         }
-        OutlinedTextField(
-            value = provider.apiUrl,
-            onValueChange = { onChange(provider.copy(apiUrl = it)) },
-            label = { Text("API URL") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        if (provider.keyless) {
+        if (provider.id != ModelCatalog.WEB_PHONE_ID) {
+            OutlinedTextField(
+                value = provider.apiUrl,
+                onValueChange = { onChange(provider.copy(apiUrl = it)) },
+                label = { Text("API URL") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        if (provider.id == ModelCatalog.WEB_PHONE_ID) {
+            WebPhoneLine()
+        } else if (provider.keyless) {
             Text(
                 text = "No key and no payment: the bridge on your computer talks to the free DeepSeek web chat with your account. " +
                     "Run it there with python app.py. Keep 127.0.0.1 and run adb reverse tcp:8000 tcp:8000, or start it with " +
