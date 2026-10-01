@@ -67,5 +67,12 @@ class DesignCatalogTest {
         assertTrue(saved.contains("If the registry was missing"))
         assertTrue(saved.contains("render_video"))
         assertTrue(saved.contains("was not encoded"))
+        assertTrue(saved.contains("make_music"))
+        assertTrue(saved.contains("sound_effect"))
+        assertTrue(saved.contains("voiceover"))
+        val rendered = "# Make a video as HTML\ndata-composition-id\nrender_video\n"
+        file.writeText(rendered)
+        StarterSkills.ensure(dir)
+        assertTrue(file.readText().contains("make_music"))
     }
 }

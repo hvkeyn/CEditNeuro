@@ -47,6 +47,7 @@ import com.hvkeyn.ceditneuro.agent.SkillEntry
 import com.hvkeyn.ceditneuro.agent.SkillNote
 import com.hvkeyn.ceditneuro.data.AgentSettings
 import com.hvkeyn.ceditneuro.data.CatalogModel
+import com.hvkeyn.ceditneuro.data.ModelCatalog
 import com.hvkeyn.ceditneuro.data.ModelProvider
 import com.hvkeyn.ceditneuro.data.RemoteServer
 import com.hvkeyn.ceditneuro.net.ProviderBalance
@@ -128,6 +129,11 @@ fun SettingsDialog(
                                     }
                                 },
                             )
+                        }
+                        if (draft.providers.none { it.id == ModelCatalog.WEB_BRIDGE_ID }) {
+                            TextButton(onClick = {
+                                draft = draft.copy(providers = draft.providers + ModelCatalog.webBridge())
+                            }) { Text("Add free DeepSeek web bridge") }
                         }
                         AddProviderForm(
                             onAdd = { provider ->
@@ -523,15 +529,26 @@ private fun ProviderCard(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        OutlinedTextField(
-            value = provider.apiKey,
-            onValueChange = { onChange(provider.copy(apiKey = it)) },
-            label = { Text("API key") },
-            singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        BalanceLine(provider.apiUrl, provider.apiKey)
+        if (provider.keyless) {
+            Text(
+                text = "No key and no payment: the bridge on your computer talks to the free DeepSeek web chat with your account. " +
+                    "Run it there with python app.py. Keep 127.0.0.1 and run adb reverse tcp:8000 tcp:8000, or start it with " +
+                    "HOST=0.0.0.0 and put the computer's LAN address here. The context is 64K, so old turns are shortened.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            BridgeLine(provider.apiUrl)
+        } else {
+            OutlinedTextField(
+                value = provider.apiKey,
+                onValueChange = { onChange(provider.copy(apiKey = it)) },
+                label = { Text("API key") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            BalanceLine(provider.apiUrl, provider.apiKey)
+        }
         provider.models.forEach { model ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -593,6 +610,28 @@ private fun BalanceLine(apiUrl: String, apiKey: String) {
             modifier = Modifier.weight(1f),
         )
         TextButton(onClick = { refresh() }, enabled = apiKey.isNotBlank()) { Text("Balance") }
+    }
+}
+
+@Composable
+private fun BridgeLine(apiUrl: String) {
+    var text by remember(apiUrl) { mutableStateOf("Not checked yet.") }
+    val scope = rememberCoroutineScope()
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = {
+            text = "Checking…"
+            scope.launch { text = withContext(Dispatchers.IO) { ProviderBalance.bridge(apiUrl) } }
+        }) { Text("Check") }
     }
 }
 

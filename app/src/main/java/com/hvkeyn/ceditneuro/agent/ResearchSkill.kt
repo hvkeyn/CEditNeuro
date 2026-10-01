@@ -346,17 +346,22 @@ object StarterSkills {
 
             Use this when the user wants a video, an animation, a motion graphic, a title card, a slideshow, or a HyperFrames composition. Switch it off when the task is not a video.
 
-            This phone writes one HTML composition that plays when the file is opened, and render_video turns it into an MP4 with the phone's own encoder. Do not install a package, Node, FFmpeg, or a command-line renderer. Until render_video prints a path, say the video was not encoded. Do not pretend a preview server ran. If a page cannot be read, stop and ask the user to paste it.
+            This phone writes one HTML composition that plays when the file is opened, and render_video turns it into an MP4 with the phone's own encoder, sound included. Do not install a package, Node, FFmpeg, or a command-line renderer. Until render_video prints a path, say the video was not encoded. Do not pretend a preview server ran. If a page cannot be read, stop and ask the user to paste it.
 
             1. Name the piece in one sentence: the subject, the length in seconds, and the kind. A navigable deck is a slideshow. Captions on footage stay captions. A short unnarrated sting is motion. A site or product promo is a launch. A topic with no site is an explainer. Anything else is a general video.
             2. Before writing HTML, http_request https://raw.githubusercontent.com/heygen-com/hyperframes/main/skills/hyperframes-core/SKILL.md and follow only a step that page printed and this phone can do. Do not invent a timing attribute.
             3. write_file one index.html in the project. The root is one div in the body, not inside a template. It carries data-composition-id, data-start of 0, data-width, data-height, and data-duration. Its CSS width and height stay 100 percent. html and body fill the window. Each scene is class clip with data-start, data-duration, and data-track-index. Times are seconds. One gsap.timeline stays paused. Do not tween visibility on a clip. Do not copy a company's product.
             4. The page has to play when opened by itself. Before the timeline, remember whether window.__timelines already exists. Then set window.__timelines to that object or to a new one. Store the timeline on it under the composition id. If the registry was missing, set the root to its data width and height in pixels, scale the page into the window, hide each clip whose start and duration do not contain the playhead, and call play. If the registry already existed, do not play and do not hide clips. The runtime owns that.
-            5. Media is a file the user already put in the project. Do not download a video and do not call an image generator. A missing file is named, not replaced with a stock URL.
-            6. The editor preview plays the html with a play button and a time bar. Name the file in backticks.
-            7. When the user wants a video, a clip, or an MP4, call load_tools group=video, then render_video path=index.html. Quote the path, the size, and the frame count it printed. The MP4 has no sound track; say so when the composition has audio. Every element is drawn from the html, so a remote font or script must load, and a page that draws nothing renders black.
-            8. A change the user asks for is edit_file on the html, one span at a time, then render_video again. Do not rewrite the whole file for one change.
-            9. When the video is done, call use_skill name=hyperframes scope=app on=false.
+            5. Media is a file the user already put in the project, or one the tools below wrote. Do not download a video, a song, or a sample, and do not call an image or music generator on the network. A missing file is named, not replaced with a stock URL.
+            6. Sound follows the HyperFrames audio rules. Call load_tools group=video first. Each sound is its own audio element inside the root with an id, a src in the project, data-start, data-duration, data-track-index, and data-volume. A video element stays muted. Do not call play, pause, or seek on media in the page; the runtime owns it. A fade or a duck is a volume lane in data-automation: points t in seconds from the clip start, v from 0 to 1.
+              - Effects: sound_effect name=list prints the bundled HyperFrames library (whoosh, pop, click, chime, riser, impact, glitch, typing, sparkle and more). sound_effect name=whoosh at=4.2 copies the file and prints the tag. Put a hit on the visual moment. A riser starts its own length before the reveal. Effects sit near volume 0.35.
+              - Music: make_music for=index.html prompt="the brief in words" writes one bed the length of the piece. Choose mood, bpm, key, scale, and intensity from the brief; a new seed is a new take. Without a voice the bed sits near 0.9; under a voice pass voice=true and it sits near 0.12.
+              - Voice: voiceover text="one line" at=2 speaks it with the phone's voice and prints its length. One call per line. Place the next line after the printed length.
+              Paste each printed tag with edit_file. A clip must end inside data-duration of the root.
+            7. The editor preview plays the html like a video player: play and pause, back and forward five seconds, a time bar, speed from 0.25 to 2, loop, mute, and full screen (a double tap too). Name the file in backticks.
+            8. When the user wants a video, a clip, or an MP4, call render_video path=index.html. It mixes every audio element into the MP4. Quote the path, the size, the frame count, and the sound line it printed; if it skipped a track, say which and why. Every element is drawn from the html, so a remote font or script must load, and a page that draws nothing renders black.
+            9. A change the user asks for is edit_file on the html, one span at a time, then render_video again. A different tune is make_music with another seed or mood, then render again. Do not rewrite the whole file for one change.
+            10. When the video is done, call use_skill name=hyperframes scope=app on=false.
         """.trimIndent() + "\n",
         "net-map" to """
             # Map a network from a dump
@@ -503,12 +508,12 @@ object StarterSkills {
         file.writeText(skills.getValue("security"), Charsets.UTF_8)
     }
 
-    /** Phones that saved an earlier HyperFrames skill learn to play the file and render the MP4. */
+    /** Phones that saved an earlier HyperFrames skill learn to play the file, add sound, and render the MP4. */
     private fun extendHyperframes(appDir: File) {
         val file = File(appDir, "hyperframes.md")
         if (!file.isFile) return
         val current = file.readText(Charsets.UTF_8)
-        if (current.contains("render_video")) return
+        if (current.contains("make_music")) return
         if (!current.contains("data-composition-id")) return
         file.writeText(skills.getValue("hyperframes"), Charsets.UTF_8)
     }

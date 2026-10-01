@@ -47,6 +47,24 @@ object ProviderBalance {
         }
     }
 
+    /** Asks a keyless OpenAI-compatible bridge for its models; one line for the settings card. */
+    fun bridge(apiUrl: String): String {
+        val base = apiUrl.trim().trimEnd('/')
+        if (originOf(base) == null) return "API URL is not a valid address."
+        val response = runCatching { get("$base/models", "unused") }.getOrElse { error ->
+            return "No answer from the bridge (${error.message ?: error.javaClass.simpleName}). Start python app.py on the computer."
+        }
+        if (response.code !in 200..299) return "The bridge answered HTTP ${response.code}."
+        return bridgeModels(response.body)?.let { "Bridge is up: " + it.joinToString(", ") }
+            ?: "This address answers, but not with a model list."
+    }
+
+    fun bridgeModels(body: String): List<String>? {
+        val root = runCatching { json.parseToJsonElement(body) as? JsonObject }.getOrNull() ?: return null
+        val data = root["data"] as? JsonArray ?: return null
+        return data.mapNotNull { (it as? JsonObject)?.text("id") }.takeIf { it.isNotEmpty() }
+    }
+
     /** Turns a balance JSON body into one line, or null when the shape is unknown. */
     fun parse(body: String): String? {
         val root = runCatching { json.parseToJsonElement(body) as? JsonObject }.getOrNull()

@@ -241,7 +241,7 @@ class AgentLoop(
 
     private fun retryable(error: IOException): Boolean {
         val text = error.message.orEmpty()
-        if (text.contains("No API key")) return false
+        if (text.contains("No API key") || text.contains("login_required")) return false
         return !text.contains("HTTP 400") &&
             !text.contains("HTTP 401") &&
             !text.contains("HTTP 403") &&
