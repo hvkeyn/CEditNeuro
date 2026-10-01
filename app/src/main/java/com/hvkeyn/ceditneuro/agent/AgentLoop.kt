@@ -43,7 +43,7 @@ class AgentLoop(
         private val OFF_MAIN = setOf(
             "research_log", "research_report", "research_figure", "research_plot", "research_run",
             "health_log", "health_panel", "health_trend", "health_index",
-            "remember", "list_skills", "read_skill", "debug_case",
+            "remember", "list_skills", "read_skill", "debug_case", "harness_rrsi",
         )
     }
 
