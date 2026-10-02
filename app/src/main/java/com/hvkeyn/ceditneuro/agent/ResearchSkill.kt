@@ -9,7 +9,7 @@ object ResearchSkill {
     /** Each line is added to an existing file once, when its tool name is missing. */
     private val ADDITIONS = listOf(
         "calculate" to "Numbers go through calculate. A fact, paper, or DOI goes through reference before it is cited.\n" +
-            "open_file shows research/report.pdf to the user when the report is ready.",
+                "open_file shows research/report.pdf to the user when the report is ready.",
         "research_plot" to "A chart of measured numbers is research_plot. Send the data; the app draws the SVG.",
         "use_skill deep-read" to "Studying a page or a scheme: use_skill deep-read. A code change: use_skill review. A failure: use_skill debug. A key or another app: use_skill security.",
     )
@@ -63,7 +63,8 @@ object ResearchSkill {
             val current = file.readText(Charsets.UTF_8)
             val missing = ADDITIONS.filter { (marker, _) -> !current.contains(marker) }
             if (missing.isNotEmpty()) {
-                file.writeText(current.trimEnd() + "\n\n" + missing.joinToString("\n") { it.second } + "\n", Charsets.UTF_8)
+                file.writeText(current.trimEnd() + "\n\n" + missing.joinToString("\n") { it.second } + "\n",
+                    Charsets.UTF_8)
             }
         }
         extendResearch(file)
@@ -77,8 +78,8 @@ object ResearchSkill {
         if (current.contains("research_run")) {
             if (!current.contains("Do not guess another locator")) {
                 current = current.trimEnd() + "\n\n" +
-                    "If action=source says the locator was not printed by a tool, stop calling action=source. " +
-                    "Do not guess another locator. A reference result of Not found is final for that query.\n"
+                        "If action=source says the locator was not printed by a tool, stop calling action=source. " +
+                        "Do not guess another locator. A reference result of Not found is final for that query.\n"
                 file.writeText(current, Charsets.UTF_8)
             }
             return
@@ -153,7 +154,7 @@ object StarterSkills {
             5. Navigation stays on the library the project already uses. A new app uses Navigation 3: a typed route, NavDisplay, and one back stack per top-level tab. Do not invent a route string if the project is already type-safe.
             6. An XML layout is migrated one screen at a time. The old view stays until that screen's Compose replacement builds.
             7. Before changing navigation, edge-to-edge, or an XML migration, http_request the matching file: https://raw.githubusercontent.com/android/skills/main/navigation/navigation-3/SKILL.md or https://raw.githubusercontent.com/android/skills/main/system/edge-to-edge/SKILL.md or https://raw.githubusercontent.com/android/skills/main/jetpack-compose/migration/migrate-xml-views-to-jetpack-compose/SKILL.md. Follow only a step that page printed. If the page cannot be read, stop and ask the user to paste it.
-            8. The project's theme wins. Do not copy a company's screen.
+            8. The project's theme wins.
         """.trimIndent() + "\n",
         "android-ui" to """
             # Android screen design
@@ -163,7 +164,7 @@ object StarterSkills {
             1. use_skill frontend-design. The project's own design wins. Quote a color only from a page http_request printed.
             2. One job per screen. The primary action is the one obvious button. Empty, loading, and error are separate states with their own text.
             3. Body text is at least 14sp. A control is at least 48dp. System bars stay clear. System back leaves. Honor reduced motion.
-            4. A mockup is frames in one HTML file in the project. A frame that could belong to any app is a failed draft: follow the one-mood rule in frontend-design. Do not install a design package and do not copy a company's product.
+            4. A mockup is frames in one HTML file in the project. A frame that could belong to any app is a failed draft: follow the one-mood rule in frontend-design.
             5. When the HTML is written and the task was only the mockup, use_skill name=android-ui scope=app on=false.
         """.trimIndent() + "\n",
         "android-apk" to """
@@ -304,7 +305,7 @@ object StarterSkills {
             Do not install a package, an MCP, or a command-line tool. This phone has no 21st.dev MCP. A video, an animation, or a motion graphic uses use_skill hyperframes. Do not pretend a renderer ran. If a page cannot be read, stop and ask the user to paste it. Do not fill a color, a type size, or a component from memory.
 
             1. Call load_tools group=design. Name the surface: web, desktop, Android, or iOS. Restate who it is for and the one job of the screen.
-            2. If the project already has DESIGN.md or a style block, follow that. Otherwise pick one public DESIGN.md. http_request https://styles.refero.design/ or one raw file from https://github.com/voltagent/awesome-design-md. If they name a design system, call design_system with that name. Quote only the swatches the tool printed. If load_tools says the group has no tools, http_request that system's public page on https://www.designsystems.one/ instead. Write the quoted colors, type, and spacing into DESIGN.md in the project root. Say which page you used and what you took. Do not invent a hex and call it official. Do not copy a company's product.
+            2. If the project already has DESIGN.md or a style block, follow that. Otherwise pick one public DESIGN.md. http_request https://styles.refero.design/ or one raw file from https://github.com/voltagent/awesome-design-md. If they name a design system, call design_system with that name. Quote only the swatches the tool printed. If load_tools says the group has no tools, http_request that system's public page on https://www.designsystems.one/ instead. Write the quoted colors, type, and spacing into DESIGN.md in the project root. Say which page you used and what you took.
             3. Components. Say in the chat what you will look up, then http_request https://component.gallery/ and use only a pattern that page printed. There is no 21st.dev MCP on this phone. http_request https://21st.dev/ or ask the user to paste the component. Do not invent the markup.
             4. Motion, only when the screen needs it. http_request https://kinetics.colorion.co/ and copy only CSS that page printed. A press answers at once. Motion follows the finger and can be stopped. Honor reduced motion. No remote script and no library this phone cannot run.
             5. Platform, on top of the quoted style. Web: one HTML file, system fonts, a plain style block. Desktop: visible keyboard focus, a label as well as a shortcut, hover is extra, do not lay it out as a phone. Android: a target is at least 48dp, content clears the system bars, the system back leaves the screen. iOS: a target is at least 44pt, content clears the safe area and the home indicator. A vendor rule that is not in this list is fetched with http_request. If that fetch fails, stop.
@@ -368,24 +369,24 @@ object StarterSkills {
 
             Use this when the user wants a video, an animation, a motion graphic, a title card, a slideshow, or a HyperFrames composition. Switch it off when the task is not a video.
 
-            This phone writes one HTML composition that plays when the file is opened, and render_video turns it into an MP4 with the phone's own encoder, sound included. Do not install a package, Node, FFmpeg, or a command-line renderer. Until render_video prints a path, say the video was not encoded. Do not pretend a preview server ran. If the core timing page cannot be read, stop and ask the user to paste it. A style page that cannot be read falls back to the bar in step 3.
+            This phone writes one HTML composition that plays when the file is opened, and render_video turns it into an MP4 with the phone's own encoder, sound included. The MP4 stays in the project. Do not upload it; uploading is a separate task the user asks for. Do not install a package, Node, FFmpeg, or a command-line renderer. Until render_video prints a path, say the video was not encoded. Do not pretend a preview server ran. If the core timing page cannot be read, stop and ask the user to paste it. A style page that cannot be read falls back to the bar in step 3.
 
             Adapted from heygen-com/hyperframes. Every scene enters. Scenes hand off with a transition. The first render is a draft: three variations of the weakest beat, then one kept cut.
 
             1. Name the piece in one sentence: the subject, the length in seconds, and the kind. A navigable deck is a slideshow. Captions on footage stay captions. A short unnarrated sting is motion. A site or product promo is a launch. A topic with no site is an explainer. Anything else is a general video. Write real words for that subject. A placeholder sentence is a failed draft.
             2. Before writing HTML, http_request https://raw.githubusercontent.com/heygen-com/hyperframes/main/skills/hyperframes-core/SKILL.md and follow only a step that page printed and this phone can do. Do not invent a timing attribute. For more than a title card, also http_request https://raw.githubusercontent.com/heygen-com/hyperframes/main/skills/hyperframes-creative/references/house-style.md and https://raw.githubusercontent.com/heygen-com/hyperframes/main/skills/hyperframes-creative/references/video-composition.md. For more than one scene, http_request https://raw.githubusercontent.com/heygen-com/hyperframes/main/skills/hyperframes-animation/SKILL.md and follow only the entrance and transition step that page printed. Open one extra file only when that page names it.
             3. The local bar, used when a style page did not print a step. One background, one foreground, one accent, the same background in every scene. Tint a neutral toward that accent. Two faces from fonts.googleapis.com, one display and one text, not Inter, Roboto, or Arial unless the project already uses that face. Headlines are heavy and large enough to read on a phone. Each scene keeps two to five slow layers (a tinted glow, ghost type, a hairline, grain, or one shape from the subject) on one shared breath. An entrance is 0.3 to 0.6 seconds and moves as well as fades. Between scenes use a crossfade, a wipe, or a reveal. A hard cut only when the brief asked for a cut. Do not use gradient text, a purple-to-blue gradient, cyan on black, identical cards, or a frame where everything sits in the center at the same weight. Do not call Math.random or Date.now. A scene that pops in is a failed draft.
-            4. write_file one index.html in the project. The root is one div in the body, not inside a template. It carries data-composition-id, data-start of 0, data-width, data-height, and data-duration. Its CSS width and height stay 100 percent. html and body fill the window. Each scene is class clip with data-start, data-duration, and data-track-index. Times are seconds. One gsap.timeline stays paused. Do not tween visibility on a clip. Do not copy a company's product.
+            4. write_file one index.html in the project. The root is one div in the body, not inside a template. It carries data-composition-id, data-start of 0, data-width, data-height, and data-duration. Its CSS width and height stay 100 percent. html and body fill the window. Each scene is class clip with data-start, data-duration, and data-track-index. Times are seconds. One gsap.timeline stays paused. Do not tween visibility on a clip.
             5. The page has to play when opened by itself. Before the timeline, remember whether window.__timelines already exists. Then set window.__timelines to that object or to a new one. Store the timeline on it under the composition id. If the registry was missing, set the root to its data width and height in pixels, scale the page into the window, hide each clip whose start and duration do not contain the playhead, and call play. If the registry already existed, do not play and do not hide clips. The runtime owns that.
-            6. You choose the search, and you choose which materials and facts this piece needs. Call load_tools group=video. A bed, an effect, a picture, a short insert, or a number on screen is collected only when that scene uses it. Do not fetch a file the piece will not show.
-              web_search when you need a lead. http_request a page it printed. Commons and the Internet Archive also answer without a key, and you write the query: https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search&gsrnamespace=6&gsrlimit=8&prop=imageinfo&iiprop=url|mime|extmetadata|size&gsrsearch=YOUR+WORDS and https://archive.org/advancedsearch.php?q=YOUR+WORDS&fl[]=identifier,title&rows=5&output=json&page=1 then https://archive.org/metadata/IDENTIFIER. A result is a page, not a file.
+            6. You choose the search, and you choose which materials and facts this piece needs. Call load_tools group=video. A bed, an effect, a picture, a short insert, or a number on screen is collected only when that scene uses it. Do not fetch a file the piece will not show. Look in the project first: a file the user already put in the project is used as it is and credited in assets/media-credit.txt as user material, and you go to the web only for a scene the project cannot fill.
+              web_search when you need a lead. http_request a page it printed. These also answer without a key, and you write the query: Commons https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search&gsrnamespace=6&gsrlimit=8&prop=imageinfo&iiprop=url|mime|extmetadata|size&gsrsearch=YOUR+WORDS ; Internet Archive https://archive.org/advancedsearch.php?q=YOUR+WORDS&fl[]=identifier,title&rows=5&output=json&page=1 then https://archive.org/metadata/IDENTIFIER ; Openverse https://api.openverse.org/v1/images/?q=YOUR+WORDS&license=cc0,pdm,by,by-sa&page_size=8 ; Library of Congress https://www.loc.gov/photos/?q=YOUR+WORDS&fo=json ; NASA https://images-api.nasa.gov/search?q=YOUR+WORDS . A result is a page, not a file.
               Save with http_request and save_path only when the page you opened printed CC0, public domain, CC BY, CC BY-SA, or the Pixabay license. Skip NonCommercial and NoDerivatives. Audio ends in wav, mp3, or ogg and stays under 20 MB. A picture is jpg, png, or webp, the full file rather than a thumb, large enough to fill the frame. A clip is mp4 or webm of at most 30 seconds. Append a line to assets/media-credit.txt: title, author when printed, page URL, and the license line. A fact printed in the video is a fact that page printed. If you did not find it, leave it out.
-              If a call returns a check page, no results, or the wrong kind of file, pick another query or another page. Do not repeat the same call. Do not invent a URL. sound_effect, make_music, and voiceover are yours when a generated file fits, or when the search did not yield one. sound_effect name=list still has whoosh, pop, click, chime, riser, impact, glitch, typing, and sparkle.
+              If a call returns a check page, no results, or the wrong kind of file, pick another query or another page. Do not repeat the same call. Do not invent a URL, a number, a date, a name, or a quote that no page printed. A scene whose fact you could not source keeps the graphic and drops the claim. sound_effect, make_music, and voiceover are yours when a generated file fits, or when the search did not yield one. sound_effect name=list still has whoosh, pop, click, chime, riser, impact, glitch, typing, and sparkle.
               Place what you kept. A picture is an img with object-fit cover and type over a scrim. A clip is a muted video inside the root with data-start, data-duration, and data-media-start. The runtime seeks it. A scene that stays a flat shape after you found a fitting picture is a failed draft. If you found nothing, use a flat shape and say so. Do not leave a remote image URL in the html.
               Do not download from YouTube, Spotify, SoundCloud, Instagram, Pinterest, or a store. Do not download a film or a TV episode. Do not call a paid music or image generator.
             7. Each sound is its own audio element inside the root with an id, a src in the project, data-start, data-duration, data-track-index, and data-volume. A video element stays muted. Do not call play, pause, or seek on media in the page. A fade or a duck is a volume lane in data-automation: points t in seconds from the clip start, v from 0 to 1. Put a hit on the visual moment. A riser starts its own length before the reveal. Effects sit near volume 0.35. Without a voice the bed sits near 0.9. Under a voice the bed sits near 0.12 and ducks further while the line speaks. voiceover text="one line" at=2 speaks it and prints its length. One call per line. Place the next line after that length. Paste each tag with edit_file. A clip must end inside data-duration of the root. Do not invent a beat grid for a file you downloaded. A bed from make_music can change scene on its printed bpm.
             8. The editor preview plays the html: play and pause, back and forward five seconds, a time bar, speed from 0.25 to 2, loop, mute, and full screen. Name the file in backticks.
-            9. When the user wants a video, a clip, or an MP4, call render_video path=index.html. Quote the path, the size, the frame count, and the sound line it printed. If it skipped a track, say which and why. A page that draws nothing renders black.
+            9. When the user wants a video, a clip, or an MP4, call render_video path=index.html. Quote the path, the size, the frame count, and the sound line it printed. If it skipped a track, say which and why. A page that draws nothing renders black. Do not upload the MP4 unless the user asks.
             10. The first render is a draft. In video/takes.md name the weakest beat: a scene with no entrance, a jump with no transition, type that is hard to read, a flat scene where a picture was found, a hit off the picture, or a bed that fights the voice. Write three variations of that beat only. One changes the entrance or the transition. One changes the picture, the crop, or the insert. One changes the sound: another downloaded file, or make_music with another seed. Keep the variation that serves the brief. edit_file that span. render_video again. Say in one sentence which variation you kept and why. Do not rewrite the whole file. Do not ship the first render.
             11. A later change the user asks for is edit_file on that span, then render_video again. When the video is done, call use_skill name=hyperframes scope=app on=false.
         """.trimIndent() + "\n",
@@ -557,12 +558,12 @@ object StarterSkills {
         file.writeText(skills.getValue("security"), Charsets.UTF_8)
     }
 
-    /** Phones that saved an earlier HyperFrames skill learn the quality bar, the free-audio search, and the three takes. */
+    /** Phones that saved an earlier HyperFrames skill learn the user material first, the wider free search, and a local-only MP4. */
     private fun extendHyperframes(appDir: File) {
         val file = File(appDir, "hyperframes.md")
         if (!file.isFile) return
         val current = file.readText(Charsets.UTF_8)
-        if (current.contains("You choose the search")) return
+        if (current.contains("Look in the project first")) return
         if (!current.contains("data-composition-id")) return
         file.writeText(skills.getValue("hyperframes"), Charsets.UTF_8)
     }
@@ -576,11 +577,11 @@ object StarterSkills {
         if (!current.contains("video_brief")) return
         file.writeText(
             current.trimEnd() + "\n\n" +
-                "Find path. A topic is video_brief action=search. A channel is action=channel. " +
-                "A playlist is action=playlist. Up to 3 pages are action=batch urls separated by |. " +
-                "Those list lines are titles only. Open a video before judging its meaning. " +
-                "Do not sign up for a transcript service and do not store an API key for one. " +
-                "Captions are cut, so a long video is the start of the public captions, not a viewing of the picture.\n",
+                    "Find path. A topic is video_brief action=search. A channel is action=channel. " +
+                    "A playlist is action=playlist. Up to 3 pages are action=batch urls separated by |. " +
+                    "Those list lines are titles only. Open a video before judging its meaning. " +
+                    "Do not sign up for a transcript service and do not store an API key for one. " +
+                    "Captions are cut, so a long video is the start of the public captions, not a viewing of the picture.\n",
             Charsets.UTF_8,
         )
     }
@@ -591,19 +592,20 @@ object StarterSkills {
         if (!file.isFile) return
         var current = file.readText(Charsets.UTF_8)
         if (!current.contains("group has no tools") && current.contains("call design_system")) {
-            current = current.trimEnd() + "\n\nIf load_tools says the group has no tools, http_request that system's public page instead.\n"
+            current =
+                current.trimEnd() + "\n\nIf load_tools says the group has no tools, http_request that system's public page instead.\n"
             file.writeText(current, Charsets.UTF_8)
         }
         if (!current.contains("styles.refero.design") &&
             (current.contains("call design_system") || current.contains("Design a page"))
         ) {
             current = current.trimEnd() + "\n\n" +
-                "Surfaces. Also use this for a desktop window, an Android screen, or an iOS screen, and when the user names styles.refero.design, awesome-design-md, 21st.dev, component.gallery, or kinetics.colorion.co. A small edit stays a small edit.\n" +
-                "The project's existing design wins. Do not install a package, an MCP, or a command-line tool. This phone has no 21st.dev MCP and no HyperFrames. If a page cannot be read, stop and ask the user to paste it. Do not fill a color from memory.\n" +
-                "Pick one public DESIGN.md with http_request of https://styles.refero.design/ or one raw file from https://github.com/voltagent/awesome-design-md. Quote only what that page printed into DESIGN.md. Say which page and what you took.\n" +
-                "Before a component lookup, say what you will open, then http_request https://component.gallery/. For motion, http_request https://kinetics.colorion.co/ and copy only CSS that page printed.\n" +
-                "Desktop: visible keyboard focus, a label as well as a shortcut, hover is extra. Android: a target is at least 48dp, clear the system bars, the system back leaves. iOS: a target is at least 44pt, clear the safe area and the home indicator. A rule that is not in this list is fetched; if the fetch fails, stop.\n" +
-                "A demo is frames in one HTML file. If it still looks wrong, keep one accent and cut decoration. Say what changed.\n"
+                    "Surfaces. Also use this for a desktop window, an Android screen, or an iOS screen, and when the user names styles.refero.design, awesome-design-md, 21st.dev, component.gallery, or kinetics.colorion.co. A small edit stays a small edit.\n" +
+                    "The project's existing design wins. Do not install a package, an MCP, or a command-line tool. This phone has no 21st.dev MCP and no HyperFrames. If a page cannot be read, stop and ask the user to paste it. Do not fill a color from memory.\n" +
+                    "Pick one public DESIGN.md with http_request of https://styles.refero.design/ or one raw file from https://github.com/voltagent/awesome-design-md. Quote only what that page printed into DESIGN.md. Say which page and what you took.\n" +
+                    "Before a component lookup, say what you will open, then http_request https://component.gallery/. For motion, http_request https://kinetics.colorion.co/ and copy only CSS that page printed.\n" +
+                    "Desktop: visible keyboard focus, a label as well as a shortcut, hover is extra. Android: a target is at least 48dp, clear the system bars, the system back leaves. iOS: a target is at least 44pt, clear the safe area and the home indicator. A rule that is not in this list is fetched; if the fetch fails, stop.\n" +
+                    "A demo is frames in one HTML file. If it still looks wrong, keep one accent and cut decoration. Say what changed.\n"
             file.writeText(current, Charsets.UTF_8)
         }
         if (current.contains("ai-ui-design-google-ai-studio")) {
@@ -617,12 +619,11 @@ object StarterSkills {
         }
         file.writeText(
             current.trimEnd() + "\n\n" +
-                "A bland screen is a failed draft. Pick one mood and do not mix them: editorial, technical, or warm. " +
-                "Do not default to Inter, Roboto, or Arial unless the project already uses that face. Name one display face and one body face and link them from fonts.googleapis.com. " +
-                "A picture is an attached file or a flat shape in CSS. Do not leave a broken stock URL and do not call an image generator. " +
-                "Put two or three frames in the one HTML file, keep the frame that matches the brief, align the spacing, and cut every chip that does not do the job. " +
-                "When the user names the Google design guide, http_request https://aistudio.google.com/learn/ai-ui-design-google-ai-studio and follow only a step that page printed. " +
-                "Do not open Google AI Studio and do not pretend an Edit tool ran.\n",
+                    "A bland screen is a failed draft. Pick one mood and do not mix them: editorial, technical, or warm. " +
+                    "Do not default to Inter, Roboto, or Arial unless the project already uses that face. Name one display face and one body face and link them from fonts.googleapis.com. " +
+                    "A picture is an attached file or a flat shape in CSS. Do not leave a broken stock URL and do not call an image generator. " +
+                    "Put two or three frames in the one HTML file, keep the frame that matches the brief, align the spacing, and cut every chip that does not do the job. " +
+                    "When the user names the Google design guide, http_request https://aistudio.google.com/learn/ai-ui-design-google-ai-studio and follow only a step that page printed.\n",
             Charsets.UTF_8,
         )
         appendCraft(file)
@@ -636,12 +637,12 @@ object StarterSkills {
         if (!current.contains("Design a screen") && !current.contains("Design a page") && !current.contains("styles.refero.design")) return
         file.writeText(
             current.trimEnd() + "\n\n" +
-                "Craft. Adapted from AkyRayy/Frontend-Design-SKILLS-for-AI (MIT). " +
-                "http_request https://raw.githubusercontent.com/AkyRayy/Frontend-Design-SKILLS-for-AI/main/SKILL.md and follow only a step that page printed. " +
-                "One aesthetic, and do not mix them: editorial, technical, warm, refined minimal, swiss, brutalist, or playful. " +
-                "Colors live in one style block: one accent, one paper, one ink, one muted ink, one hairline. " +
-                "Rewrite a purple-to-blue gradient, glass on every card, a blob background, emoji as icons, a pill on every control, three identical feature cards, or a Welcome or Empowering headline. " +
-                "Then remove one element. If the page is clearer, that element was decoration.\n",
+                    "Craft. Adapted from AkyRayy/Frontend-Design-SKILLS-for-AI (MIT). " +
+                    "http_request https://raw.githubusercontent.com/AkyRayy/Frontend-Design-SKILLS-for-AI/main/SKILL.md and follow only a step that page printed. " +
+                    "One aesthetic, and do not mix them: editorial, technical, warm, refined minimal, swiss, brutalist, or playful. " +
+                    "Colors live in one style block: one accent, one paper, one ink, one muted ink, one hairline. " +
+                    "Rewrite a purple-to-blue gradient, glass on every card, a blob background, emoji as icons, a pill on every control, three identical feature cards, or a Welcome or Empowering headline. " +
+                    "Then remove one element. If the page is clearer, that element was decoration.\n",
             Charsets.UTF_8,
         )
     }
@@ -665,9 +666,9 @@ object StarterSkills {
         if (current.contains("health_trend")) return
         file.writeText(
             current.trimEnd() + "\n\n" +
-                "For one named test over time, call health_trend. Quote its min, max, mean, and whether the last number is higher or lower than the first. health_index lists every saved test.\n" +
-                "Pass topic to health_log when the sheet names a specialty.\n" +
-                "Quote a diagnosis only when that sentence is already in the file. Do not combine tests into a new disease name.\n",
+                    "For one named test over time, call health_trend. Quote its min, max, mean, and whether the last number is higher or lower than the first. health_index lists every saved test.\n" +
+                    "Pass topic to health_log when the sheet names a specialty.\n" +
+                    "Quote a diagnosis only when that sentence is already in the file. Do not combine tests into a new disease name.\n",
             Charsets.UTF_8,
         )
     }
