@@ -2999,6 +2999,7 @@ class WorkspaceViewModel(
             com.hvkeyn.ceditneuro.tools.VoiceoverTool(appContext, ws) { path ->
                 if (project.epoch.get() == epochAtBuild) refreshProjectTree(project, path)
             },
+            com.hvkeyn.ceditneuro.tools.WebSearchTool(agentNet, { settingsStore.current.networkEnabled }),
             SearchSessionsTool {
                 val saved = library.load(ws.root.canonicalPath)
                 val shown = if (current === project) _state.value else project.ui

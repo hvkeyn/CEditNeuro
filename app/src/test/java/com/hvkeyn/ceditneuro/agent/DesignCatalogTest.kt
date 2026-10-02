@@ -44,6 +44,7 @@ class DesignCatalogTest {
         assertTrue(video.contains("public domain"))
         assertTrue(video.contains("three variations"))
         assertTrue(video.contains("filetype:bitmap"))
+        assertTrue(video.contains("web_search"))
         assertTrue(video.contains("CC BY"))
         assertTrue(video.contains("assets/media"))
         assertTrue(video.contains("YouTube"))
@@ -91,5 +92,6 @@ class DesignCatalogTest {
         assertTrue(file.readText().contains("three variations"))
         assertTrue(file.readText().contains("public domain"))
         assertTrue(file.readText().contains("filetype:bitmap"))
+        assertTrue(file.readText().contains("web_search"))
     }
 }
