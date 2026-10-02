@@ -1,6 +1,8 @@
 # Active context
 
-v0.91.0 (versionCode 108). `web_search` (group `video`) posts the query to DuckDuckGo's HTML results page, the keyless page that answered without a key. It returns titles and links. A video or store host is omitted. The hyperframes skill opens at most three of those pages, then still uses Commons and the Internet Archive. A file is saved only when the opened page printed a free license. If DuckDuckGo returns a check page, the search is not retried.
+v0.92.0 (versionCode 109). The hyperframes skill no longer fixes the search order. The agent chooses the query, the page, and which bed, picture, clip, or fact the scene actually uses. `web_search`, Commons, and the Internet Archive stay available. A file is saved only when the opened page printed a free license. A number on screen has to be a number that page printed. The same failed call is not repeated.
+
+v0.91.0 (versionCode 108). `web_search` (group `video`) posts the query to DuckDuckGo's HTML results page, the keyless page that answered without a key. It returns titles and links. A video or store host is omitted. A file is saved only when the opened page printed a free license. If DuckDuckGo returns a check page, that same call is not repeated.
 
 v0.90.0 (versionCode 107). The hyperframes skill also searches pictures and short inserts the same way as the bed: Wikimedia Commons, then the Internet Archive. A jpg, png, webp, or a clip of at most 30 seconds is saved only when the page printed CC0, public domain, CC BY, CC BY-SA, or the Pixabay license. NonCommercial and NoDerivatives are skipped. The credit line goes to `assets/media-credit.txt`. The picture sits in the scene with type over a scrim. A muted video element with data-start is a short insert; the runtime seeks it. A film, YouTube, and a store stay refused. A flat shape remains only when the search found nothing.
 
