@@ -18,6 +18,7 @@ class SkillWiringTest {
         "output_plumbing",
         "context_mgmt",
         "client_tool",
+        "save_path",
     )
 
     @Test

@@ -36,8 +36,18 @@ class DesignCatalogTest {
         val video = StarterSkills.skills.getValue("hyperframes")
         assertFalse(SkillAudit.check(video, "hyperframes").blocked)
         assertTrue(video.contains("skills/hyperframes-core/SKILL.md"))
+        assertTrue(video.contains("house-style.md"))
         assertTrue(video.contains("was not encoded"))
         assertTrue(video.contains("If the registry was missing"))
+        assertTrue(video.contains("commons.wikimedia.org"))
+        assertTrue(video.contains("archive.org"))
+        assertTrue(video.contains("public domain"))
+        assertTrue(video.contains("three variations"))
+        assertTrue(video.contains("filetype:bitmap"))
+        assertTrue(video.contains("CC BY"))
+        assertTrue(video.contains("assets/media"))
+        assertTrue(video.contains("YouTube"))
+        assertFalse(video.contains("Do not download a video, a song"))
     }
 
     @Test
@@ -73,9 +83,13 @@ class DesignCatalogTest {
         assertTrue(saved.contains("make_music"))
         assertTrue(saved.contains("sound_effect"))
         assertTrue(saved.contains("voiceover"))
-        val rendered = "# Make a video as HTML\ndata-composition-id\nrender_video\n"
+        assertTrue(saved.contains("three variations"))
+        assertTrue(saved.contains("commons.wikimedia.org"))
+        val rendered = "# Make a video as HTML\ndata-composition-id\nrender_video\nmake_music\n"
         file.writeText(rendered)
         StarterSkills.ensure(dir)
-        assertTrue(file.readText().contains("make_music"))
+        assertTrue(file.readText().contains("three variations"))
+        assertTrue(file.readText().contains("public domain"))
+        assertTrue(file.readText().contains("filetype:bitmap"))
     }
 }
