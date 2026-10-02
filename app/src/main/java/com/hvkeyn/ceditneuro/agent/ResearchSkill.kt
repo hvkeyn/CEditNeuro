@@ -308,7 +308,8 @@ object StarterSkills {
             3. Components. Say in the chat what you will look up, then http_request https://component.gallery/ and use only a pattern that page printed. There is no 21st.dev MCP on this phone. http_request https://21st.dev/ or ask the user to paste the component. Do not invent the markup.
             4. Motion, only when the screen needs it. http_request https://kinetics.colorion.co/ and copy only CSS that page printed. A press answers at once. Motion follows the finger and can be stopped. Honor reduced motion. No remote script and no library this phone cannot run.
             5. Platform, on top of the quoted style. Web: one HTML file, system fonts, a plain style block. Desktop: visible keyboard focus, a label as well as a shortcut, hover is extra, do not lay it out as a phone. Android: a target is at least 48dp, content clears the system bars, the system back leaves the screen. iOS: a target is at least 44pt, content clears the safe area and the home indicator. A vendor rule that is not in this list is fetched with http_request. If that fetch fails, stop.
-            6. Before code, write a short plan in the chat: who it is for, the one job, one mood, two type roles, and one signature element that belongs to this brief. The mood is one of these, and only one: editorial (a serif display face, wide space, a light ground), technical (dense rows, monospace for metadata, a visible grid), or warm (soft cards, pill buttons, round corners). Do not mix them. If that plan would fit any other product, change it. Do not default to Inter, Roboto, or Arial unless the project already uses that face. Name one display face and one body face. For an Apple-like feel, hold to purpose, agency, responsibility, familiarity, flexibility, simplicity, craft, and delight.
+            6. Before code, write a short plan in the chat: who it is for, the one job, one mood, two type roles, and one signature element that belongs to this brief. The mood is one of these, and only one: editorial (a serif display face, wide space, a light ground), technical (dense rows, monospace for metadata, a visible grid), warm (soft cards, pill buttons, round corners), refined minimal (one accent, wide margins, product chrome), swiss (a strict grid, one type family, no decoration), brutalist (raw type, hard edges, almost no color), or playful (a clear shape, one bright accent, still one job). Do not mix them. If that plan would fit any other product, change it. Do not default to Inter, Roboto, or Arial unless the project already uses that face. Name one display face and one body face. For an Apple-like feel, hold to purpose, agency, responsibility, familiarity, flexibility, simplicity, craft, and delight.
+            Craft. Adapted from AkyRayy/Frontend-Design-SKILLS-for-AI (MIT). http_request https://raw.githubusercontent.com/AkyRayy/Frontend-Design-SKILLS-for-AI/main/SKILL.md and follow only a step that page printed and this phone can do. Open one extra file from that repo only when that page names it. If the page cannot be read, keep going with these rules. Put colors in one style block: one accent on a small part of the page, one paper, one ink, one muted ink, one hairline. Rewrite the page if it has a purple-to-blue gradient, glass on every card, a blob background, emoji as icons, a pill on every control, three identical feature cards, or a headline that says Welcome, Empowering, or three stacked adjectives. Write real words, not placeholder copy. Every control has a hover, a focus ring, and a disabled state. Empty, loading, and error each have their own text. Then remove one element. If the page is clearer, that element was decoration.
             7. If the user attached a picture, describe its layout, type roles, card edges, spacing, and mood, and follow that description. Quote a color only when a tool printed it. Do not copy that picture's product. A picture in the page is a file they attached or a flat shape in CSS. Do not leave a broken stock URL. Do not call an image generator.
             8. write_file one HTML page in the project. Link the two faces from fonts.googleapis.com. A demo is two or three frames in that file, the same words and controls, one mood each; keep the frame that matches the brief. Then edit the kept frame: one spacing step, aligned edges, room inside a card, and cut every chip, badge, and widget that does not do the job. The editor preview shows html and htm. Name the file in backticks. A video uses use_skill hyperframes instead of this page.
             9. When they name the Google design guide, or the draft still looks generic, http_request https://aistudio.google.com/learn/ai-ui-design-google-ai-studio and follow only a step that page printed and this phone can do. Do not open Google AI Studio, do not click Remix, and do not pretend an Edit tool ran. If the page cannot be read, keep the mood rules and say the page was not read.
@@ -602,6 +603,7 @@ object StarterSkills {
             file.writeText(current, Charsets.UTF_8)
         }
         if (current.contains("ai-ui-design-google-ai-studio")) {
+            appendCraft(file)
             appendVideoSkill(file)
             return
         }
@@ -619,7 +621,25 @@ object StarterSkills {
                 "Do not open Google AI Studio and do not pretend an Edit tool ran.\n",
             Charsets.UTF_8,
         )
+        appendCraft(file)
         appendVideoSkill(file)
+    }
+
+    /** An old design skill learns the craft bar: one aesthetic, tokens, and a reject list. */
+    private fun appendCraft(file: File) {
+        val current = file.readText(Charsets.UTF_8)
+        if (current.contains("Frontend-Design-SKILLS-for-AI")) return
+        if (!current.contains("Design a screen") && !current.contains("Design a page") && !current.contains("styles.refero.design")) return
+        file.writeText(
+            current.trimEnd() + "\n\n" +
+                "Craft. Adapted from AkyRayy/Frontend-Design-SKILLS-for-AI (MIT). " +
+                "http_request https://raw.githubusercontent.com/AkyRayy/Frontend-Design-SKILLS-for-AI/main/SKILL.md and follow only a step that page printed. " +
+                "One aesthetic, and do not mix them: editorial, technical, warm, refined minimal, swiss, brutalist, or playful. " +
+                "Colors live in one style block: one accent, one paper, one ink, one muted ink, one hairline. " +
+                "Rewrite a purple-to-blue gradient, glass on every card, a blob background, emoji as icons, a pill on every control, three identical feature cards, or a Welcome or Empowering headline. " +
+                "Then remove one element. If the page is clearer, that element was decoration.\n",
+            Charsets.UTF_8,
+        )
     }
 
     /** An old design skill learns that a video is the HyperFrames composition, not a renderer. */

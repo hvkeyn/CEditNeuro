@@ -31,6 +31,8 @@ class DesignCatalogTest {
         assertTrue(text.contains("44pt"))
         assertTrue(text.contains("ai-ui-design-google-ai-studio"))
         assertTrue(text.contains("Do not mix them"))
+        assertTrue(text.contains("Frontend-Design-SKILLS-for-AI"))
+        assertTrue(text.contains("purple-to-blue"))
         val video = StarterSkills.skills.getValue("hyperframes")
         assertFalse(SkillAudit.check(video, "hyperframes").blocked)
         assertTrue(video.contains("skills/hyperframes-core/SKILL.md"))
@@ -54,6 +56,7 @@ class DesignCatalogTest {
         assertTrue(saved.contains("no HyperFrames"))
         assertTrue(saved.contains("use_skill hyperframes"))
         assertTrue(saved.contains("ai-ui-design-google-ai-studio"))
+        assertTrue(saved.contains("Frontend-Design-SKILLS-for-AI"))
     }
 
     @Test
