@@ -12,7 +12,13 @@ class SkillWiringTest {
     private val known = ToolGroups.core.toSet() + ToolGroups.groups.values.flatten()
 
     /** Words in snake case that are arguments or file names, not tools. */
-    private val notTools = setOf("delay_seconds")
+    private val notTools = setOf(
+        "delay_seconds",
+        "control_flow",
+        "output_plumbing",
+        "context_mgmt",
+        "client_tool",
+    )
 
     @Test
     fun everyToolASkillNamesIsInAGroup() {

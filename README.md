@@ -1,230 +1,86 @@
 # CEditNeuro
 
-**Complex Editor Neuro** — a code editor for Android with a built-in agentic chat, aimed at
-the Zed desktop workflow: edit files by hand, slide the agent panel open when you want a
-change made, let it work, read the report, close the panel, keep editing.
+A code editor, a book reader, a shell, and an agent. On one Android phone.
 
-The built-in provider is **DeepSeek** through its OpenAI-compatible API. Other providers can
-be added in **Language models** settings. The workspace, the tools, and the conversation stay
-on the device. API keys stay on the device too.
+[![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)](https://github.com/hvkeyn/CEditNeuro/releases/latest)
+[![Release](https://img.shields.io/github/v/release/hvkeyn/CEditNeuro?logo=github)](https://github.com/hvkeyn/CEditNeuro/releases/latest)
+[![API](https://img.shields.io/badge/minSdk-26-blue)](https://github.com/hvkeyn/CEditNeuro)
 
-## Status
+Edit a project by hand. Open the agent when you want a change made. Read the report, close the panel, keep editing. The workspace, the tools, and the conversation stay on the device. API keys stay on the device too.
 
-Milestone 1 (skeleton) is complete: the project builds as a normal Android app and every
-layer is wired end to end.
+**[Download the latest APK](https://github.com/hvkeyn/CEditNeuro/releases/latest)** · [All releases](https://github.com/hvkeyn/CEditNeuro/releases)
 
-| Area | State |
+## What you can do
+
+| | |
 | --- | --- |
-| Gradle project, version catalog, wrapper | done |
-| Workspace + path-safe file access | done |
-| File tree, tabs, editor surface | done |
-| Agent loop with tool calling | done |
-| DeepSeek streaming client (SSE, reasoning, tool calls) | done |
-| Tools: read / write / edit / list / grep / glob | done |
-| Tools: git status, git diff (JGit) | done |
-| Built-in shell (`run_command`, mksh/toybox) | done |
-| FTP, FTPS, and SFTP, including mkdir, delete, and rename | done |
-| SSH command on the selected SFTP server (`ssh_exec`) and in-app site preview | done |
-| Collapsible chat panel, shell, and in-app page preview | done |
-| Tree-sitter highlighting for Java, Kotlin, Python, JSON, and XML | done |
-| In-process completion and syntax diagnostics for those languages | done |
-| TextMate grammars | **not yet** — blocked on record desugaring, see `docs/ARCHITECTURE.md` |
-| One agent per open project, with its own shade card | done |
-| Install and open an APK with `install_apk` (no Shizuku) | done |
-| Shared-storage paths follow this phone's real storage root and Downloads folder | done |
-| Book and note reader (txt, Markdown, HTML, FB2, EPUB, or a zip of those) with pages, bookmarks, notes, and a book chat. The last page is restored after the reader closes or the app exits | done |
-| Foreground layout and tap (`fetch_system_layout`, `execute_system_action`) when Shizuku or root is already allowed | done |
-| Longer agent runs send a stable prompt, load rare tools on demand, and keep file reads and command output short | done |
-| Prepaid balance for the API key in Language models (DeepSeek and other hosts that publish one) | done |
-| Update check at the bottom of Language models settings | done — install starts only after confirmation |
-| Phone profile in `CEditNeuro/profiles` survives uninstall and loads on the next install | done |
-| Optional SOCKS or HTTP proxy for the user's own servers, FTP, SFTP, and mail | done |
-| Timer notification, notification access, and a mailbox in Settings → Desk | done |
-| System install and uninstall (`install_apk`, `uninstall_apk`); a failed tool call is not repeated with the same arguments | done |
-| Project memory, search of this project's past chat, and skills that can be saved and extended | done |
-| Study focus: a research log, a checked report with PDF, and one SVG figure, loaded only for that work | done |
-| Study checks: exact `calculate`, and `reference` for Wikipedia, arXiv, and DOI lookups | done |
-| Phone tools: `device_status` (battery, storage, Shizuku or root), `list_apps`, `open_settings`, `clipboard`, `open_file` | done |
-| Find in book, local and without the model | done |
-| A read-only call is not repeated in a run until something changes | done |
-| Shell: live output, Stop, command history, Copy, and a Root switch (root or Shizuku shell user) | done |
-| Reader: read aloud with the phone's speech engine, swipe and volume-key paging, notes from every page | done |
-| Link dialog shows Off, Waiting, or Linked, and can wait on your code again | done |
-| Chat bar: work focus and skills in one tap; `research_plot` draws a chart from numbers; `calculate` has sum, mean, median, stdev | done |
-| An open `.py` or `.sh` file runs from the editor; output streams into the shell and Stop ends it | done |
-| PNG, JPG, WebP, GIF, BMP, SVG, and HTML open as a preview, with a switch back to the text | done |
-| A ticked skill stays on for that chat, with no count cap, and the agent follows it on every run | done |
-| The agent turns on every saved skill that fits the task. use_skill, save_skill, and append_skill switch it on | done |
-| No signal blocks a new agent run. A chat link opens that book or file. SVG schemes draw in the chat and in the reader | done |
-| A scheme named in backticks is drawn in the reader and in chat, including when the file sits in a subfolder | done |
-| A tap on a scheme or photo opens it full screen, and a pinch zooms in and back out | done |
-| The menu button hides the project list and Choose folder, so the file list can use the height | done |
-| Chat attach offers the camera, the photo picker, and the system file picker | done |
-| A website or a local HTML folder becomes a signed WebView app (`web_to_app`, then `install_apk`) | done |
-| A lab sheet is logged and checked against the range printed on it. `health_trend` gives min, max, mean, and direction. `health_index` lists saved tests | done |
-| A missing skill is searched by plain words. `review_skill` blocks a dangerous prompt, a backdoor, malware, or a key, and `save_skill` stores only the adapted text | done |
-| A product screen is designed in the project for web, desktop, Android, or iOS. The project's own design wins. A bland draft picks one mood, two type faces, and drops empty chips. A video or motion graphic is an HTML composition from HyperFrames: timing comes from the printed core page, and this phone does not encode an MP4 or install a renderer. A public DESIGN.md, gallery page, or the Google AI Studio design guide is quoted, not invented. Google AI Studio itself is not opened | done |
-| `android-app`, `android-compose`, and `android-ui` cover a phone app's layers, Compose, Navigation 3, and edge-to-edge. A build counts only after BUILD SUCCESSFUL and `install_apk`. `android-debug` then checks that screen: one dump, one tap on a printed row, then the dump again. A unit test is not the screen. `android-apk` reads an APK in phases before it is trusted: the framework fingerprint, the manifest flags, the permissions and services that matter, the calls that read a user store or open a socket, the Retrofit, OkHttp, Ktor, and GraphQL endpoints with their auth shape, where each read is written out, the Kotlin names R8 could not strip, the packed native libraries, and the hosts it contacts. A deep native read hands the .so to Ghidra on a PC. A part of that code may be copied into a separate test app to reproduce one behavior, in the isolation the developer picks. A public page from android/skills is quoted | done |
-| `ru-translate` turns an article, a book, a game, or a program into Russian beside the original. It does not stop until the state file says pass (P5 or P6) | done |
-| `net-map` draws a network from a dump. `capture_dump` records this phone's public IPv4 into a pcap, both directions, and stops by itself. `read_dump` names hosts and ports and ends with an audit block | done |
-| `net_audit` checks the Wi-Fi this phone is on: gateway, DNS, private DNS, open ports, SSDP and mDNS devices, an optional /24 sweep, and ranked findings. Connect only, no login | done |
-| `systematic-debugging` reproduces a failure, records facts, and tests one cause at a time. `debug_case` refuses a fix until a test supports it, and the case passes only when the same check that failed now passes | done |
-| `research` keeps a short check on `research_log`. A question that needs several sources uses `research_run`: a plan, independent sources, a reprint that does not count, critics, and a cite that has to use the quote. The run resumes from `research/run.md` | done |
-| `video-notes` reads a public YouTube, RuTube, or Yandex page with `video_brief` and writes the point, the important ideas, the takeaway, and whether it is worth watching. YouTube search, a channel's latest uploads, a playlist, and a batch of three stay on the same tool. The video file is not downloaded | done |
-| Reader tools are labelled icons: contents, find, listen, text, pen, layer, notes, and the book chat | done |
-| A reasoning-only assistant turn still continues, and a failed command, URL, or login is not sent again | done |
-| Starter phone skills include `review`, `debug`, `security`, and `deep-read`; a deleted starter skill stays deleted | done |
-| `install_jdk`, `install_android_sdk`, `install_runtime` from the Termux mirror | done |
-| Zed-style per-edit Accept/Reject diffs | not yet — edits apply immediately |
+| **Edit** | File tree, tabs, tree-sitter highlighting for Java, Kotlin, Python, JSON, and XML. Run an open `.py` or `.sh` from the editor. |
+| **Agent** | Tool calling, skills, project memory, and a Doctor report. The model is not trained. The harness around it can change. |
+| **Read** | txt, Markdown, HTML, FB2, and EPUB, with pages, notes, bookmarks, and read-aloud. |
+| **Phone** | Install an APK, turn a web page into an app, a timer, mail, FTP, and SFTP. |
+| **Study** | A checked research report, a chart from numbers, and notes from a public video page. |
 
-## Requirements
+DeepSeek is built in, through its API or a sign-in on this phone. Qwen web chat is the same idea: sign in once inside the app, no key and no computer. Other providers can be added in Settings.
 
-- Android 8.0 (API 26) or newer, arm64 device recommended.
-- JDK 17 or newer, Android SDK 35 to build.
-- A DeepSeek API key.
+## Install
+
+1. Download the APK from [the latest release](https://github.com/hvkeyn/CEditNeuro/releases/latest).
+2. Allow install from this source and confirm the system installer.
+3. Grant all-files access. The app edits project folders on shared storage, which is why it is sideloaded and not a Play Store app.
+4. Tap **Choose folder** and point it at a project.
+5. Open **Settings**. Paste a DeepSeek API key, or use **DeepSeek Web** / **Qwen Web** and sign in on the page.
+
+**Check for updates** sits at the bottom of Language models. A newer release asks before it downloads.
+
+## First hour
+
+- The chat icon slides the agent in. The paperclip attaches a photo or a file.
+- **Doctor** reads saved sessions and lists mistakes that repeat, including the same miss in the chats and texts. The report keeps the kind of miss, not the sentence.
+- Long project and skill menus stay on screen and scroll.
+- Opening another project does not stop the agent you left running.
+- The menu button hides the project list so the file list can use the height.
 
 ## Build
 
+JDK 17 and Android SDK 35.
+
 ```sh
-# Point Gradle at your SDK if Android Studio has not done it already.
 echo "sdk.dir=/path/to/Android/Sdk" > local.properties
-
-./gradlew assembleDebug
-```
-
-The APK lands in `app/build/outputs/apk/debug/`. Or just open the folder in Android Studio.
-
-```sh
 ./gradlew assembleRelease
 ```
 
-The release APK is about 38 MB. Most of that is the native tree-sitter libraries and JGit.
-Published builds are on the [GitHub releases](https://github.com/hvkeyn/CEditNeuro/releases) page.
+The release APK is in `app/build/outputs/apk/release/`. Most of its size is the tree-sitter libraries and JGit.
 
-## First run
+## What stays on the phone
 
-1. The app asks for all-files access. It is required: the app edits project folders on shared
-   storage. This is why CEditNeuro is a sideloaded tool and not a Play Store app.
-2. Tap **Choose folder** and point it at a project.
-3. Open **Settings** (**Language models**). **Models** is open; paste the DeepSeek API key
-   there. The balance line under the key shows what is left on that account, so a stop
-   for price limits is visible before the agent runs out. Other providers use the same
-   line when their host publishes a balance. The built-in provider defaults to
-   `https://api.deepseek.com/v1` and `deepseek-flash`.
-   **Check for updates** is a separate row at the bottom.
-4. Tap the chat icon to slide the agent panel in. The paperclip attaches photos and
-   documents. They are saved in the project and their text is sent with the message.
-   A model that accepts images also receives the photo. DeepSeek receives the file text
-   and path. **Doctor** reads saved agent sessions, lists mistakes that repeat, and can
-   send that report back so the agent fixes them. **Share this folder** uses a server both
-   phones already saved. The link icon shows a code. Tap the code to copy it. The channel
-   stays on screen and shows when the other phone is linked and data is moving. The phone
-   that shared is the lead, the other checks that work and sends corrections.
-   Opening another project does not stop the agent you left running.
+Settings, the API key, saved servers, and each project's chat are copied to `CEditNeuro/profiles` on shared storage. Uninstalling the app deletes its private files. The next install loads that profile after all-files access is allowed.
 
-## Profiles
+That folder contains the API key and server passwords. Do not copy it into a repository or a public release.
 
-Settings, the API key, saved servers, and the project list (with each project's chat and
-shell) are copied to shared storage at `CEditNeuro/profiles`. The active profile is the
-file named in `active.txt`. Uninstalling the app deletes its private files. The next
-install, from any computer, loads that profile after all-files access is allowed.
+## Shell
 
-Open **Language models** and expand **Profile** to save the current state under another
-name, or switch. Switching loads that profile's settings and projects. Models, reasoning,
-the agent, and servers are separate sections. **Check for updates** stays on its own row.
+`run_command` is mksh and toybox inside this app. It is not Termux: there is no `pkg` or `apt`. Git status and diff go through JGit. A JDK, the Android SDK tools, and other runtimes can be unpacked into this app's toolchain from the Termux mirror.
 
-That folder stays on the phone. It contains the API key and server passwords. Do not copy
-it into a repository or a public release.
-
-## Built-in shell
-
-`run_command` and the shell panel run `/system/bin/sh` inside this app. That is mksh plus
-toybox (`ls`, `mkdir`, `grep`, `find`, and the other applets on the device). Nothing else
-has to be installed.
-
-An open `.py` or `.sh` file has **Run** above the editor. The script runs from its own folder, and the shell panel shows each line as it is written. **Stop** ends that run. The first Python run installs the interpreter into this app.
-
-This is not the Termux distribution. Termux packages expect the prefix
-`/data/data/com.termux/files/usr`, so `pkg` and `apt` are not part of the shell. Git status
-and diff still go through JGit. The agent can still install a JDK, the Android SDK tools,
-and other runtimes into this app's toolchain with `install_jdk`, `install_android_sdk`, and
-`install_runtime`. Those tools download Debian packages from the Termux mirror and unpack
-them here.
-
-## Paths outside the project
-
-A relative path stays inside the open project. An absolute path is a real directory on
-this phone. `/sdcard` and `/mnt/sdcard` mean the shared-storage root Android reports for
-the device. The Downloads folder is whichever of `Download` or `Downloads` actually
-exists there, and a removable volume keeps its own root. Tools return that absolute path
-and the file size. A path under a hidden mount such as `/mnt/runtime` is not used, because
-the file manager would not show the file.
-
-The shell variable `HOME` is this app's private directory. `DOWNLOAD` is the public
-Downloads folder. `install_apk` installs an APK that is already on the device through the
-system installer and opens it after you confirm. Shizuku is not required for that.
-`web_to_app` builds that APK from an http(s) page or a project folder that contains
-`index.html`. The same name and the same page update the installed app. It does not copy
-another installed app.
-When Shizuku is already running, or the phone is rooted, `fetch_system_layout` returns
-the foreground UI XML and `execute_system_action` taps one point taken from that layout.
-`scripts/start-shell.ps1` starts that server from the computer's wireless adb link. The Shizuku screen stays closed.
+An absolute path is a real directory on this phone. `HOME` is this app's private directory. `DOWNLOAD` is the public Downloads folder.
 
 ## Reading
 
-PNG, JPG, WebP, GIF, and BMP open as a picture you can pinch. SVG and HTML open as a page; **Code** switches back to the text. JavaScript stays off in that preview.
-
-Long-press a file and choose **Read**, or open it and tap the book icon. txt, Markdown, HTML, FB2, and EPUB are shown as text, not raw markup. Pictures inside FB2, EPUB, and HTML are shown on their own page. Pinch a picture to look closer. **Pen** draws on the page and places keyboard text you can move, rotate, and resize. **Notes** opens that page's comments under the text. **Contents** jumps by chapter, by a saved moment, or along the book. **Book** opens a chat that stays with this file. It reads the book text and does not use the project chat or the file catalog. Question text follows the day, sepia, or night paper. A catalog FB2 is often a zip, and a zip of those files opens as one book. Headings, lists, wiki links, and tables become readable lines. Pages are fitted to the screen and laid out again when you rotate or change the type. Tap the center, then the sliders icon, for size, serif or sans, spacing, and day, sepia, or night paper. Bookmarks and notes stay on this phone.
-
-## Several projects
-
-Each open folder keeps its own chat and its own agent. Switching folders leaves the other
-run going. The menu button at the top left opens the project list: switch to one already
-open, choose a new folder, or show and hide that folder's files. Save appears only when
-an open file has unsaved edits; several files save together and the button shows how many.
-The globe appears only while the running agent is using the in-app browser. A strip under
-the editor shows what the other projects are doing.
-
-The Android status shade shows one ongoing card per running project: the folder name, the
-elapsed time, and what the agent is doing in plain words (reading a file, running a command,
-reading the screen). The file or command sits on the next line. A finished step is marked
-`+`. When the run succeeds, the card stays as `+ Done` with the first line of the answer,
-until you swipe it away. **Stop** and **Continue** apply only to that project. A stopped
-or failed run leaves its own card, without the plus.
-
-On a short landscape screen the chat, shell, and page preview open across the editor instead
-of docking into a column that is not on screen.
-
-## Token use
-
-Each turn resends the conversation, so the harness keeps the repeated part small.
-
-- The standing instructions do not include the project path, the clock, or which server is connected. That setup is a second system message. DeepSeek can cache the unchanged prefix. The activity line shows `cache hit` and `cache miss` when the API reports them.
-- Reading, editing, search, and the shell are on every request. Installers, the remote tools, and screen automation load through `load_tools`, or come with the build and remote focus. That focus, plus network and running installed programs, is in **Language models → Agent**. The chat bar keeps the model and Doctor.
-- `read_file` numbers the first line of a slice and every 10th line.
-- `grep` with no matches is a result. `logcat` is refused: this app cannot read the system log, so that command is not retried.
-- A long `run_command` result is written to a file under `.ceditneuro/tool-output`. The model sees the path and the tail.
-- Screen dumps stay the short tap list from `fetch_system_layout`.
-
-CEditNeuro does not spawn subagents or switch models in the middle of a chat. Those cuts belong to a multi-agent harness, and here they would add a round trip instead of removing one.
-
-## Updates
-
-**Check for updates** at the bottom of **Language models** compares this install with the
-latest GitHub release. If a newer version is published, the app asks before it downloads.
-Confirming starts the download and the system installer. An equal version is left as is.
+Long-press a file and choose **Read**, or tap the book icon. Pages fit the screen. Pictures inside FB2, EPUB, and HTML get their own page. **Pen**, **Notes**, **Contents**, and **Book** stay with that file. PNG, JPG, WebP, GIF, BMP, SVG, and HTML also open as a preview, with a switch back to the text.
 
 ## Layout
 
 ```
 app/src/main/java/com/hvkeyn/ceditneuro/
-  agent/            agent loop, message models, prompts
-  agent/deepseek/   streaming chat-completions client
-  data/             settings and API key storage
-  shell/            built-in mksh/toybox shell
-  tools/            the capabilities the agent can call
-  ui/               Compose screens, editor surface, chat panel, shell panel
-  workspace/        project root and path-safety rules
+  agent/        loop, prompts, skills
+  data/         settings and the API key
+  shell/        mksh and toybox
+  tools/        what the agent can call
+  ui/           Compose screens
+  workspace/    project root and path rules
 ```
 
-See `docs/ARCHITECTURE.md` for the design rationale and the roadmap.
+Design notes live in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+## Not in this build
+
+TextMate grammars are not wired yet. Edits apply immediately. There is no Zed-style Accept or Reject on each hunk.
