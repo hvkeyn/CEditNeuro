@@ -112,6 +112,7 @@ object ToolGroups {
             "sound_effect",
             "make_music",
             "voiceover",
+            "web_search",
         ),
         "harness" to listOf(
             "harness_rrsi",
