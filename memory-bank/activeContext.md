@@ -1,5 +1,7 @@
 # Active context
 
+v0.93.0 (versionCode 110). The video skill still lets the agent choose the search. A file already in the project is used first. Openverse, the Library of Congress, and NASA are extra catalogs. The MP4 stays in the project. A file from the web is saved only when the page printed a free license.
+
 v0.92.0 (versionCode 109). The hyperframes skill no longer fixes the search order. The agent chooses the query, the page, and which bed, picture, clip, or fact the scene actually uses. `web_search`, Commons, and the Internet Archive stay available. A file is saved only when the opened page printed a free license. A number on screen has to be a number that page printed. The same failed call is not repeated.
 
 v0.91.0 (versionCode 108). `web_search` (group `video`) posts the query to DuckDuckGo's HTML results page, the keyless page that answered without a key. It returns titles and links. A video or store host is omitted. A file is saved only when the opened page printed a free license. If DuckDuckGo returns a check page, that same call is not repeated.

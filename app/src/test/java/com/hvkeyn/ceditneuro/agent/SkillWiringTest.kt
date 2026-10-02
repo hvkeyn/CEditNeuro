@@ -19,6 +19,7 @@ class SkillWiringTest {
         "context_mgmt",
         "client_tool",
         "save_path",
+        "page_size",
     )
 
     @Test
