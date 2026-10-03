@@ -1,7 +1,7 @@
 # Product context
 
 - Editor and file tree per project folder; chat and shell stay with each folder.
-- Agent chat with work focus (Edit, Build, Remote, Study), skills, project memory, doctor report.
+- Agent chat with work focus (Edit, Build, Remote, Study), skills, project memory, doctor report. You should know adds one local note above the message when a reply hides a failure or crosses a limit the user set. It does not call another model.
 - Models: the paid DeepSeek API by default, any OpenAI-compatible host, or the free DeepSeek web chat through a bridge on the user's computer (no key, no payment, 64K context, tool calls emulated by the bridge).
 - The agent can turn a website or a local HTML folder into a signed WebView app and hand it to the system installer.
 - Reader for txt, Markdown, HTML, FB2, EPUB: pages, find, bookmarks, notes, pen layer, book chat, read aloud. The last page is kept on this phone after the reader closes or the app exits.

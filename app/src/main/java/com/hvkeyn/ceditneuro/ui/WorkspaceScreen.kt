@@ -888,6 +888,7 @@ private fun AgentChat(
         onListSkills = viewModel::listSkills,
         onToggleSkill = viewModel::toggleSkill,
         onOpenLink = viewModel::openChatLink,
+        onYouShouldKnow = { on -> viewModel.updateSettings { it.copy(youShouldKnow = on) } },
         modifier = modifier,
     )
 }

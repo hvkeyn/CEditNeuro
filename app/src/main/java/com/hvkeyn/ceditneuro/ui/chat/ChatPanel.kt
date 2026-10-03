@@ -68,6 +68,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import com.hvkeyn.ceditneuro.agent.YouShouldKnow
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -124,6 +125,7 @@ fun ChatPanel(
     onToggleSkill: (SkillEntry) -> Unit = {},
     onOpenLink: (String) -> Unit = {},
     onRecheck: () -> Unit = {},
+    onYouShouldKnow: (Boolean) -> Unit = {},
 ) {
     var input by rememberSaveable { mutableStateOf("") }
     var attachments by remember { mutableStateOf<List<Uri>>(emptyList()) }
@@ -231,6 +233,7 @@ fun ChatPanel(
                 onClose = onClose,
                 onDoctor = onDoctor,
                 onSendReport = { text -> onSend(text, emptyList()) },
+                onYouShouldKnow = onYouShouldKnow,
                 onSelectFocus = onSelectFocus,
                 onListSkills = onListSkills,
                 onUseSkill = onToggleSkill,
@@ -386,6 +389,43 @@ fun ChatPanel(
                     )
                     androidx.compose.material3.TextButton(onClick = onRecheck) {
                         Text("Check again")
+                    }
+                }
+            }
+            val knowNote = if (settings.youShouldKnow) {
+                YouShouldKnow.look(state.chat.map { entry ->
+                    YouShouldKnow.Line(
+                        role = when (entry.role) {
+                            ChatRole.User -> "user"
+                            ChatRole.Assistant -> "assistant"
+                            ChatRole.Tool -> "tool"
+                            ChatRole.Error -> "error"
+                            ChatRole.Reasoning -> "reasoning"
+                        },
+                        text = entry.text,
+                        tool = entry.toolName.orEmpty(),
+                        streaming = entry.streaming,
+                    )
+                })
+            } else {
+                null
+            }
+            var hiddenKnow by rememberSaveable { mutableStateOf("") }
+            if (knowNote != null && knowNote != hiddenKnow) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = knowNote,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f),
+                    )
+                    IconButton(onClick = { hiddenKnow = knowNote }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Hide this note", modifier = Modifier.size(16.dp))
                     }
                 }
             }
@@ -602,6 +642,7 @@ private fun AgentToolbar(
     onListSkills: () -> List<SkillEntry>,
     onUseSkill: (SkillEntry) -> Unit,
     activeSkills: List<String>,
+    onYouShouldKnow: (Boolean) -> Unit,
 ) {
     var modelOpen by rememberSaveable { mutableStateOf(false) }
     var focusOpen by remember { mutableStateOf(false) }
@@ -705,6 +746,12 @@ private fun AgentToolbar(
                 }
             }
             Pill(text = "Doctor", compact = compact, onClick = { doctorText = onDoctor(); doctorOpen = true })
+            Pill(
+                text = "Know",
+                compact = compact,
+                selected = settings.youShouldKnow,
+                onClick = { onYouShouldKnow(!settings.youShouldKnow) },
+            )
             Box(modifier = Modifier.weight(1f))
             IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
                 Icon(Icons.Default.Close, contentDescription = "Hide chat", modifier = Modifier.size(18.dp))
