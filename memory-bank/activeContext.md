@@ -1,5 +1,7 @@
 # Active context
 
+v0.94.0 (versionCode 111). `second_monitor` (group `remote`, skill `second-monitor`) returns a host script and opens the page full screen with the screen kept awake. Windows downloads the official SlothMon 0.7.0 zip and does not change it; the person at the computer approves the driver prompt, and the page address is the code in that window. Linux adds a headless output only on Sway or Hyprland and serves it on the local network with touch. GNOME, KDE, and a plain session are refused, and nothing is mirrored. Installed over 0.93.0. The projects screen opened and the process stayed up. The driver was not installed on this computer.
+
 v0.93.0 (versionCode 110). The video skill still lets the agent choose the search. A file already in the project is used first. Openverse, the Library of Congress, and NASA are extra catalogs. The MP4 stays in the project. A file from the web is saved only when the page printed a free license.
 
 v0.92.0 (versionCode 109). The hyperframes skill no longer fixes the search order. The agent chooses the query, the page, and which bed, picture, clip, or fact the scene actually uses. `web_search`, Commons, and the Internet Archive stay available. A file is saved only when the opened page printed a free license. A number on screen has to be a number that page printed. The same failed call is not repeated.

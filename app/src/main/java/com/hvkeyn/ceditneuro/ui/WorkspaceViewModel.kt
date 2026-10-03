@@ -2935,6 +2935,7 @@ class WorkspaceViewModel(
                 if (project.epoch.get() == epochAtBuild) onAgentEditedFile(project, path)
             },
             SshExecTool(::activeRemote, remoteClient),
+            com.hvkeyn.ceditneuro.tools.SecondMonitorTool(appContext),
             RemoteMkdirTool(::activeRemote, remoteClient),
             RemoteDeleteTool(::activeRemote, remoteClient),
             RemoteRenameTool(::activeRemote, remoteClient),

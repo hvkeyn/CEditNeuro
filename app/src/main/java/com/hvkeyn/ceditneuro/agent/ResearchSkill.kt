@@ -444,6 +444,21 @@ object StarterSkills {
             13. Program. Translate strings a person sees, in the locale file. Translate a comment only when asked. Do not rename a function, a variable, or a key. A placeholder stays where it is. Run a test the project already has. A failed command stays failed. Pass is P6.
             14. When the state file says pass, call use_skill name=ru-translate scope=app on=false.
         """.trimIndent() + "\n",
+        "second-monitor" to """
+            # Second monitor
+
+            Use this when the user wants this phone as an extra monitor for a Windows or Linux computer they own.
+
+            This is an extended display on the same local network. Windows, and a Sway or Hyprland desktop, can add that display. GNOME, KDE, and a plain session cannot, and the script says so. A copy of the main screen is not this task.
+
+            1. load_tools group=remote. remote_connect to the computer the user named. Do not invent a host or a password.
+            2. second_monitor action=script with os=windows or os=linux. remote_write that text to one file on that computer. Do not edit the text.
+            3. Linux: ssh_exec runs nohup python3 -u that file, with output redirected to second-monitor.log, then a trailing ampersand. remote_read the state path the log prints. The address field is the page. If the log says the desktop cannot add a virtual monitor, stop and say so. Do not claim a display was added.
+            4. Windows: ssh_exec runs powershell on that file. It downloads the official program and starts it. The first launch asks the person at the computer to approve a display driver. Do not approve it yourself and do not bypass that prompt. The page address is the code in that program's window. If no address was printed, ask the user to paste it. Do not invent one.
+            5. second_monitor action=open with that address. The page fills this phone and the screen stays awake.
+            6. To stop, ssh_exec the same file with the argument stop. Windows closes its window and leaves the driver installed. Linux removes the extra display.
+            7. Do not change, repack, or sell the Windows program. Do not say you wrote it. Do not print the address or the connection key in the chat. Do not upload a picture of the computer. When the extra display is up, use_skill name=second-monitor scope=app on=false.
+        """.trimIndent() + "\n",
         "rrsi" to """
             # Harness self-improvement
 

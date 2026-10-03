@@ -3,6 +3,7 @@
 Released: v0.45.0 through v0.75.0 (`frontend-design` rejects a bland draft: one mood, two type faces, no empty chips; see activeContext.md). Unit tests include `DesignCatalogTest` and `VideoBriefTest`. Unit tests include `ResearchRunTest`. Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, `SkillLibraryTest`, `ChatLinkTest`, `WebAppPackTest`, `HealthRecordTest`, `SkillAuditTest`, and `ReaderPlaceTest`.
 
 Known gaps:
+- v0.94.0 (versionCode 111). Installed over 0.93.0. The projects screen opened and the process stayed up. The agent can start an extended display on Windows, via the official SlothMon program left unchanged, or on Sway or Hyprland. A desktop that cannot add one is told so. Not checked against a live computer. The driver was not installed on this computer.
 - v0.93.0 (versionCode 110). Installed over 0.92.0. The projects screen opened and the process stayed up. Project files come first, then the free catalogs, and a web file still needs a printed license.
 - v0.92.0 (versionCode 109). The video skill lets the agent choose the search and which materials or facts to keep. The license gate is unchanged. Not checked as a live chat.
 - v0.91.0 (versionCode 108). `web_search` reads DuckDuckGo HTML results. A live search from the phone was not run. The parser was checked on a saved result list.

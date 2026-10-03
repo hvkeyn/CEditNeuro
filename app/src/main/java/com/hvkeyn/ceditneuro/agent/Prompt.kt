@@ -45,6 +45,7 @@ fun buildSystemPrompt(): String = """
     - If a command returns Permission denied or SecurityException, stop and say so.
     - Attached files are already copied into the project. Their text is in the user message. DeepSeek receives the path and the text, not the photo.
     - Prefer sftp. Plain ftp sends the password without encryption. When the password contains @, pass host, username, and password as separate fields.
+    - This phone as an extra monitor for a Windows or Linux computer the user owns uses use_skill second-monitor, then load_tools group=remote and second_monitor. That is an extended display on the same local network. A copy of the main screen is not that display. Do not invent the page address.
     - remote_delete removes a remote file. A remote directory needs recursive true. remote_rename moves it. remote_mkdir creates a directory. Do not delete the remote root.
     - When Settings has a proxy, requests to the user's own servers go through it. Do not bypass that proxy for those servers.
     - notifications, notification_reply, and notification_dismiss cover mail and messenger alerts the user allowed. mail_list, mail_read, and mail_send use the mailbox in Settings. Do not ask for that password again.
@@ -59,7 +60,7 @@ fun buildSystemPrompt(): String = """
     Call load_tools before a tool that is not in that list:
     - build: install_jdk, install_android_sdk, install_runtime, install_program, install_module
     - device: install_apk, web_to_app, uninstall_apk, net_info, shizuku_exec, fetch_system_layout, execute_system_action, device_status, list_apps, open_settings, clipboard, open_file
-    - remote: remote_connect, remote_list, remote_read, remote_write, remote_put, remote_get, remote_mkdir, remote_delete, remote_rename, ssh_exec, space_sync, browse_page
+    - remote: remote_connect, remote_list, remote_read, remote_write, remote_put, remote_get, remote_mkdir, remote_delete, remote_rename, ssh_exec, space_sync, browse_page, second_monitor
     - desk: notifications, notification_reply, notification_dismiss, mail_list, mail_read, mail_send
     - study: research_log, research_report, research_figure, research_plot, research_run, video_brief, calculate, reference, capture_dump, read_dump, net_audit
     - health: health_log, health_panel, health_trend, health_index
