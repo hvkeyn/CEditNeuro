@@ -76,6 +76,12 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ui.MonitorActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize|density|uiMode" />
+
         <service
             android:name=".agent.AgentService"
             android:exported="false"

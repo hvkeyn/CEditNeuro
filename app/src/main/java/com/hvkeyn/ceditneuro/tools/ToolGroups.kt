@@ -66,6 +66,7 @@ object ToolGroups {
             "space_sync",
             "ssh_exec",
             "browse_page",
+            "second_monitor",
             "remote_mkdir",
             "remote_delete",
             "remote_rename",
