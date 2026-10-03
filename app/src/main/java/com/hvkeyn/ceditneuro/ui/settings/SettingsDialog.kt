@@ -216,6 +216,12 @@ fun SettingsDialog(
                             onCheckedChange = { draft = draft.copy(networkEnabled = it) },
                         )
                         ToggleRow(
+                            title = "You should know",
+                            detail = "A local note above the message when a reply hides a failure or crosses a limit you set. It does not call another model.",
+                            checked = draft.youShouldKnow,
+                            onCheckedChange = { draft = draft.copy(youShouldKnow = it) },
+                        )
+                        ToggleRow(
                             title = "Run installed programs",
                             detail = "Lets the agent install and start compilers inside this app. Asked once if left unset.",
                             checked = draft.execAllowed == true,

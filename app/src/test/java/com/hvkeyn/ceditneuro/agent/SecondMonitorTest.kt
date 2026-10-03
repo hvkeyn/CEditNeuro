@@ -94,6 +94,8 @@ class SecondMonitorTest {
         val skill = StarterSkills.skills.getValue("second-monitor")
         assertTrue(skill.contains("extended display"))
         assertTrue(skill.contains("Nothing was mirrored.") || skill.contains("cannot add a virtual monitor"))
+        assertTrue(skill.contains("Same Wi-Fi is not a shell"))
+        assertTrue(skill.contains("Do not ask for a password"))
         assertTrue(skill.contains("Do not invent"))
         assertTrue(skill.contains("Do not change, repack, or sell"))
         assertTrue(skill.contains("second_monitor"))
