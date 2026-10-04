@@ -1,13 +1,11 @@
 package com.hvkeyn.ceditneuro.tools
 
 /**
- * Host scripts for an extended display. The Windows script downloads the official
- * SlothMon zip and does not change it. The Linux script adds a headless output
- * on Sway or Hyprland. Neither script is a copy of the main screen.
+ * Host scripts for an extended display. Windows is the adb tunnel to 127.0.0.1.
+ * The Linux script adds a headless output on Sway or Hyprland.
+ * Neither path copies the main screen or downloads a display program.
  */
 object SecondMonitor {
-    const val WINDOWS_ZIP =
-        "https://kuuhugu.github.io/SlothMon/download/v0.7.0/SlothMon-v0.7.0-windows.zip"
 
     fun acceptPage(url: String): Boolean {
         val clean = url.trim()
@@ -17,7 +15,8 @@ object SecondMonitor {
         val host = clean.substringAfter("://").substringBefore("/").substringBefore("?").substringBefore(":")
         if (host.isEmpty() || host.startsWith(".")) return false
         val bare = host.lowercase()
-        if (bare == "localhost" || bare == "127.0.0.1" || bare == "0.0.0.0" || bare == "::1") return false
+        // 127.0.0.1 is the computer when adb reverse is up. 0.0.0.0 is not a page.
+        if (bare == "0.0.0.0" || bare == "::1") return false
         return true
     }
 
@@ -420,27 +419,11 @@ object SecondMonitor {
 
     fun windowsScript(): String = """
         ¤ErrorActionPreference = 'Stop'
-        ¤ProgressPreference = 'SilentlyContinue'
-        ¤root = Join-Path ¤env:LOCALAPPDATA 'CEditNeuro\SlothMon'
         if (¤args -contains 'stop') {
-            Get-Process -Name slothmon -ErrorAction SilentlyContinue | Stop-Process
-            Write-Output 'SlothMon was closed. The display driver stays installed.'
+            Write-Output 'The extra display is the adb tunnel. Stop that host on the computer. Nothing was downloaded.'
             exit 0
         }
-        New-Item -ItemType Directory -Force -Path ¤root | Out-Null
-        ¤exe = Get-ChildItem -Path ¤root -Filter slothmon.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-        if (-not ¤exe) {
-            ¤zip = Join-Path ¤root 'SlothMon-v0.7.0-windows.zip'
-            ¤page = '$WINDOWS_ZIP'
-            Invoke-WebRequest -Uri ¤page -OutFile ¤zip -UseBasicParsing
-            Expand-Archive -LiteralPath ¤zip -DestinationPath ¤root -Force
-            ¤exe = Get-ChildItem -Path ¤root -Filter slothmon.exe -Recurse | Select-Object -First 1
-        }
-        if (-not ¤exe) {
-            Write-Output 'The official archive did not contain slothmon.exe. Nothing was started.'
-            exit 2
-        }
-        Start-Process -FilePath ¤exe.FullName -WorkingDirectory ¤exe.DirectoryName
-        Write-Output 'Started SlothMon. Approve the permission prompt on this computer the first time. The page address is the code in the SlothMon window. Do not invent an address. The program files were not changed.'
+        Write-Output 'Windows uses the open adb tunnel. The page is http://127.0.0.1:8791/ . Do not download a display program. Do not invent an address.'
+        exit 0
     """.trimIndent().replace("¤", "$") + "\n"
 }

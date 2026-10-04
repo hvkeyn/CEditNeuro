@@ -3,7 +3,8 @@
 Released: v0.45.0 through v0.75.0 (`frontend-design` rejects a bland draft: one mood, two type faces, no empty chips; see activeContext.md). Unit tests include `DesignCatalogTest` and `VideoBriefTest`. Unit tests include `ResearchRunTest`. Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, `SkillLibraryTest`, `ChatLinkTest`, `WebAppPackTest`, `HealthRecordTest`, `SkillAuditTest`, and `ReaderPlaceTest`.
 
 Known gaps:
-- v0.95.0 (versionCode 112). Installed over 0.94.0. Project 123 opened and the process stayed up. You should know is on. The second-monitor skill no longer asks for a password when the computer is not in Settings. The same network still cannot start the Windows program by itself.
+- v0.96.0 (versionCode 113). Installed over 0.95.0. The phone is showing this computer's extra display full screen through the open adb link. A pointer move landed on that display. The phone agent opens the page. The host is `tools/adb-monitor.ps1` on the computer that has adb.
+- v0.95.0 (versionCode 112). Installed over 0.94.0. Project 123 opened and the process stayed up. You should know is on. The second-monitor skill no longer asks for a password when the computer is not in Settings.
 - v0.94.0 (versionCode 111). Installed over 0.93.0. The projects screen opened and the process stayed up. The agent can start an extended display on Windows, via the official SlothMon program left unchanged, or on Sway or Hyprland. A desktop that cannot add one is told so. Not checked against a live computer. The driver was not installed on this computer.
 - v0.93.0 (versionCode 110). Installed over 0.92.0. The projects screen opened and the process stayed up. Project files come first, then the free catalogs, and a web file still needs a printed license.
 - v0.92.0 (versionCode 109). The video skill lets the agent choose the search and which materials or facts to keep. The license gate is unchanged. Not checked as a live chat.

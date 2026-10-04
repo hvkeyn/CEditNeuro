@@ -11,10 +11,11 @@ import kotlinx.serialization.json.JsonObject
 class SecondMonitorTool(private val context: Context) : Tool {
     override val name = "second_monitor"
     override val description =
-        "Make this phone an extra display for a computer the user owns, on the same local network. " +
-            "action=script returns the whole host file for os=windows or os=linux. Write that text unchanged. " +
-            "action=open loads the address the computer printed, full screen, and keeps this screen awake. " +
-            "This is an extended display, not a copy of the main screen."
+        "Make this phone an extra display for a computer the user owns. " +
+            "On Windows the page is http://127.0.0.1:8791/ through the open adb tunnel. " +
+            "action=script returns the host file for os=windows or os=linux. " +
+            "action=open loads that page full screen and keeps this screen awake. " +
+            "This is an extended display, not a copy of the main screen. Do not download a display program."
     override val parameters = objectSchema(
         properties = mapOf(
             "action" to stringProp("script or open."),
