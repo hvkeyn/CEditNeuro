@@ -51,12 +51,13 @@ class SecondMonitorTest {
     }
 
     @Test
-    fun windowsScriptKeepsTheOfficialProgramUnchanged() {
+    fun windowsScriptUsesTheAdbTunnel() {
         val script = SecondMonitor.windowsScript()
-        assertTrue(script.contains(SecondMonitor.WINDOWS_ZIP))
-        assertTrue(script.contains("The program files were not changed."))
+        assertTrue(script.contains("http://127.0.0.1:8791/"))
+        assertTrue(script.contains("Do not download a display program."))
         assertTrue(script.contains("Do not invent an address."))
-        assertTrue(script.contains("The display driver stays installed."))
+        assertFalse(script.contains("Invoke-WebRequest"))
+        assertFalse(script.contains("Expand-Archive"))
         assertFalse(script.contains("Invoke-Expression"))
         assertFalse(script.contains("-enc"))
         assertFalse(script.contains("¤"))
@@ -82,8 +83,8 @@ class SecondMonitorTest {
     @Test
     fun openAcceptsOnlyARemotePage() {
         assertTrue(SecondMonitor.acceptPage("http://192.168.1.20:8791/m/abc/"))
-        assertFalse(SecondMonitor.acceptPage("http://127.0.0.1:8791/m/abc/"))
-        assertFalse(SecondMonitor.acceptPage("http://localhost/m/abc/"))
+        assertTrue(SecondMonitor.acceptPage("http://127.0.0.1:8791/"))
+        assertTrue(SecondMonitor.acceptPage("http://localhost/m/abc/"))
         assertFalse(SecondMonitor.acceptPage("http://user:secret@192.168.1.20/"))
         assertFalse(SecondMonitor.acceptPage("javascript:alert(1)"))
         assertFalse(SecondMonitor.acceptPage("file:///sdcard/a.html"))

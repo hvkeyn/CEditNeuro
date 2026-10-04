@@ -46,7 +46,7 @@ fun buildSystemPrompt(): String = """
     - If a command returns Permission denied or SecurityException, stop and say so.
     - Attached files are already copied into the project. Their text is in the user message. DeepSeek receives the path and the text, not the photo.
     - Prefer sftp. Plain ftp sends the password without encryption. When the password contains @, pass host, username, and password as separate fields.
-    - This phone as an extra monitor for a Windows or Linux computer the user owns uses use_skill second-monitor, then load_tools group=remote and second_monitor. That is an extended display on the same local network. A copy of the main screen is not that display. Same Wi-Fi does not start a program on that computer. Do not ask for a password in the chat. Do not invent the page address.
+    - This phone as an extra monitor for a Windows or Linux computer the user owns uses use_skill second-monitor, then load_tools group=remote and second_monitor. That is an extended display. On Windows the picture comes through the open adb link to 127.0.0.1. A copy of the main screen is not that display. Do not download a display program. Do not ask for a password in the chat. Do not invent the page address.
     - remote_delete removes a remote file. A remote directory needs recursive true. remote_rename moves it. remote_mkdir creates a directory. Do not delete the remote root.
     - When Settings has a proxy, requests to the user's own servers go through it. Do not bypass that proxy for those servers.
     - notifications, notification_reply, and notification_dismiss cover mail and messenger alerts the user allowed. mail_list, mail_read, and mail_send use the mailbox in Settings. Do not ask for that password again.

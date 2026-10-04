@@ -35,6 +35,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        maybeMonitor(intent)
         maybeCapture(intent)
 
         val app = application as CEditNeuroApp
@@ -57,7 +58,21 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        maybeMonitor(intent)
         maybeCapture(intent)
+    }
+
+    /** The computer's adb tunnel opens the extra display. Only a loopback page is accepted here. */
+    private fun maybeMonitor(intent: Intent?) {
+        val url = intent?.getStringExtra(com.hvkeyn.ceditneuro.ui.MonitorActivity.EXTRA_URL).orEmpty()
+        if (!com.hvkeyn.ceditneuro.tools.SecondMonitor.acceptPage(url)) return
+        val host = url.substringAfter("://").substringBefore("/").substringBefore(":").lowercase()
+        if (host != "127.0.0.1" && host != "localhost") return
+        intent?.removeExtra(com.hvkeyn.ceditneuro.ui.MonitorActivity.EXTRA_URL)
+        startActivity(
+            Intent(this, com.hvkeyn.ceditneuro.ui.MonitorActivity::class.java)
+                .putExtra(com.hvkeyn.ceditneuro.ui.MonitorActivity.EXTRA_URL, url),
+        )
     }
 
     /** A same-app start used to check the recorder. The VPN prompt and the notification still apply. */
