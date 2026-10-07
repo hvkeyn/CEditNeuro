@@ -20,6 +20,7 @@ class SkillWiringTest {
         "client_tool",
         "save_path",
         "page_size",
+        "topic_id",
     )
 
     @Test

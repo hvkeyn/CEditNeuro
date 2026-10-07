@@ -45,6 +45,13 @@ class HttpRequestTool(
                 "That host is a browser proxy. Request the page URL directly with http_request. Do not call the proxy again.",
             )
         }
+        PageCheck.readerTarget(url)?.let { target ->
+            if (!PageCheck.isPublic(target)) {
+                return@withContext ToolResult.error(
+                    "r.jina.ai reads only a public http(s) page. Do not send a private address, a login, or a key to it.",
+                )
+            }
+        }
         val method = args.stringArg("method") ?: "GET"
         val savePath = args.stringArg("save_path")?.trim()?.trimStart('/')
         val maxChars = (args.intArg("max_chars") ?: 16_000).coerceIn(200, 40_000)
@@ -95,6 +102,24 @@ class HttpRequestTool(
         }
 
         val text = exchange.body.toString(Charset.forName("UTF-8"))
+        if (PageCheck.isChallenge(text)) {
+            val next = if (PageCheck.readerTarget(url) == null && PageCheck.readerUrl(url) != null) {
+                "Read it once through ${PageCheck.READER}$url, or say the page could not be read."
+            } else {
+                "Say the page could not be read. Do not retry it."
+            }
+            return@withContext ToolResult.error(
+                "HTTP ${exchange.code}: an anti-bot check page answered, not the page. That is not content. $next",
+            )
+        }
+        if (PageCheck.readerTarget(url) != null) {
+            PageCheck.readerRefusal(text)?.let { code ->
+                return@withContext ToolResult.error(
+                    "The site answered $code to the reader. That is not the page. " +
+                        "Say it needs a login or could not be read. Do not retry it.",
+                )
+            }
+        }
         val shown = if (text.length <= maxChars) text else text.take(maxChars) + "\n… truncated"
         val type = exchange.contentType.ifBlank { "unknown" }
         val refusal = com.hvkeyn.ceditneuro.shell.ShellExit.refusal(shown)
