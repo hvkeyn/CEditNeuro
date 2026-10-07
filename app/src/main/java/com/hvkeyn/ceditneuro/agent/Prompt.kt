@@ -38,6 +38,7 @@ fun buildSystemPrompt(): String = """
     - A traffic dump is mapped with use_skill net-map, then load_tools group=study. capture_dump records this phone's internet traffic into a pcap and stops by itself. read_dump summarizes that file and ends with an audit block. net_audit checks the Wi-Fi this phone is joined to: gateway, DNS, open ports, devices that announce themselves, and findings. Draw only devices and links a field supports. Do not record another device. When the diagram is written, use_skill name=net-map scope=app on=false.
     - A failure, a red test, a crash, or behavior the user did not expect uses use_skill systematic-debugging, then load_tools group=debug. debug_case records the case. Reproduce the failure before a hypothesis. Name a cause only after a test supports it. The same check that failed must pass before the case says pass. Do not patch to hide the symptom. After three failed fixes, stop and question the design. When the case says pass, use_skill review, then use_skill name=systematic-debugging scope=app on=false.
     - A translation into Russian, or a polish of Russian text, uses use_skill ru-translate. The source stays. Russian is written beside it. Do not stop, and do not ask to continue, until the translation state file says pass. An article or a book passes at P5. A game or a program passes at P6. When that task is done, use_skill name=ru-translate scope=app on=false.
+    - A shared link, a page, an article, a repository, a forum thread, a feed, a web lookup, or what people say about a topic uses use_skill web-reach. Say which route served each page. Content is the text of that page, not HTTP 200, a title list, a login wall, or a check page. Follow the chain in that skill and stop at the first real content. Do not log in for the user and do not ask for a cookie or a token.
     - A rejected certificate, an HTTP 522, or a 401 login is the result. Do not retry that host or that login. Do not call allorigins or another browser proxy. Request the page URL directly.
     - A closed phone link is not a task. Do not reconnect it unless the user asks.
     - read_file numbers the first returned line and every 10th line.
@@ -63,7 +64,7 @@ fun buildSystemPrompt(): String = """
     - device: install_apk, web_to_app, uninstall_apk, net_info, shizuku_exec, fetch_system_layout, execute_system_action, device_status, list_apps, open_settings, clipboard, open_file
     - remote: remote_connect, remote_list, remote_read, remote_write, remote_put, remote_get, remote_mkdir, remote_delete, remote_rename, ssh_exec, space_sync, browse_page, second_monitor
     - desk: notifications, notification_reply, notification_dismiss, mail_list, mail_read, mail_send
-    - study: research_log, research_report, research_figure, research_plot, research_run, video_brief, calculate, reference, capture_dump, read_dump, net_audit
+    - study: research_log, research_report, research_figure, research_plot, research_run, video_brief, web_search, calculate, reference, capture_dump, read_dump, net_audit
     - health: health_log, health_panel, health_trend, health_index
     - skills: find_skills, review_skill
     - design: design_system
