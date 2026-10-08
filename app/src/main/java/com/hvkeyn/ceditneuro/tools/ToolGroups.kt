@@ -116,6 +116,9 @@ object ToolGroups {
             "voiceover",
             "web_search",
         ),
+        "learn" to listOf(
+            "learn",
+        ),
         "harness" to listOf(
             "harness_rrsi",
         ),

@@ -7,7 +7,8 @@
 - Reader for txt, Markdown, HTML, FB2, EPUB: pages, find, bookmarks, notes, pen layer, book chat, read aloud. The last page is kept on this phone after the reader closes or the app exits.
 - Shell inside the app (toybox, app toolchain) plus a Root switch that runs through Shizuku or su.
 - Link: two phones share a 6-digit code; lead and support agents exchange tasks and files.
-- Study: research log, report (md + PDF), SVG figure, `research_plot`, `calculate`, `reference`. A source locator is copied from a tool. A rejected locator, a missed lookup, a 522, and a rejected certificate are not retried.
+- Study: research log, report (md + PDF), SVG figure, `research_plot`, `calculate`, `reference`. A source locator is copied from a tool. A rejected locator, a missed lookup, a 522, and a rejected certificate are not retried. A lesson uses `learn`: the answer stays hidden until the learner tries, then a notebook and a resume point are kept.
+
 - Health: the agent turns on a skill for a lab sheet or a scan report, stores each printed number, marks it against the range on that sheet, and can show the trend of one test. It does not diagnose.
 - Dreams: the agent talks a dream through as a Jungian psychotherapist: images, people, feelings, what the dream compensates, examples from life, and small steps. It is reflection, not a diagnosis.
 - Skills: when a task needs a skill this phone does not have, the agent searches by plain words, checks the file, and saves only a short adapted procedure. A dangerous prompt, a backdoor, malware, or a key is not saved.

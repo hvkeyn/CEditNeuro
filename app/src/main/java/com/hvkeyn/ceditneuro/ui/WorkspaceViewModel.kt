@@ -2404,6 +2404,7 @@ class WorkspaceViewModel(
             "research_plot" -> "Drawing a chart"
             "research_run" -> "Running the study"
             "video_brief" -> "Reading a video"
+            "learn" -> "Teaching"
             "render_video" -> "Rendering a video"
             "sound_effect" -> "Adding a sound effect"
             "make_music" -> "Making music"
@@ -2974,6 +2975,7 @@ class WorkspaceViewModel(
             ResearchFigureTool(ws),
             com.hvkeyn.ceditneuro.tools.ResearchPlotTool(ws),
             com.hvkeyn.ceditneuro.tools.ResearchRunTool(ws),
+            com.hvkeyn.ceditneuro.tools.LearnTool(ws),
             com.hvkeyn.ceditneuro.tools.VideoBriefTool(agentNet) { settingsStore.current.networkEnabled },
             com.hvkeyn.ceditneuro.tools.CalculateTool(),
             com.hvkeyn.ceditneuro.tools.ReferenceTool(agentNet) { settingsStore.current.networkEnabled },
