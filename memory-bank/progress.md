@@ -3,6 +3,8 @@
 Released: v0.45.0 through v0.75.0 (`frontend-design` rejects a bland draft: one mood, two type faces, no empty chips; see activeContext.md). Unit tests include `DesignCatalogTest` and `VideoBriefTest`. Unit tests include `ResearchRunTest`. Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, `SkillLibraryTest`, `ChatLinkTest`, `WebAppPackTest`, `HealthRecordTest`, `SkillAuditTest`, and `ReaderPlaceTest`.
 
 Known gaps:
+- v0.99.2 (versionCode 118). Released. The shared queue, note links, and the link-chip fix shipped together. `CrewBoardTest` and `NoteVaultTest` cover the queue and the lookup. A live tap through a vault, and a live chat with several phones, were not run. One phone still runs one model session.
+- v0.99.1 and v0.99.0 were installed on the phone while the work was in progress and are folded into this release.
 - v0.98.0 (versionCode 115). Installed over 0.97.0. The app opened and stayed up. `ConceptLoomTest` covers a hidden answer, a spent token, a resume, and a due review. A live lesson chat was not run. The release file is `CEditNeuro-0.98.0.apk`.
 - v0.97.0 (versionCode 114). `web-reach` and `PageCheck` are covered by `WebReachTest`. The keyless routes answered from the computer on 2026-10-07: the reader, GitHub, V2EX, Hacker News, RSS. Reddit 403 and Bilibili 412 were seen there too. A live chat on the phone was not run.
 - v0.96.0 (versionCode 113). Installed over 0.95.0. The phone is showing this computer's extra display full screen through the open adb link. A pointer move landed on that display. The phone agent opens the page. The host is `tools/adb-monitor.ps1` on the computer that has adb.

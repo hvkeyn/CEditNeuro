@@ -97,8 +97,7 @@ class AgentLoop(
             val peer = peerFeed().trim()
             if (peer.isNotEmpty()) {
                 messages += ChatMessage.user(
-                    "Parallel peer. If you are the lead, give the other agent a part and apply its audit. " +
-                        "If you are supporting, check the lead and send corrections. Keep working:\n$peer",
+                    "Parallel peer. The link has no lead. Read the queue with crew, claim one open task, and post a FACT, FAIL, or DONE. Do not wait to be assigned. Keep working:\n$peer",
                 )
             }
             emit(activity(messages, round))

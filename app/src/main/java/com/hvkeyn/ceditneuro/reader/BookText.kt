@@ -58,7 +58,12 @@ object BookText {
 
     /** Turns Markdown, wiki links, and pipe tables into lines meant to be read. */
     fun polish(text: String): String {
+        val kept = ArrayList<String>()
         var value = text.replace("\r\n", "\n")
+        value = Regex("\u0002[^\u0002]*\u0002").replace(value) { match ->
+            kept += match.value
+            "\uE000${kept.lastIndex}\uE000"
+        }
         value = Regex("\\[\\[([^\\]|]+)\\|([^\\]]+)]]").replace(value) { it.groupValues[2].trim() }
         value = Regex("\\[\\[([^\\]]+)]]").replace(value) {
             it.groupValues[1].substringAfterLast('/').substringAfterLast('|').trim()
@@ -67,7 +72,7 @@ object BookText {
         value = Regex("\\[([^\\]]+)]\\([^)]*\\)").replace(value) { it.groupValues[1] }
         value = Regex("`{1,3}([^`]*)`{1,3}").replace(value) { it.groupValues[1] }
         value = value.replace("**", "").replace("__", "").replace("~~", "")
-        return value.lineSequence().joinToString("\n") { line ->
+        val lined = value.lineSequence().joinToString("\n") { line ->
             val trimmed = line.trim()
             when {
                 trimmed.startsWith("|") && trimmed.contains("---") -> ""
@@ -78,7 +83,18 @@ object BookText {
                 else -> line
             }
         }.replace(Regex("\n{3,}"), "\n\n").trim()
+        return Regex("\uE000(\\d+)\uE000").replace(lined) { match ->
+            kept.getOrNull(match.groupValues[1].toInt()) ?: match.value
+        }
     }
+
+    /** Drops figure and link markers, keeping the words a person would hear. */
+    fun spoken(text: String): String = text
+        .replace('\u0000', '\n')
+        .replace(Regex("\u0001[^\u0001]*\u0001"), " ")
+        .replace(Regex("\u0002([^\u001f]*)\u001f[^\u0002]*\u0002"), "$1")
+        .replace(Regex("[ ]{2,}"), " ")
+        .trim()
 
     fun pages(book: ParsedBook, charsPerPage: Int): List<BookPage> {
         val size = charsPerPage.coerceIn(400, 4_000)
@@ -94,9 +110,10 @@ object BookText {
                         ?: body.lastIndexOf(' ', end).takeIf { it > start + size / 2 }
                     if (breakAt != null) end = breakAt
                 }
-                val slice = body.substring(start, end).trim()
+                val sliceEnd = snapMarker(body, start, end)
+                val slice = body.substring(start, sliceEnd).trim()
                 if (slice.isNotEmpty()) pages.add(BookPage(chapter.title, slice))
-                start = end
+                start = sliceEnd
                 while (start < body.length && body[start].isWhitespace()) start++
             }
         }
@@ -104,23 +121,56 @@ object BookText {
         return pages
     }
 
+    /** Keeps a figure or a note link on one page instead of cutting through its marker. */
+    private fun snapMarker(body: String, start: Int, end: Int): Int {
+        if (start >= body.length) return body.length
+        val mark = body[start]
+        if (mark == '\u0001' || mark == '\u0002') {
+            val close = body.indexOf(mark, start + 1)
+            if (close > start) return (close + 1).coerceAtMost(body.length)
+        }
+        if (end >= body.length) return body.length
+        var cut = end
+        for (token in charArrayOf('\u0001', '\u0002')) {
+            val open = body.lastIndexOf(token, (cut - 1).coerceAtLeast(start))
+            if (open <= start) continue
+            val close = body.indexOf(token, open + 1)
+            if (close < 0 || close >= cut) cut = open
+        }
+        return if (cut <= start) end.coerceAtMost(body.length) else cut
+    }
+
     private fun plainBook(name: String, text: String): ParsedBook {
         val title = name.substringBeforeLast('.').ifBlank { name }
-        return ParsedBook(title, listOf(BookChapter(title, text.trim())))
+        val woven = if (text.contains("[[") || text.contains("](")) weaveNoteLinks(text) else text
+        return ParsedBook(title, listOf(BookChapter(title, woven.trim())))
     }
 
     /** A page is words, a picture, or both. Figure ids match keys in [ParsedBook.images]. */
     fun pagePieces(text: String): List<PagePiece> {
         val out = ArrayList<PagePiece>()
-        var last = 0
-        for (match in FIGURE.findAll(text)) {
-            val words = text.substring(last, match.range.first).trim()
-            if (words.isNotEmpty()) out += PagePiece.Words(words)
-            out += PagePiece.Figure(match.groupValues[1])
-            last = match.range.last + 1
+        var index = 0
+        while (index < text.length) {
+            val figureAt = text.indexOf('\u0001', index).takeIf { it >= 0 }
+            val linkAt = text.indexOf('\u0002', index).takeIf { it >= 0 }
+            val at = listOfNotNull(figureAt, linkAt).minOrNull()
+            if (at == null) {
+                addWords(out, text.substring(index))
+                break
+            }
+            addWords(out, text.substring(index, at))
+            val mark = text[at]
+            val close = text.indexOf(mark, at + 1)
+            if (close < 0) break
+            val body = text.substring(at + 1, close)
+            if (mark == '\u0001') {
+                out += PagePiece.Figure(body)
+            } else {
+                val parts = body.split('\u001f')
+                if (parts.size >= 3) out += PagePiece.Jump(parts[0], parts[1], parts[2])
+            }
+            index = close + 1
         }
-        val tail = text.substring(last).trim()
-        if (tail.isNotEmpty()) out += PagePiece.Words(tail)
         if (out.isEmpty()) out += PagePiece.Words(text)
         return out
     }
@@ -136,7 +186,7 @@ object BookText {
 
     private fun markdownBook(name: String, text: String, baseDir: java.io.File?): ParsedBook {
         val images = LinkedHashMap<String, ByteArray>()
-        val prepared = pullFigures(text, baseDir, images)
+        val prepared = weaveNoteLinks(pullFigures(text, baseDir, images))
         val title = prepared.lineSequence().firstOrNull { it.startsWith("# ") }?.removePrefix("# ")?.trim()
             ?: name.substringBeforeLast('.')
         val chapters = ArrayList<BookChapter>()
@@ -151,6 +201,7 @@ object BookText {
             if (line.startsWith("# ")) {
                 flush()
                 current = line.trimStart('#').trim().ifBlank { current }
+                current = Regex("\u0002([^\u001f]*)\u001f[^\u0002]*\u0002").replace(current) { it.groupValues[1] }
             } else {
                 body.append(line.replace(Regex("^#{2,6}\\s+"), "")).append('\n')
             }
@@ -176,6 +227,10 @@ object BookText {
         body = Regex("(?is)<svg\\b.*?</svg>").replace(body) { match ->
             store(match.value.toByteArray(Charsets.UTF_8)).ifEmpty { match.value }
         }
+        body = Regex("!\\[\\[([^\\]|#]+)]]").replace(body) { match ->
+            val bytes = readFigure(baseDir, match.groupValues[1].trim()) ?: return@replace match.value
+            store(bytes).ifEmpty { match.value }
+        }
         body = Regex("!\\[([^\\]]*)]\\(([^)]+)\\)").replace(body) { match ->
             val src = match.groupValues[2].trim().trim('<', '>').substringBefore(' ').trim('"')
             val bytes = readFigure(baseDir, src) ?: return@replace match.value
@@ -188,6 +243,62 @@ object BookText {
             }
         }
         return body
+    }
+
+    private fun weaveNoteLinks(text: String): String = mapOutsideFences(text) { part ->
+        mapOutsideTicks(part) { plain ->
+            var value = WIKI.replace(plain) { match ->
+                val body = match.groupValues[1]
+                val alias = body.substringAfter('|', "").trim()
+                val core = body.substringBefore('|').trim()
+                val target = core.substringBefore('#').trim()
+                val heading = core.substringAfter('#', "").trim()
+                val label = alias.ifBlank {
+                    target.substringAfterLast('/').substringBeforeLast('.').ifBlank { heading }.ifBlank { "note" }
+                }
+                linkMark(label, target, heading)
+            }
+            value = MARKDOWN_LINK.replace(value) { match ->
+                val dest = match.groupValues[2].trim().trim('<', '>')
+                if (dest.startsWith("http://") || dest.startsWith("https://") || dest.startsWith("mailto:")) {
+                    return@replace match.value
+                }
+                val path = dest.substringBefore('#').substringBefore(' ').trim()
+                val heading = dest.substringAfter('#', "").substringBefore(' ').replace("%20", " ").trim()
+                linkMark(match.groupValues[1].trim().ifBlank { path.substringAfterLast('/') }, path, heading)
+            }
+            value
+        }
+    }
+
+    private fun linkMark(label: String, target: String, heading: String): String {
+        fun clean(value: String) = value.replace('\u0002', ' ').replace('\u001f', ' ').replace('\n', ' ').trim()
+        return "\u0002${clean(label)}\u001f${clean(target)}\u001f${clean(heading)}\u0002"
+    }
+
+    private fun mapOutsideTicks(text: String, block: (String) -> String): String {
+        val out = StringBuilder()
+        var index = 0
+        while (index < text.length) {
+            if (text[index] == '`') {
+                val end = text.indexOf('`', index + 1)
+                if (end < 0) {
+                    out.append(block(text.substring(index)))
+                    break
+                }
+                out.append(text, index, end + 1)
+                index = end + 1
+            } else {
+                val next = text.indexOf('`', index).let { if (it < 0) text.length else it }
+                out.append(block(text.substring(index, next)))
+                index = next
+            }
+        }
+        return out.toString()
+    }
+
+    private fun addWords(out: MutableList<PagePiece>, raw: String) {
+        if (raw.any { !it.isWhitespace() }) out += PagePiece.Words(raw)
     }
 
     private fun mapOutsideFences(text: String, block: (String) -> String): String {
@@ -488,6 +599,8 @@ object BookText {
 
     private fun extension(name: String) = name.substringAfterLast('.', "").lowercase()
 
+    private val WIKI = Regex("!?\\[\\[([^\\]]+)]]")
+    private val MARKDOWN_LINK = Regex("(?<!!)\\[([^\\]]+)]\\(([^)]+)\\)")
     private val FIGURE = Regex("\u0001([^\u0001]+)\u0001")
     private val FIGURE_EXT = setOf("svg", "png", "jpg", "jpeg", "webp", "gif", "bmp")
     private const val MAX_BYTES = 8 * 1024 * 1024
@@ -498,4 +611,5 @@ object BookText {
 sealed class PagePiece {
     data class Words(val text: String) : PagePiece()
     data class Figure(val id: String) : PagePiece()
+    data class Jump(val label: String, val target: String, val heading: String) : PagePiece()
 }

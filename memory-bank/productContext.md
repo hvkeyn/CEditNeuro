@@ -4,9 +4,9 @@
 - Agent chat with work focus (Edit, Build, Remote, Study), skills, project memory, doctor report. You should know adds one local note above the message when a reply hides a failure or crosses a limit the user set. It does not call another model.
 - Models: the paid DeepSeek API by default, any OpenAI-compatible host, or the free DeepSeek web chat through a bridge on the user's computer (no key, no payment, 64K context, tool calls emulated by the bridge).
 - The agent can turn a website or a local HTML folder into a signed WebView app and hand it to the system installer.
-- Reader for txt, Markdown, HTML, FB2, EPUB: pages, find, bookmarks, notes, pen layer, book chat, read aloud. The last page is kept on this phone after the reader closes or the app exits.
+- Reader for txt, Markdown, HTML, FB2, EPUB: pages, find, bookmarks, notes, pen layer, book chat, read aloud. A Markdown note link opens the other note, a heading in it, or the way back. The contents list names notes that point here. The last page is kept on this phone after the reader closes or the app exits.
 - Shell inside the app (toybox, app toolchain) plus a Root switch that runs through Shizuku or su.
-- Link: two phones share a 6-digit code; lead and support agents exchange tasks and files.
+- Link: any number of phones share one code. Each agent adds a piece, claims one open task, and posts a short note. Nobody assigns the work. The phone that created the code still sends the project folder.
 - Study: research log, report (md + PDF), SVG figure, `research_plot`, `calculate`, `reference`. A source locator is copied from a tool. A rejected locator, a missed lookup, a 522, and a rejected certificate are not retried. A lesson uses `learn`: the answer stays hidden until the learner tries, then a notebook and a resume point are kept.
 
 - Health: the agent turns on a skill for a lab sheet or a scan report, stores each printed number, marks it against the range on that sheet, and can show the trend of one test. It does not diagnose.
