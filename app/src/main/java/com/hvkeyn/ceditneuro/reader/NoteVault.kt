@@ -12,20 +12,20 @@ object NoteVault {
 
     fun resolve(root: File, from: File, target: String): Hit {
         val raw = target.trim().removePrefix("./")
-        if (raw.isEmpty()) return Hit.One(from)
-        val given = File(raw)
+        val clean = raw.trimEnd('.', ',', ';', ':', '!', '?', ')', '"', '»')
+        if (clean.isEmpty()) return Hit.One(from)
+        val given = File(clean)
         if (given.isFile && inside(root, given)) return Hit.One(given.canonicalFile)
+        val stemPath = noteStem(clean)
         val direct = listOf(
-            File(from.parentFile, raw),
-            File(from.parentFile, raw.substringBeforeLast('.').let { stem ->
-                if (raw.endsWith(".md") || raw.endsWith(".markdown")) raw else "$stem.md"
-            }),
-            File(root, raw),
-            File(root, if (raw.endsWith(".md") || raw.endsWith(".markdown")) raw else "$raw.md"),
+            File(from.parentFile, clean),
+            File(from.parentFile, "$stemPath.md"),
+            File(root, clean),
+            File(root, "$stemPath.md"),
         ).firstOrNull { it.isFile && inside(root, it) }
         if (direct != null) return Hit.One(direct.canonicalFile)
 
-        val want = raw.substringBeforeLast('.').replace('\\', '/').trim('/').lowercase()
+        val want = stemPath.replace('\\', '/').trim('/').lowercase()
         val leaf = want.substringAfterLast('/')
         val matches = index(root).files.filter { file ->
             val relative = relative(root, file).substringBeforeLast('.').lowercase()
@@ -101,7 +101,7 @@ object NoteVault {
             val fromName = file.nameWithoutExtension
             val fromPath = relative(root, file)
             for (match in link.findAll(text)) {
-                val stem = match.groupValues[1].trim().substringAfterLast('/').substringBeforeLast('.').lowercase()
+                val stem = noteStem(match.groupValues[1]).lowercase()
                 if (stem.isBlank() || stem == fromName.lowercase()) continue
                 val list = mentions.getOrPut(stem) { ArrayList() }
                 if (list.none { it.second == fromPath } && list.size < 24) list += fromName to fromPath
@@ -110,8 +110,21 @@ object NoteVault {
         return Index(key, files, mentions).also { cached = it }
     }
 
+    private fun noteStem(raw: String): String {
+        var name = raw.trim().removePrefix("./").replace('\\', '/').trim('/')
+        name = name.trimEnd('.', ',', ';', ':', '!', '?', ')', '"', '»')
+        val lower = name.lowercase()
+        for (ext in listOf("markdown", "notes", "note", "txt", "md")) {
+            if (lower.endsWith(".$ext")) {
+                name = name.dropLast(ext.length + 1)
+                break
+            }
+        }
+        return name.trim()
+    }
+
     private fun walk(root: File, dir: File, depth: Int, out: MutableList<File>) {
-        if (depth > 8 || out.size >= 400) return
+        if (depth > 24 || out.size >= 8_000) return
         val children = dir.listFiles() ?: return
         for (child in children) {
             if (child.name.startsWith(".")) continue

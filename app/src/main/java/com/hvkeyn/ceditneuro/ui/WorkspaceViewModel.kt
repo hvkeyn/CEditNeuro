@@ -845,8 +845,15 @@ class WorkspaceViewModel(
                 com.hvkeyn.ceditneuro.reader.NoteVault.resolve(ws.root, from, target)
             }
             when (hit) {
-                is com.hvkeyn.ceditneuro.reader.NoteVault.Hit.Missing ->
-                    showMessage("No note named ${target.substringAfterLast('/').substringBeforeLast('.')}.")
+                is com.hvkeyn.ceditneuro.reader.NoteVault.Hit.Missing -> {
+                    val current = _state.value.reader
+                    if (current != null && com.hvkeyn.ceditneuro.reader.NoteVault.anchorForHeading(sourceText, target) >= 0) {
+                        jumpHeading(current, target)
+                    } else {
+                        val leaf = target.substringAfterLast('/').trim().trimEnd('.', ',', ';', ':', '!', '?')
+                        showMessage("No note named \"$leaf\".")
+                    }
+                }
                 is com.hvkeyn.ceditneuro.reader.NoteVault.Hit.Many ->
                     showMessage("Several notes are named ${target.substringAfterLast('/')}: ${hit.names.joinToString()}.")
                 is com.hvkeyn.ceditneuro.reader.NoteVault.Hit.One -> {

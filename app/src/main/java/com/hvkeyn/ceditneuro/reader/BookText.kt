@@ -88,6 +88,48 @@ object BookText {
         }
     }
 
+    /**
+     * The text a page should measure: a link marker becomes its label, so a long title wraps
+     * with the paragraph instead of taking a page of its own. [Presented.sourceAt] maps a
+     * visible character back to the source, which is what bookmarks and heading jumps store.
+     */
+    fun present(source: String): Presented {
+        val out = StringBuilder(source.length)
+        val map = IntArray(source.length)
+        val spans = ArrayList<NoteSpan>()
+        var shown = 0
+        var index = 0
+        while (index < source.length) {
+            if (source[index] == '\u0002') {
+                val close = source.indexOf('\u0002', index + 1)
+                if (close > index) {
+                    val parts = source.substring(index + 1, close).split('\u001f', limit = 3)
+                    val label = parts.getOrElse(0) { "" }
+                    val start = shown
+                    val labelAt = index + 1
+                    for (offset in label.indices) {
+                        if (shown >= map.size) break
+                        out.append(label[offset])
+                        map[shown] = (labelAt + offset).coerceAtMost(close)
+                        shown++
+                    }
+                    if (shown > start) {
+                        spans += NoteSpan(start, shown, parts.getOrElse(1) { "" }, parts.getOrElse(2) { "" })
+                    }
+                    index = close + 1
+                    continue
+                }
+            }
+            if (shown < map.size) {
+                out.append(source[index])
+                map[shown] = index
+                shown++
+            }
+            index++
+        }
+        return Presented(out.toString(), spans, if (shown == map.size) map else map.copyOf(shown))
+    }
+
     /** Drops figure and link markers, keeping the words a person would hear. */
     fun spoken(text: String): String = text
         .replace('\u0000', '\n')
@@ -121,13 +163,16 @@ object BookText {
         return pages
     }
 
-    /** Keeps a figure or a note link on one page instead of cutting through its marker. */
+    /** Keeps a figure on one page. A note link stays whole, then the paragraph continues. */
     private fun snapMarker(body: String, start: Int, end: Int): Int {
         if (start >= body.length) return body.length
-        val mark = body[start]
-        if (mark == '\u0001' || mark == '\u0002') {
-            val close = body.indexOf(mark, start + 1)
+        if (body[start] == '\u0001') {
+            val close = body.indexOf('\u0001', start + 1)
             if (close > start) return (close + 1).coerceAtMost(body.length)
+        }
+        if (body[start] == '\u0002') {
+            val close = body.indexOf('\u0002', start + 1)
+            if (close >= end) return (close + 1).coerceAtMost(body.length)
         }
         if (end >= body.length) return body.length
         var cut = end
@@ -253,9 +298,7 @@ object BookText {
                 val core = body.substringBefore('|').trim()
                 val target = core.substringBefore('#').trim()
                 val heading = core.substringAfter('#', "").trim()
-                val label = alias.ifBlank {
-                    target.substringAfterLast('/').substringBeforeLast('.').ifBlank { heading }.ifBlank { "note" }
-                }
+                val label = alias.ifBlank { displayLeaf(target, heading) }
                 linkMark(label, target, heading)
             }
             value = MARKDOWN_LINK.replace(value) { match ->
@@ -265,10 +308,22 @@ object BookText {
                 }
                 val path = dest.substringBefore('#').substringBefore(' ').trim()
                 val heading = dest.substringAfter('#', "").substringBefore(' ').replace("%20", " ").trim()
-                linkMark(match.groupValues[1].trim().ifBlank { path.substringAfterLast('/') }, path, heading)
+                linkMark(match.groupValues[1].trim().ifBlank { displayLeaf(path, heading) }, path, heading)
             }
             value
         }
+    }
+
+    private fun displayLeaf(target: String, heading: String): String {
+        var leaf = target.substringAfterLast('/').trim()
+        val lower = leaf.lowercase()
+        for (ext in listOf("markdown", "notes", "note", "txt", "md")) {
+            if (lower.endsWith(".$ext")) {
+                leaf = leaf.dropLast(ext.length + 1)
+                break
+            }
+        }
+        return leaf.ifBlank { heading }.ifBlank { "note" }
     }
 
     private fun linkMark(label: String, target: String, heading: String): String {
@@ -612,4 +667,48 @@ sealed class PagePiece {
     data class Words(val text: String) : PagePiece()
     data class Figure(val id: String) : PagePiece()
     data class Jump(val label: String, val target: String, val heading: String) : PagePiece()
+}
+
+/** A link's place in the visible text. Offsets are into that text, not the marker. */
+data class NoteSpan(val start: Int, val end: Int, val target: String, val heading: String)
+
+/** One screen column after markers have been turned into words. */
+data class ShownPage(val text: String, val spans: List<NoteSpan>)
+
+/** Visible book text plus the map back to the source offsets the reader saves. */
+class Presented(
+    val text: String,
+    val spans: List<NoteSpan>,
+    private val sourceOf: IntArray,
+) {
+    fun sourceAt(shownIndex: Int): Int {
+        if (sourceOf.isEmpty()) return 0
+        return sourceOf[shownIndex.coerceIn(0, sourceOf.lastIndex)]
+    }
+
+    fun page(range: IntRange): ShownPage {
+        if (text.isEmpty()) return ShownPage("", emptyList())
+        val rawStart = range.first.coerceIn(0, text.length)
+        val rawEnd = (range.last + 1).coerceIn(rawStart, text.length)
+        var from = rawStart
+        var to = rawEnd
+        while (from < to && text[from].let { it == '\u0000' || it == '\n' || it == ' ' }) from++
+        while (to > from && text[to - 1].let { it == '\u0000' || it == '\n' || it == ' ' }) to--
+        val local = ArrayList<NoteSpan>()
+        for (span in spans) {
+            if (span.end <= from || span.start >= to) continue
+            val start = (span.start - from).coerceAtLeast(0)
+            val end = (span.end - from).coerceAtMost(to - from)
+            if (end > start) local += span.copy(start = start, end = end)
+        }
+        return ShownPage(text.substring(from, to), local)
+    }
+
+    fun toSource(range: IntRange, sourceLength: Int): IntRange {
+        if (sourceOf.isEmpty()) return 0 until sourceLength.coerceAtLeast(1)
+        val from = sourceOf[range.first.coerceIn(0, sourceOf.lastIndex)]
+        val to = sourceOf[range.last.coerceIn(0, sourceOf.lastIndex)] + 1
+        val end = to.coerceAtLeast(from + 1).coerceAtMost(sourceLength.coerceAtLeast(from + 1))
+        return from until end
+    }
 }
