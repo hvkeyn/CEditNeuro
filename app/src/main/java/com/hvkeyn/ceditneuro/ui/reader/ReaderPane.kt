@@ -4,7 +4,6 @@ import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -83,7 +82,11 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
@@ -92,8 +95,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hvkeyn.ceditneuro.data.ReaderNote
 import com.hvkeyn.ceditneuro.reader.BookText
+import com.hvkeyn.ceditneuro.reader.NoteSpan
 import com.hvkeyn.ceditneuro.reader.PageBreak
 import com.hvkeyn.ceditneuro.reader.PagePiece
+import com.hvkeyn.ceditneuro.reader.ShownPage
 import com.hvkeyn.ceditneuro.ui.ReaderView
 import com.hvkeyn.ceditneuro.ui.ExpandablePicture
 import com.hvkeyn.ceditneuro.ui.editor.ExpandableMarkup
@@ -318,10 +323,11 @@ fun ReaderPane(
             val measured = if (columnHeight > 80) columnHeight - 8.dp.roundToPx() else (maxHeight - 96.dp).roundToPx()
             measured.coerceAtLeast(1)
         }
-        val spread = remember(pageText, textWidth, textHeightPx, reader.fontSp, reader.fontName, reader.spacing) {
+        val face = remember(pageText) { BookText.present(pageText) }
+        val spread = remember(face.text, textWidth, textHeightPx, reader.fontSp, reader.fontName, reader.spacing) {
             with(density) {
                 paginate(
-                    pageText,
+                    face.text,
                     measurer,
                     style,
                     textWidth.roundToPx().coerceAtLeast(1),
@@ -329,12 +335,15 @@ fun ReaderPane(
                 )
             }
         }
+        val sourceRanges = remember(spread.ranges, pageText) {
+            spread.ranges.map { face.toSource(it, pageText.length) }
+        }
         val widthPx = with(density) { textWidth.roundToPx() }
         val count = spread.ranges.size.coerceAtLeast(1)
-        LaunchedEffect(spread.ranges, widthPx, textHeightPx) {
+        LaunchedEffect(sourceRanges, widthPx, textHeightPx) {
             if (placed || reader.land || widthPx <= 80 || columnHeight <= 80) return@LaunchedEffect
             page = com.hvkeyn.ceditneuro.reader.ReaderPlace.pageFor(
-                spread.ranges,
+                sourceRanges,
                 pageText.length,
                 reader.anchor,
                 reader.fraction,
@@ -344,18 +353,18 @@ fun ReaderPane(
         }
         LaunchedEffect(reader.nav, count, reader.landAnchor) {
             if (!reader.land || reader.landAnchor < 0) return@LaunchedEffect
-            page = com.hvkeyn.ceditneuro.reader.ReaderPlace.pageAt(spread.ranges, reader.landAnchor)
+            page = com.hvkeyn.ceditneuro.reader.ReaderPlace.pageAt(sourceRanges, reader.landAnchor)
             placed = true
         }
         if (placed && page > count - 1) page = count - 1
         LaunchedEffect(placed, count, page, spread.chapters.getOrNull(page)) {
             if (!placed) return@LaunchedEffect
-            val anchor = spread.ranges.getOrNull(page)?.first ?: 0
+            val anchor = sourceRanges.getOrNull(page)?.first ?: 0
             onProgress(page, count, spread.chapters.getOrNull(page).orEmpty(), anchor)
         }
         val shown = (0 until columns).map { column ->
             val index = page + column
-            spread.ranges.getOrNull(index)?.let { pageText.substring(it.first, it.last + 1).trim('\u0000', '\n', ' ') }.orEmpty()
+            spread.ranges.getOrNull(index)?.let { face.page(it) } ?: ShownPage("", emptyList())
         }
         LaunchedEffect(turn) {
             if (turn != 0) {
@@ -378,7 +387,7 @@ fun ReaderPane(
                 aloud.stop()
                 return@LaunchedEffect
             }
-            aloud.speak(BookText.spoken(shown.joinToString("\n"))) {
+            aloud.speak(BookText.spoken(shown.joinToString("\n") { it.text })) {
                 if (page + columns <= count - 1) page += columns else speaking = false
             }
         }
@@ -392,7 +401,8 @@ fun ReaderPane(
             ) {
                 for (column in shown) {
                     ReaderColumn(
-                        column,
+                        column.text,
+                        column.spans,
                         images,
                         style,
                         Modifier.weight(1f).fillMaxHeight(),
@@ -488,7 +498,7 @@ fun ReaderPane(
                 },
         )
         val photoPage = shown.isNotEmpty() && shown.all { column ->
-            val only = com.hvkeyn.ceditneuro.reader.BookText.pagePieces(column).singleOrNull()
+            val only = com.hvkeyn.ceditneuro.reader.BookText.pagePieces(column.text).singleOrNull()
             only is com.hvkeyn.ceditneuro.reader.PagePiece.Figure &&
                 images[only.id]?.let { !com.hvkeyn.ceditneuro.reader.BookText.isSvgBytes(it) } == true
         }
@@ -636,11 +646,11 @@ fun ReaderPane(
                 )
                 Row {
                     TextButton(onClick = {
-                        onExplain(page, shown.joinToString("\n"))
+                        onExplain(page, shown.joinToString("\n") { it.text })
                     }) { Text("Explain page", color = paper.ink) }
                     TextButton(
                         onClick = {
-                            onAsk(page, shown.joinToString("\n"), bookQuestion)
+                            onAsk(page, shown.joinToString("\n") { it.text }, bookQuestion)
                             bookQuestion = ""
                         },
                         enabled = bookQuestion.isNotBlank(),
@@ -763,7 +773,7 @@ fun ReaderPane(
             )
         }
         if (finding) {
-            val hits = remember(findQuery, pageText, spread) { findPages(pageText, spread.ranges, findQuery) }
+            val hits = remember(findQuery, pageText, sourceRanges) { findPages(pageText, sourceRanges, findQuery) }
             AlertDialog(
                 onDismissRequest = { finding = false },
                 title = { Text("Find in book") },
@@ -938,7 +948,7 @@ private fun paginate(
     var chapter = ""
     var start = 0
     while (start < text.length) {
-        if (text[start] == '\u0001' || text[start] == '\u0002') {
+        if (text[start] == '\u0001') {
             val mark = text[start]
             val close = text.indexOf(mark, start + 1)
             if (close > start) {
@@ -956,8 +966,7 @@ private fun paginate(
             continue
         }
         val imageAt = text.indexOf('\u0001', start).takeIf { it > start }
-        val linkAt = text.indexOf('\u0002', start).takeIf { it > start }
-        val limit = listOfNotNull(imageAt, linkAt, text.length).min()
+        val limit = listOfNotNull(imageAt, text.length).min()
         var probe = minOf(limit, start + budget)
         var layout = measurer.measure(
             text.substring(start, probe),
@@ -995,6 +1004,7 @@ private fun paginate(
 @Composable
 private fun ReaderColumn(
     column: String,
+    spans: List<NoteSpan>,
     images: Map<String, ByteArray>,
     style: TextStyle,
     modifier: Modifier,
@@ -1009,8 +1019,8 @@ private fun ReaderColumn(
         FigureBlock(only.id, images, modifier, fill = true, onZone = onZone, onFlip = onFlip)
         return
     }
-    if (pieces.all { it is PagePiece.Words || it is PagePiece.Jump }) {
-        NoteText(pieces, style, link, onLink, modifier.clipToBounds())
+    if (pieces.none { it is PagePiece.Figure }) {
+        NoteText(column, spans, style, link, onLink, modifier.clipToBounds())
         return
     }
     Column(modifier.verticalScroll(rememberScrollState())) {
@@ -1021,12 +1031,11 @@ private fun ReaderColumn(
                     style = style,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                 )
-                is PagePiece.Jump -> NoteText(
-                    listOf(piece),
-                    style,
-                    link,
-                    onLink,
-                    Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                is PagePiece.Jump -> Text(
+                    text = piece.label,
+                    color = link,
+                    style = style,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).clickable { onLink(piece.target, piece.heading) },
                 )
                 is PagePiece.Figure -> FigureBlock(
                     piece.id,
@@ -1043,58 +1052,56 @@ private fun ReaderColumn(
 
 @Composable
 private fun NoteText(
-    pieces: List<PagePiece>,
+    text: String,
+    spans: List<NoteSpan>,
     style: TextStyle,
     link: Color,
     onLink: (String, String) -> Unit,
     modifier: Modifier,
 ) {
-    val density = LocalDensity.current
-    val measurer = rememberTextMeasurer()
-    val inline = HashMap<String, androidx.compose.foundation.text.InlineTextContent>()
-    val text = androidx.compose.ui.text.buildAnnotatedString {
-        pieces.forEachIndexed { index, piece ->
-            when (piece) {
-                is PagePiece.Words -> append(piece.text)
-                is PagePiece.Figure -> Unit
-                is PagePiece.Jump -> {
-                    val previous = pieces.getOrNull(index - 1)
-                    if (previous is PagePiece.Jump) append('\u2004')
-                    val id = "j$index"
-                    val label = piece.label.ifBlank { piece.target.ifBlank { piece.heading } }.ifBlank { "note" }
-                    appendInlineContent(id, label)
-                    val measured = measurer.measure(
-                        label,
-                        style = style.copy(color = link),
-                    ).size.width
-                    val width = with(density) { (measured + 8).toSp() }
-                    val height = style.lineHeight
-                    inline[id] = androidx.compose.foundation.text.InlineTextContent(
-                        androidx.compose.ui.text.Placeholder(
-                            width,
-                            height,
-                            androidx.compose.ui.text.PlaceholderVerticalAlign.Center,
-                        ),
-                    ) {
-                        Text(
-                            text = label,
-                            color = link,
-                            style = style,
-                            maxLines = 1,
-                            softWrap = false,
-                            modifier = Modifier.clickable { onLink(piece.target, piece.heading) },
-                        )
-                    }
-                }
+    val annotated = remember(text, spans, link) {
+        buildAnnotatedString {
+            var cursor = 0
+            for (span in spans) {
+                val from = span.start.coerceIn(0, text.length)
+                val to = span.end.coerceIn(from, text.length)
+                if (from > cursor) append(text.substring(cursor, from))
+                withStyle(SpanStyle(color = link)) { append(text.substring(from, to)) }
+                cursor = to
             }
+            if (cursor < text.length) append(text.substring(cursor))
         }
     }
+    var layout by remember(text) { mutableStateOf<TextLayoutResult?>(null) }
     Text(
-        text = text,
+        text = annotated,
         style = style,
-        inlineContent = inline,
         overflow = TextOverflow.Clip,
-        modifier = modifier,
+        onTextLayout = { layout = it },
+        modifier = modifier.pointerInput(text, spans) {
+            val slop = viewConfiguration.touchSlop
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                val start = down.position
+                val pointer = down.id
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val change = event.changes.firstOrNull { it.id == pointer } ?: break
+                    if (change.pressed) continue
+                    val result = layout
+                    val moved = (change.position - start).getDistance()
+                    if (result != null && moved < slop) {
+                        val offset = result.getOffsetForPosition(start)
+                        val hit = spans.firstOrNull { offset >= it.start && offset < it.end }
+                        if (hit != null) {
+                            change.consume()
+                            onLink(hit.target, hit.heading)
+                        }
+                    }
+                    break
+                }
+            }
+        },
     )
 }
 

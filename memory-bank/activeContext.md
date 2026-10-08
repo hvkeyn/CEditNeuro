@@ -1,6 +1,8 @@
 # Active context
 
-v0.99.2 (versionCode 118). Released and installed over 0.98.0. Note links no longer share one hit area. Each link is its own measured chip in the line, in a link color, with a gap when two sit together. Back sits under the page, not on the words. A return and a heading jump use a character offset, so they land on the same place after the page size changes. Notes that link here are chips on the last page. The lookup of the vault is cached. Markdown and plain notes (`txt`, `note`) keep `[[links]]`.
+v0.99.3 (versionCode 119). A note link is colored text in the paragraph and wraps with the line. It is not a chip and not its own page, so a long title is not clipped and a list of links does not leave a blank page. The vault index keeps 8000 notes, 24 folders deep. A name with dots, or a trailing period, still resolves. A missing note that is a heading in the open file jumps there. Back stays under the page.
+
+v0.99.2 (versionCode 118). Released and installed over 0.98.0. Note links no longer share one hit area. Each link was drawn as its own measured chip; that clipped a long title and left the link alone on a blank page, and is replaced in 0.99.3. Back sits under the page, not on the words. A return and a heading jump use a character offset, so they land on the same place after the page size changes. Notes that link here are chips on the last page. The lookup of the vault is cached. Markdown and plain notes (`txt`, `note`) keep `[[links]]`.
 
 v0.99.1 (versionCode 117). Folded into the 0.99.2 release. A Markdown book keeps note links. `[[Note]]`, `[[Note|words]]`, `[[Note#Heading]]`, `[[#Heading]]`, and `[words](note.md)` open that note or heading. The same folder wins when two notes share a name. Back returns to the previous note. The contents list shows notes that link here. A fenced block and a web address are not notes. `NoteVault` is the lookup. The Obsidian application source is not in this project.
 
