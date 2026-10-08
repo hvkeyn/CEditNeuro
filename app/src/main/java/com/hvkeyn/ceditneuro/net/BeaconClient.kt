@@ -119,6 +119,11 @@ class BeaconClient(
         }
     }
 
+    /** Every phone on the code, not only the one direct peer. */
+    fun relay(text: String) {
+        offer("T $text")
+    }
+
     fun send(text: String) {
         val peer = direct
         if (peer != null && udp != null) {

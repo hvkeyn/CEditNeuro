@@ -119,6 +119,9 @@ object ToolGroups {
         "learn" to listOf(
             "learn",
         ),
+        "crew" to listOf(
+            "crew",
+        ),
         "harness" to listOf(
             "harness_rrsi",
         ),

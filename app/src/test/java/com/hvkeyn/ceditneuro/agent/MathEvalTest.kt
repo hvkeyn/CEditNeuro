@@ -54,7 +54,7 @@ class MathEvalTest {
             ResearchSkill.ensure(dir)
             assertTrue(!debug.exists())
             assertEquals(
-                listOf("android-apk", "android-app", "android-compose", "android-ui", "book-notes", "debug", "deep-read", "dreams", "find-skills", "frontend-design", "health", "hyperframes", "learn", "net-map", "research", "review", "rrsi", "ru-translate", "second-monitor", "security", "systematic-debugging", "video-notes", "web-reach", "web-to-app"),
+                listOf("android-apk", "android-app", "android-compose", "android-ui", "book-notes", "crew", "debug", "deep-read", "dreams", "find-skills", "frontend-design", "health", "hyperframes", "learn", "net-map", "research", "review", "rrsi", "ru-translate", "second-monitor", "security", "systematic-debugging", "video-notes", "web-reach", "web-to-app"),
                 SkillLibrary(null, dir).list().map { it.name },
             )
         } finally {

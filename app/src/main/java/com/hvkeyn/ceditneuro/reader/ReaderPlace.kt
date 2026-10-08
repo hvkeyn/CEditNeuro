@@ -22,4 +22,11 @@ object ReaderPlace {
         }
         return savedPage.coerceIn(0, last)
     }
+
+    /** The screen page that contains this character, including the start of the text. */
+    fun pageAt(ranges: List<IntRange>, anchor: Int): Int {
+        if (ranges.isEmpty()) return 0
+        val hit = ranges.indexOfLast { it.first <= anchor.coerceAtLeast(0) }
+        return if (hit >= 0) hit else 0
+    }
 }

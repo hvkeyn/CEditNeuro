@@ -4,6 +4,8 @@ import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.appendInlineContent
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -47,6 +49,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
@@ -97,7 +100,7 @@ import com.hvkeyn.ceditneuro.ui.editor.ExpandableMarkup
 import com.hvkeyn.ceditneuro.ui.editor.svgAspect
 import kotlin.math.min
 
-private data class Paper(val background: Color, val ink: Color, val muted: Color)
+private data class Paper(val background: Color, val ink: Color, val muted: Color, val link: Color)
 
 @Composable
 private fun paperFieldColors(paper: Paper) = OutlinedTextFieldDefaults.colors(
@@ -126,9 +129,9 @@ private fun screenBrightness(view: android.view.View, value: Float) {
 }
 
 private fun paper(theme: String): Paper = when (theme) {
-    "night" -> Paper(Color(0xFF1C1A17), Color(0xFFE6E0D6), Color(0xFFB3AA9E))
-    "day" -> Paper(Color(0xFFF7F4EF), Color(0xFF1E1A16), Color(0xFF5C564E))
-    else -> Paper(Color(0xFFF3E6C8), Color(0xFF2B2416), Color(0xFF6B5E48))
+    "night" -> Paper(Color(0xFF1C1A17), Color(0xFFE6E0D6), Color(0xFFB3AA9E), Color(0xFF8ECAE6))
+    "day" -> Paper(Color(0xFFF7F4EF), Color(0xFF1E1A16), Color(0xFF5C564E), Color(0xFF1F5C8B))
+    else -> Paper(Color(0xFFF3E6C8), Color(0xFF2B2416), Color(0xFF6B5E48), Color(0xFF1D4E89))
 }
 
 private data class Spread(val ranges: List<IntRange>, val chapters: List<String>)
@@ -151,6 +154,7 @@ internal fun findPages(text: String, ranges: List<IntRange>, query: String): Lis
         val snippet = text.substring(start, end)
             .replace('\u0000', ' ')
             .replace(Regex("\u0001[^\u0001]*\u0001"), " ")
+            .replace(Regex("\u0002([^\u001f]*)\u001f[^\u0002]*\u0002"), "$1")
             .replace('\n', ' ')
             .trim()
         hits += rangeIndex to snippet
@@ -178,6 +182,8 @@ fun ReaderPane(
     onRestyle: (id: String, color: Long?, width: Float?, scale: Float?, rotation: Float?) -> Unit = { _, _, _, _, _ -> },
     onExplain: (page: Int, passage: String) -> Unit = { _, _ -> },
     onAsk: (page: Int, passage: String, question: String) -> Unit = { _, _, _ -> },
+    onOpenLink: (target: String, heading: String) -> Unit = { _, _ -> },
+    onBack: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val paper = paper(reader.theme)
@@ -326,7 +332,7 @@ fun ReaderPane(
         val widthPx = with(density) { textWidth.roundToPx() }
         val count = spread.ranges.size.coerceAtLeast(1)
         LaunchedEffect(spread.ranges, widthPx, textHeightPx) {
-            if (placed || widthPx <= 80 || columnHeight <= 80) return@LaunchedEffect
+            if (placed || reader.land || widthPx <= 80 || columnHeight <= 80) return@LaunchedEffect
             page = com.hvkeyn.ceditneuro.reader.ReaderPlace.pageFor(
                 spread.ranges,
                 pageText.length,
@@ -334,6 +340,11 @@ fun ReaderPane(
                 reader.fraction,
                 reader.page,
             )
+            placed = true
+        }
+        LaunchedEffect(reader.nav, count, reader.landAnchor) {
+            if (!reader.land || reader.landAnchor < 0) return@LaunchedEffect
+            page = com.hvkeyn.ceditneuro.reader.ReaderPlace.pageAt(spread.ranges, reader.landAnchor)
             placed = true
         }
         if (placed && page > count - 1) page = count - 1
@@ -367,7 +378,7 @@ fun ReaderPane(
                 aloud.stop()
                 return@LaunchedEffect
             }
-            aloud.speak(shown.joinToString("\n").replace(Regex("\u0001[^\u0001]*\u0001"), " ")) {
+            aloud.speak(BookText.spoken(shown.joinToString("\n"))) {
                 if (page + columns <= count - 1) page += columns else speaking = false
             }
         }
@@ -387,6 +398,8 @@ fun ReaderPane(
                         Modifier.weight(1f).fillMaxHeight(),
                         onZone = { fraction -> applyZone(fraction) },
                         onFlip = { direction -> flipPage(direction) },
+                        onLink = onOpenLink,
+                        link = paper.link,
                     )
                 }
             }
@@ -404,15 +417,57 @@ fun ReaderPane(
                         .background(paper.muted),
                 )
             }
-            Text(
-                text = "${page + 1} / $count  ·  ${reader.chapter.ifBlank { "page" }}  ·  ${((page + 1) * 100 / count)}%" +
-                    if (speaking) "  ·  reading aloud" else "",
-                color = paper.muted,
-                style = MaterialTheme.typography.labelMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp),
-            )
+            if (reader.mentions.isNotEmpty() && page + columns >= count) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 6.dp)
+                        .horizontalScroll(rememberScrollState()),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "From",
+                        color = paper.muted,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(end = 8.dp),
+                    )
+                    reader.mentions.forEach { mention ->
+                        Text(
+                            text = mention.title,
+                            color = paper.link,
+                            maxLines = 1,
+                            style = MaterialTheme.typography.labelLarge,
+                            modifier = Modifier
+                                .padding(end = 6.dp)
+                                .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                                .background(paper.link.copy(alpha = 0.12f))
+                                .clickable { onOpenLink(mention.path, "") }
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                        )
+                    }
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (reader.canBack) {
+                    androidx.compose.material3.TextButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = paper.link)
+                        Text("Back", color = paper.link, modifier = Modifier.padding(start = 4.dp))
+                    }
+                }
+                Text(
+                    text = "${page + 1} / $count  ·  ${reader.chapter.ifBlank { "page" }}  ·  ${((page + 1) * 100 / count)}%" +
+                        if (speaking) "  ·  reading aloud" else "",
+                    color = paper.muted,
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+            }
         }
         if (showLayer) InkLayer(
                 page = page,
@@ -776,6 +831,18 @@ fun ReaderPane(
                                 )
                             }
                         }
+                        if (reader.mentions.isNotEmpty()) {
+                            Text("Links to this note", modifier = Modifier.padding(top = 8.dp))
+                            reader.mentions.forEach { mention ->
+                                Text(
+                                    text = mention.title,
+                                    modifier = Modifier.clickable {
+                                        toc = false
+                                        onOpenLink(mention.path, "")
+                                    }.padding(vertical = 6.dp),
+                                )
+                            }
+                        }
                     }
                 },
                 confirmButton = { TextButton(onClick = { toc = false }) { Text("Close") } },
@@ -871,8 +938,9 @@ private fun paginate(
     var chapter = ""
     var start = 0
     while (start < text.length) {
-        if (text[start] == '\u0001') {
-            val close = text.indexOf('\u0001', start + 1)
+        if (text[start] == '\u0001' || text[start] == '\u0002') {
+            val mark = text[start]
+            val close = text.indexOf(mark, start + 1)
             if (close > start) {
                 ranges.add(start..close)
                 chapters.add(chapter)
@@ -888,7 +956,8 @@ private fun paginate(
             continue
         }
         val imageAt = text.indexOf('\u0001', start).takeIf { it > start }
-        val limit = minOf(text.length, imageAt ?: text.length)
+        val linkAt = text.indexOf('\u0002', start).takeIf { it > start }
+        val limit = listOfNotNull(imageAt, linkAt, text.length).min()
         var probe = minOf(limit, start + budget)
         var layout = measurer.measure(
             text.substring(start, probe),
@@ -931,6 +1000,8 @@ private fun ReaderColumn(
     modifier: Modifier,
     onZone: (Float) -> Unit,
     onFlip: (Int) -> Unit,
+    onLink: (String, String) -> Unit,
+    link: Color,
 ) {
     val pieces = remember(column) { BookText.pagePieces(column) }
     val only = pieces.singleOrNull()
@@ -938,13 +1009,8 @@ private fun ReaderColumn(
         FigureBlock(only.id, images, modifier, fill = true, onZone = onZone, onFlip = onFlip)
         return
     }
-    if (pieces.all { it is PagePiece.Words }) {
-        Text(
-            text = column,
-            style = style,
-            overflow = TextOverflow.Clip,
-            modifier = modifier.clipToBounds(),
-        )
+    if (pieces.all { it is PagePiece.Words || it is PagePiece.Jump }) {
+        NoteText(pieces, style, link, onLink, modifier.clipToBounds())
         return
     }
     Column(modifier.verticalScroll(rememberScrollState())) {
@@ -954,6 +1020,13 @@ private fun ReaderColumn(
                     text = piece.text,
                     style = style,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                )
+                is PagePiece.Jump -> NoteText(
+                    listOf(piece),
+                    style,
+                    link,
+                    onLink,
+                    Modifier.fillMaxWidth().padding(bottom = 8.dp),
                 )
                 is PagePiece.Figure -> FigureBlock(
                     piece.id,
@@ -966,6 +1039,63 @@ private fun ReaderColumn(
             }
         }
     }
+}
+
+@Composable
+private fun NoteText(
+    pieces: List<PagePiece>,
+    style: TextStyle,
+    link: Color,
+    onLink: (String, String) -> Unit,
+    modifier: Modifier,
+) {
+    val density = LocalDensity.current
+    val measurer = rememberTextMeasurer()
+    val inline = HashMap<String, androidx.compose.foundation.text.InlineTextContent>()
+    val text = androidx.compose.ui.text.buildAnnotatedString {
+        pieces.forEachIndexed { index, piece ->
+            when (piece) {
+                is PagePiece.Words -> append(piece.text)
+                is PagePiece.Figure -> Unit
+                is PagePiece.Jump -> {
+                    val previous = pieces.getOrNull(index - 1)
+                    if (previous is PagePiece.Jump) append('\u2004')
+                    val id = "j$index"
+                    val label = piece.label.ifBlank { piece.target.ifBlank { piece.heading } }.ifBlank { "note" }
+                    appendInlineContent(id, label)
+                    val measured = measurer.measure(
+                        label,
+                        style = style.copy(color = link),
+                    ).size.width
+                    val width = with(density) { (measured + 8).toSp() }
+                    val height = style.lineHeight
+                    inline[id] = androidx.compose.foundation.text.InlineTextContent(
+                        androidx.compose.ui.text.Placeholder(
+                            width,
+                            height,
+                            androidx.compose.ui.text.PlaceholderVerticalAlign.Center,
+                        ),
+                    ) {
+                        Text(
+                            text = label,
+                            color = link,
+                            style = style,
+                            maxLines = 1,
+                            softWrap = false,
+                            modifier = Modifier.clickable { onLink(piece.target, piece.heading) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+    Text(
+        text = text,
+        style = style,
+        inlineContent = inline,
+        overflow = TextOverflow.Clip,
+        modifier = modifier,
+    )
 }
 
 @Composable

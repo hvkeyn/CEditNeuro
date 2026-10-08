@@ -732,6 +732,8 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                     onRestyle = viewModel::readerRestyle,
                     onExplain = viewModel::readerExplain,
                     onAsk = viewModel::readerAsk,
+                    onOpenLink = viewModel::readerFollow,
+                    onBack = viewModel::readerBack,
                     modifier = Modifier
                         .fillMaxSize()
                         .zIndex(if (state.readerInFront) 2f else -1f),

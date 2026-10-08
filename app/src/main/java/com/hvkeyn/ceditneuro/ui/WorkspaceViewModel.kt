@@ -186,6 +186,8 @@ data class ReaderToc(val title: String, val page: Int)
 
 data class BookLine(val mine: Boolean, val text: String)
 
+data class ReaderMention(val title: String, val path: String)
+
 data class ReaderView(
     val path: String,
     val title: String,
@@ -206,6 +208,11 @@ data class ReaderView(
     val bookChat: List<BookLine> = emptyList(),
     val anchor: Int = 0,
     val fraction: Float = 0f,
+    val canBack: Boolean = false,
+    val mentions: List<ReaderMention> = emptyList(),
+    val nav: Int = 0,
+    val land: Boolean = false,
+    val landAnchor: Int = -1,
 )
 
 data class WorkspaceUiState(
@@ -337,6 +344,7 @@ class WorkspaceViewModel(
     private val beacon = com.hvkeyn.ceditneuro.net.BeaconClient()
     private val peerLines = ArrayDeque<String>()
     private var beaconRole: String = ""
+    private var linkName: String = "phone"
     private val seenPeers = mutableSetOf<String>()
     @Volatile
     private var parallelPeer: String = ""
@@ -350,6 +358,11 @@ class WorkspaceViewModel(
     private var openPages: List<com.hvkeyn.ceditneuro.reader.BookPage> = emptyList()
     private var readerImages: Map<String, ByteArray> = emptyMap()
     private var openBookKey: String? = null
+    private val readerStack = ArrayDeque<Pair<String, Int>>()
+    private var readerMentions: List<ReaderMention> = emptyList()
+    private var readerNav: Int = 0
+    private var readerLand: Boolean = false
+    private var readerLandAnchor: Int = -1
     private var sourceText: String = ""
     private val profiles = ProfileStore(appContext)
     private var profileJob: Job? = null
@@ -646,6 +659,8 @@ class WorkspaceViewModel(
         openPages = emptyList()
         readerImages = emptyMap()
         openBookKey = null
+        readerStack.clear()
+        readerMentions = emptyList()
         sourceText = ""
         val restore = _state.value.reader?.path
         if (restore != null) {
@@ -786,6 +801,7 @@ class WorkspaceViewModel(
             return
         }
         _state.update { it.copy(activePath = path) }
+        readerStack.clear()
         viewModelScope.launch {
             val opened = withContext(Dispatchers.IO) { runCatching { loadReader(path, keepPlace = false) } }
             opened.onFailure { showMessage(it.message ?: "Cannot open this book.") }
@@ -793,6 +809,8 @@ class WorkspaceViewModel(
     }
 
     fun closeReader() {
+        readerStack.clear()
+        readerMentions = emptyList()
         _state.update { it.copy(reader = null, readerInFront = true) }
     }
 
@@ -800,6 +818,66 @@ class WorkspaceViewModel(
     fun showReader() {
         if (_state.value.reader == null) return
         _state.update { it.copy(readerInFront = true) }
+    }
+
+    fun readerBack() {
+        val previous = readerStack.removeLastOrNull() ?: return
+        viewModelScope.launch {
+            val opened = withContext(Dispatchers.IO) {
+                runCatching { loadReader(previous.first, keepPlace = false, forcedAnchor = previous.second) }
+            }
+            opened.onFailure { showMessage(it.message ?: "Cannot open this note.") }
+        }
+    }
+
+    fun readerFollow(target: String, heading: String) {
+        val ws = workspace ?: return
+        val reader = _state.value.reader ?: return
+        val from = java.io.File(reader.path)
+        if (target.isBlank() || target.equals(from.name, ignoreCase = true) ||
+            target.equals(from.nameWithoutExtension, ignoreCase = true)
+        ) {
+            jumpHeading(reader, heading)
+            return
+        }
+        viewModelScope.launch {
+            val hit = withContext(Dispatchers.IO) {
+                com.hvkeyn.ceditneuro.reader.NoteVault.resolve(ws.root, from, target)
+            }
+            when (hit) {
+                is com.hvkeyn.ceditneuro.reader.NoteVault.Hit.Missing ->
+                    showMessage("No note named ${target.substringAfterLast('/').substringBeforeLast('.')}.")
+                is com.hvkeyn.ceditneuro.reader.NoteVault.Hit.Many ->
+                    showMessage("Several notes are named ${target.substringAfterLast('/')}: ${hit.names.joinToString()}.")
+                is com.hvkeyn.ceditneuro.reader.NoteVault.Hit.One -> {
+                    if (hit.file.canonicalPath == from.canonicalPath) {
+                        jumpHeading(reader, heading)
+                    } else {
+                        readerStack.addLast(reader.path to reader.anchor.coerceAtLeast(0))
+                        val opened = withContext(Dispatchers.IO) {
+                            runCatching { loadReader(hit.file.absolutePath, keepPlace = false, heading = heading) }
+                        }
+                        opened.onFailure {
+                            readerStack.removeLastOrNull()
+                            showMessage(it.message ?: "Cannot open this note.")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun jumpHeading(reader: ReaderView, heading: String) {
+        if (heading.isBlank()) return
+        val at = com.hvkeyn.ceditneuro.reader.NoteVault.anchorForHeading(sourceText, heading)
+        if (at < 0) {
+            showMessage("No heading \"$heading\" in this note.")
+            return
+        }
+        readerLand = true
+        readerLandAnchor = at
+        readerNav++
+        publishReader(reader.path, reader.page, reader.theme, reader.fontSp, reader.title, reader.fontName, reader.spacing)
     }
 
     fun readerPageText(): String = sourceText
@@ -826,6 +904,7 @@ class WorkspaceViewModel(
 
     fun readerStyle(fontSp: Int, fontName: String, spacing: Float, theme: String) {
         val reader = _state.value.reader ?: return
+        readerLand = false
         val record = readerStore.read(reader.path)
         readerStore.write(
             record.copy(
@@ -1053,10 +1132,7 @@ class WorkspaceViewModel(
     }
 
     private fun bookPlain(): String {
-        val plain = sourceText
-            .replace('\u0000', '\n')
-            .replace(Regex("\u0001[^\u0001]*\u0001"), " ")
-            .trim()
+        val plain = com.hvkeyn.ceditneuro.reader.BookText.spoken(sourceText)
         val cap = 48_000
         return if (plain.length <= cap) plain else plain.take(cap) + "\n\n[The rest of the file was cut to fit.]"
     }
@@ -1072,7 +1148,7 @@ class WorkspaceViewModel(
         }
     }
 
-    private fun loadReader(path: String, keepPlace: Boolean) {
+    private fun loadReader(path: String, keepPlace: Boolean, heading: String = "", forcedAnchor: Int? = null) {
         val ws = workspace ?: return
         val file = ws.resolve(path)
         val name = file.name
@@ -1086,16 +1162,32 @@ class WorkspaceViewModel(
         readerImages = book.images
         openPages = com.hvkeyn.ceditneuro.reader.BookText.pages(book, charsFor(font))
         openBookKey = file.absolutePath
-        val page = if (keepPlace) {
+        val ext = name.substringAfterLast('.', "").lowercase()
+        readerMentions = if (ext == "md" || ext == "markdown" || ext == "txt" || ext == "note" || ext == "notes") {
+            com.hvkeyn.ceditneuro.reader.NoteVault.mentions(ws.root, file).map { (title, note) ->
+                ReaderMention(title, note)
+            }
+        } else {
+            emptyList()
+        }
+        val headingAt = if (heading.isBlank()) -1 else com.hvkeyn.ceditneuro.reader.NoteVault.anchorForHeading(sourceText, heading)
+        if (heading.isNotBlank() && headingAt < 0) showMessage("No heading \"$heading\" in this note.")
+        readerLand = forcedAnchor != null || headingAt >= 0
+        readerLandAnchor = if (readerLand) (forcedAnchor ?: headingAt) else -1
+        val page = if (readerLand) {
+            0
+        } else if (keepPlace) {
             _state.value.reader?.page ?: saved.page
         } else {
             saved.page
         }.coerceAtLeast(0)
+        readerNav++
         publishReader(file.absolutePath, page, saved.theme, font, book.title, saved.fontName, saved.spacing)
     }
 
     private fun reflow(path: String, font: Int, theme: String, fraction: Float) {
         val ws = workspace ?: return
+        readerLand = false
         val file = ws.resolve(path)
         val book = com.hvkeyn.ceditneuro.reader.BookText.parse(file.name, file.readBytes(), file.parentFile)
         openPages = com.hvkeyn.ceditneuro.reader.BookText.pages(book, charsFor(font))
@@ -1146,6 +1238,11 @@ class WorkspaceViewModel(
             bookChat = bookChats[path].orEmpty(),
             anchor = record.anchor,
             fraction = record.fraction,
+            canBack = readerStack.isNotEmpty(),
+            mentions = readerMentions,
+            nav = readerNav,
+            land = readerLand,
+            landAnchor = readerLandAnchor,
         )
         readerStore.write(
             record.copy(
@@ -1751,9 +1848,7 @@ class WorkspaceViewModel(
             )
         }
         publishStatus(project, force = true)
-        if (!fromPeer && beaconRole == "lead") {
-            beacon.send("TASK " + prompt.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty().take(180))
-        }
+        if (!fromPeer && _state.value.linkActive > 1) shareGoal(project, prompt)
 
         project.agentJob = agentScope.launch {
             runCatching {
@@ -1801,8 +1896,7 @@ class WorkspaceViewModel(
             }
             AgentNotifications.settle(appContext, status)
             val report = (summary ?: outcome ?: "done").take(180)
-            if (beaconRole == "follow") beacon.send("AUDIT $report")
-            else if (!fromPeer && beaconRole == "lead") beacon.send("FIX $report")
+            if (_state.value.linkActive > 1) settleCrew(project, report, failed = outcome != null)
             persistNow(project)
         }
     }
@@ -2405,6 +2499,7 @@ class WorkspaceViewModel(
             "research_run" -> "Running the study"
             "video_brief" -> "Reading a video"
             "learn" -> "Teaching"
+            "crew" -> "Sharing the queue"
             "render_video" -> "Rendering a video"
             "sound_effect" -> "Adding a sound effect"
             "make_music" -> "Making music"
@@ -2461,16 +2556,18 @@ class WorkspaceViewModel(
             false -> "Programs off"
             null -> "Programs ask"
         }
+        val linked = _state.value.linkActive
         return "$work · $network · $programs" +
-            (if (beaconRole == "lead") " · Lead" else if (beaconRole == "follow") " · Support" else "") +
+            (if (linked > 1) " · Linked $linked" else "") +
             parallelPeer.takeIf { it.isNotBlank() }?.let { "\nParallel: $it" }.orEmpty()
     }
 
     private fun openBeacon(code: String, lead: Boolean) {
         beaconRole = if (lead) "lead" else "follow"
+        val device = android.os.Build.MODEL.replace(Regex("[^A-Za-z0-9]"), "").ifBlank { "phone" }
+        linkName = device
         _state.update { it.copy(linkRole = beaconRole) }
         com.hvkeyn.ceditneuro.net.LinkService.start(appContext, code, "Waiting for the other phone.")
-        val device = android.os.Build.MODEL.replace(Regex("[^A-Za-z0-9]"), "").ifBlank { "phone" }
         beacon.start(code, device, onReady = {
             beacon.send("HERE")
             current?.workspace?.root?.name?.let { beacon.send("FOLDER $it") }
@@ -2516,43 +2613,14 @@ class WorkspaceViewModel(
                 }
                 if (text == "HERE") {
                     if (beaconRole == "lead") pushFolder(open)
+                    sendCrewSnap(open)
                     return@launch
                 }
                 if (text.startsWith("FILE ")) {
                     saveSharedFile(open, text.removePrefix("FILE "))
                     return@launch
                 }
-                val running = open.agentJob?.isActive == true
-                val body = text.removePrefix("TASK ").removePrefix("AUDIT ").removePrefix("FIX ")
-                val started = when {
-                    text.startsWith("TASK ") && beaconRole == "follow" && !running -> {
-                        startPrompt(
-                            open,
-                            "You are the supporting agent. Do this part of the lead's task. " +
-                                "End with corrections the lead should apply.\n$body",
-                            fromPeer = true,
-                        )
-                        true
-                    }
-                    text.startsWith("AUDIT ") && beaconRole == "lead" && !running -> {
-                        startPrompt(
-                            open,
-                            "Apply this audit from the supporting agent. Correct your work where the audit is right. " +
-                                "Do not assign the same task again.\n$body",
-                            fromPeer = true,
-                        )
-                        true
-                    }
-                    text.startsWith("FIX ") && beaconRole == "follow" && !running -> {
-                        startPrompt(
-                            open,
-                            "The lead finished this. Check it and end with only the corrections.\n$body",
-                            fromPeer = true,
-                        )
-                        true
-                    }
-                    else -> false
-                }
+                val started = text.startsWith("CREW ") && applyCrew(open, name, text.removePrefix("CREW ").trim())
                 val line = "$name: $text"
                 synchronized(peerLines) {
                     peerLines.add(line)
@@ -2592,6 +2660,68 @@ class WorkspaceViewModel(
         speedBytes = 0
         speedMark = now
         _state.update { it.copy(linkSpeed = speed) }
+    }
+
+    private fun shareGoal(project: LiveProject, prompt: String) {
+        val text = prompt.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty().take(180)
+        if (text.isBlank()) return
+        val (_, note) = com.hvkeyn.ceditneuro.tools.CrewBoard.update(
+            com.hvkeyn.ceditneuro.tools.CrewBoard.file(project.workspace.root),
+        ) { board ->
+            val result = board.add(text)
+            val id = Regex("t[0-9]+").find(result)?.value
+            val stored = id?.let { board.taskText(it) }
+            if (result.startsWith("Added") && id != null && stored != null) "ADD $id $stored" else ""
+        }
+        if (note.startsWith("ADD ")) beacon.relay("CREW $note")
+    }
+
+    private fun settleCrew(project: LiveProject, report: String, failed: Boolean) {
+        val lines = com.hvkeyn.ceditneuro.tools.CrewBoard.update(
+            com.hvkeyn.ceditneuro.tools.CrewBoard.file(project.workspace.root),
+        ) { board ->
+            val wire = ArrayList<String>()
+            board.heldBy(linkName).forEach { id ->
+                val verb = if (failed) "OPEN" else "DONE"
+                val result = board.apply("$verb $id $linkName")
+                if (result.startsWith("Finished") || result.startsWith("Released")) wire += "$verb $id $linkName"
+            }
+            val kind = if (failed) "FAIL" else "DONE"
+            val gist = board.gist(kind, linkName, report)
+            if (gist.startsWith("Shared")) wire += "GIST $kind $linkName $report"
+            wire.joinToString("\n")
+        }.second
+        lines.lineSequence().filter { it.isNotBlank() }.forEach { beacon.relay("CREW $it") }
+    }
+
+    private fun sendCrewSnap(project: LiveProject) {
+        val text = com.hvkeyn.ceditneuro.tools.CrewBoard.load(
+            com.hvkeyn.ceditneuro.tools.CrewBoard.file(project.workspace.root),
+        ).render()
+        if (text.isBlank()) return
+        val encoded = java.util.Base64.getEncoder().withoutPadding().encodeToString(text.toByteArray(Charsets.UTF_8))
+        beacon.relay("CREW SNAP $encoded")
+    }
+
+    /** Returns true when an idle phone starts because another agent queued work. */
+    private fun applyCrew(project: LiveProject, sender: String, line: String): Boolean {
+        val (board, _) = com.hvkeyn.ceditneuro.tools.CrewBoard.update(
+            com.hvkeyn.ceditneuro.tools.CrewBoard.file(project.workspace.root),
+        ) { it.apply(line) }
+        val running = project.agentJob?.isActive == true
+        val wake = sender != linkName && !running && board.hasOpen() &&
+            (line.startsWith("ADD ") || line.startsWith("SNAP "))
+        if (!wake) return false
+        startPrompt(
+            project,
+            "Other agents are on this link. Nobody assigns your task. " +
+                "load_tools group=crew, then crew action=list. Claim one open task. " +
+                "If the claim says it is held, claim a different open task. " +
+                "Post a FACT when a finding is usable, a FAIL when an approach is wrong, and a DONE when the task is finished. " +
+                "Do not repeat a claimed task or a known FAIL.",
+            fromPeer = true,
+        )
+        return true
     }
 
     private fun pushFolder(project: LiveProject) {
@@ -2851,7 +2981,8 @@ class WorkspaceViewModel(
         }
 
         val shizukuCommands = ShizukuCommandRunner(shizukuShell)
-        val loadedGroups = ToolGroups.forFocus(settingsStore.current.workFocus)
+        val loadedGroups = ToolGroups.forFocus(settingsStore.current.workFocus).toMutableSet()
+        if (_state.value.linkActive > 1) loadedGroups += "crew"
         val toolSession = ToolSession(loadedGroups)
         val tools = mutableListOf<Tool>(
             ListDirTool(ws),
@@ -2976,6 +3107,7 @@ class WorkspaceViewModel(
             com.hvkeyn.ceditneuro.tools.ResearchPlotTool(ws),
             com.hvkeyn.ceditneuro.tools.ResearchRunTool(ws),
             com.hvkeyn.ceditneuro.tools.LearnTool(ws),
+            com.hvkeyn.ceditneuro.tools.CrewTool(ws, { linkName }) { beacon.relay("CREW $it") },
             com.hvkeyn.ceditneuro.tools.VideoBriefTool(agentNet) { settingsStore.current.networkEnabled },
             com.hvkeyn.ceditneuro.tools.CalculateTool(),
             com.hvkeyn.ceditneuro.tools.ReferenceTool(agentNet) { settingsStore.current.networkEnabled },
