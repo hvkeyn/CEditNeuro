@@ -1,5 +1,9 @@
 # Active context
 
+v0.99.5 (versionCode 121). A motion reel lists beats that cover the length, and render_video refuses a hole, a clip past the end, or a missing timeline. If the HyperFrames pages do not answer, the phone writes from the local skill and keeps going. A 30 second piece with no length given is six to eight moving beats.
+
+v0.99.4 (versionCode 120). A command that already failed does not end the turn. The model gets the last result and continues. After a file is written or another command succeeds, that shell command can run again. A certificate or HTTP 522 block stays.
+
 v0.99.3 (versionCode 119). A note link is colored text in the paragraph and wraps with the line. It is not a chip and not its own page, so a long title is not clipped and a list of links does not leave a blank page. The vault index keeps 8000 notes, 24 folders deep. A name with dots, or a trailing period, still resolves. A missing note that is a heading in the open file jumps there. Back stays under the page.
 
 v0.99.2 (versionCode 118). Released and installed over 0.98.0. Note links no longer share one hit area. Each link was drawn as its own measured chip; that clipped a long title and left the link alone on a blank page, and is replaced in 0.99.3. Back sits under the page, not on the words. A return and a heading jump use a character offset, so they land on the same place after the page size changes. Notes that link here are chips on the last page. The lookup of the vault is cached. Markdown and plain notes (`txt`, `note`) keep `[[links]]`.

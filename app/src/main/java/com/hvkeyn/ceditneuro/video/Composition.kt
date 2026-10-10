@@ -28,6 +28,55 @@ object Composition {
         return Info(root.groupValues[1], width, height, seconds)
     }
 
+    /**
+     * Why this page would encode a blank stretch. An empty list means the scenes
+     * cover the root from the start through data-duration.
+     */
+    fun audit(html: String): List<String> {
+        val info = parse(html) ?: return listOf("No element with data-composition-id.")
+        val notes = ArrayList<String>()
+        if (info.seconds <= 0.0) notes += "Set data-duration on the root to the length of the piece."
+        val stored = Regex("""__timelines\s*\[\s*["']${Regex.escape(info.id)}["']\s*\]""")
+        if (!stored.containsMatchIn(html)) {
+            notes += "Store the paused timeline on window.__timelines[\"${info.id}\"]."
+        }
+        val spans = ArrayList<Pair<Double, Double>>()
+        for (match in CLIP.findAll(html)) {
+            val tag = match.value
+            if (tag.contains("data-composition-id")) continue
+            if (tag.startsWith("<audio", ignoreCase = true)) continue
+            val start = match.groupValues[1].toDoubleOrNull() ?: continue
+            val dur = attr(tag, "data-duration")?.toDoubleOrNull() ?: continue
+            if (dur <= 0.0) continue
+            spans += start to (start + dur)
+        }
+        if (spans.isEmpty()) {
+            notes += "Add scene clips with data-start and data-duration. A page with no clip renders empty."
+        }
+        val ordered = spans.sortedBy { it.first }
+        var covered = 0.0
+        var holes = 0
+        for ((start, end) in ordered) {
+            if (info.seconds > 0.0 && start > covered + 0.25 && start < info.seconds && holes < 4) {
+                notes += "Scenes leave a hole from ${fmt(covered)}s to ${fmt(start)}s. Overlap the handoff or extend the earlier clip."
+                holes++
+            }
+            if (end > covered) covered = end
+        }
+        if (info.seconds > 0.0 && covered + 0.25 < info.seconds) {
+            notes += "Scenes end at ${fmt(covered)}s and the root lasts ${fmt(info.seconds)}s. Extend the last beat to the end."
+        }
+        if (info.seconds > 0.0 && ordered.any { it.second > info.seconds + 0.05 }) {
+            notes += "A clip runs past data-duration ${fmt(info.seconds)}s. Shorten it or raise the root duration."
+        }
+        return notes
+    }
+
+    private fun fmt(value: Double): String {
+        val rounded = kotlin.math.round(value * 100.0) / 100.0
+        return if (rounded == rounded.toLong().toDouble()) rounded.toLong().toString() else rounded.toString()
+    }
+
     /** The page with this app as its runtime. play adds a loop and a player bar; render leaves the frame still. */
     fun hosted(html: String, play: Boolean): String {
         val first = "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no\">" +

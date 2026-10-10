@@ -48,6 +48,7 @@ class AgentLoop(
     }
 
     private val failedCalls = HashSet<String>()
+    private val failureNotes = HashMap<String, String>()
 
     /** Read-only calls since the last change. Any other tool may have changed what they would return. */
     private val recentReads = HashSet<String>()
@@ -63,8 +64,12 @@ class AgentLoop(
         shellOutcomes: Map<String, Boolean> = emptyMap(),
     ): Flow<AgentEvent> = flow {
         failedCalls += ToolTranscript.failedCalls(history)
+        failureNotes += ToolTranscript.failureNotes(history)
         shellOutcomes.forEach { (key, failed) ->
-            if (failed) failedCalls += key else failedCalls -= key
+            if (failed) failedCalls += key else {
+                failedCalls -= key
+                failureNotes.remove(key)
+            }
         }
         val messages = mutableListOf<ChatMessage>()
         messages += ChatMessage.system(systemPrompt)
@@ -74,7 +79,6 @@ class AgentLoop(
 
         var lengthContinues = 0
         var emptyContinues = 0
-        var repeatedRefusal = 0
         var batch = 0
 
         suspend fun remember() {
@@ -201,14 +205,6 @@ class AgentLoop(
                 emit(AgentEvent.ToolFinished(call.function.name, result))
                 messages += ChatMessage.tool(call.id, call.function.name, result.content)
                 remember()
-                if (result.isError && result.content.startsWith("This exact ")) {
-                    repeatedRefusal++
-                    if (repeatedRefusal >= 2) {
-                        remember()
-                        emit(AgentEvent.TurnFinished("repeat"))
-                        return@flow
-                    }
-                }
             }
             round++
         }
@@ -263,10 +259,7 @@ class AgentLoop(
         val signature = call.function.name + "\n" + rawArguments.trim()
         val keys = ToolTranscript.callKeys(call.function.name, rawArguments)
         if (ToolTranscript.blocked(call.function.name, rawArguments, failedCalls)) {
-            return ToolResult.error(
-                "This exact ${call.function.name} call already failed. " +
-                    "Change the path, the arguments, or the tool. Do not repeat it.",
-            )
+            return alreadyFailed(call.function.name, rawArguments)
         }
         val args = runCatching { json.parseToJsonElement(rawArguments) }.getOrNull() as? JsonObject
             ?: return ToolResult.error(
@@ -287,11 +280,42 @@ class AgentLoop(
                 ToolResult.error("Tool '${call.function.name}' failed: ${error.message ?: error::class.java.simpleName}")
             }
         if (result.isError) {
-            failedCalls += ToolTranscript.failureKeys(call.function.name, rawArguments, result.content)
+            val keys = ToolTranscript.failureKeys(call.function.name, rawArguments, result.content)
+            failedCalls += keys
+            val note = result.content.trim().take(800)
+            keys.forEach { failureNotes[it] = note }
         } else {
-            ToolTranscript.hostKey(call.function.name, rawArguments)?.let { failedCalls -= it }
+            ToolTranscript.hostKey(call.function.name, rawArguments)?.let { key ->
+                failedCalls -= key
+                failureNotes.remove(key)
+            }
+            if (!readOnly) {
+                val dropped = failedCalls.filter { ToolTranscript.isShellFailure(it) }
+                ToolTranscript.dropShellFailures(failedCalls)
+                dropped.forEach { failureNotes.remove(it) }
+            }
         }
         if (!readOnly) recentReads.clear() else if (!result.isError) recentReads += signature
         return result
+    }
+
+    private fun alreadyFailed(name: String, arguments: String): ToolResult {
+        val prior = ToolTranscript.callKeys(name, arguments)
+            .firstNotNullOfOrNull { failureNotes[it] }
+            ?.lineSequence()
+            ?.take(12)
+            ?.joinToString("\n")
+            ?.take(800)
+        val text = buildString {
+            append("This exact ")
+            append(name)
+            append(" call already failed, so it was not run again.")
+            if (!prior.isNullOrBlank()) {
+                append("\nLast result:\n")
+                append(prior)
+            }
+            append("\nThe task is still open. Use that result, change the command, or take the next step.")
+        }
+        return ToolResult.error(text)
     }
 }

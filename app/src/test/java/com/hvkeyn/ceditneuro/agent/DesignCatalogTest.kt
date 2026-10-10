@@ -48,6 +48,8 @@ class DesignCatalogTest {
         assertTrue(video.contains("CC BY"))
         assertTrue(video.contains("assets/media"))
         assertTrue(video.contains("Look in the project first"))
+        assertTrue(video.contains("beats cover the whole duration"))
+        assertTrue(video.length <= 12_000)
         assertTrue(video.contains("Do not upload"))
         assertTrue(video.contains("YouTube"))
         assertFalse(video.contains("Do not download a video, a song"))

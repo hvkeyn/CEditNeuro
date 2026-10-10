@@ -3,6 +3,8 @@
 Released: v0.45.0 through v0.75.0 (`frontend-design` rejects a bland draft: one mood, two type faces, no empty chips; see activeContext.md). Unit tests include `DesignCatalogTest` and `VideoBriefTest`. Unit tests include `ResearchRunTest`. Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, `SkillLibraryTest`, `ChatLinkTest`, `WebAppPackTest`, `HealthRecordTest`, `SkillAuditTest`, and `ReaderPlaceTest`.
 
 Known gaps:
+- v0.99.5 (versionCode 121). A reel has to cover its duration before it encodes. `CompositionTest` covers a hole, a short ending, and a missing timeline. The hyperframes skill no longer stops when the upstream page is unread. Installed on the phone. The app opened.
+- v0.99.4 (versionCode 120). The same failed shell call no longer stops the run. `ToolTranscriptTest` covers the saved error and that a network block stays when shell failures are dropped. Installed on the phone. Not published.
 - v0.99.3 (versionCode 119). A link wraps in the paragraph instead of taking a blank page, and the vault lookup reaches a note past the old 400-file cap, including a dotted name. `NoteVaultTest` covers both. On the phone, a vault book that had been 218 pages of one link each opened as 36 pages, a link opened the other note, and Back returned to the same page. The app stayed in front.
 - v0.99.2 (versionCode 118). Released. The shared queue and note links shipped together. The link chip clipped long titles; 0.99.3 replaces it. `CrewBoardTest` and `NoteVaultTest` cover the queue and the lookup. A live chat with several phones was not run. One phone still runs one model session.
 - v0.99.1 and v0.99.0 were installed on the phone while the work was in progress and are folded into this release.
