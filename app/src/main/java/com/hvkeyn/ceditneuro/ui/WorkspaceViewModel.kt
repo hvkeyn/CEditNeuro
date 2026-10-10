@@ -2357,7 +2357,6 @@ class WorkspaceViewModel(
                     "connection" -> "Stopped: the connection dropped. Continue resumes from here."
                     "max_tool_rounds" -> "Stopped: this run reached its step limit. Continue keeps going."
                     "empty" -> "Stopped: the model returned an empty reply."
-                    "repeat" -> "Stopped: the same failed call was repeated. Change the path, the arguments, or the tool."
                     else -> null
                 }
                 if (note != null) {

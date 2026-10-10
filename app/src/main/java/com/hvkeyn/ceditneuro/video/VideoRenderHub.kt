@@ -36,6 +36,10 @@ object VideoRenderHub {
         val text = runCatching { html.readText() }.getOrElse { return Outcome(false, "Cannot read ${html.path}.") }
         val info = Composition.parse(text)
             ?: return Outcome(false, "No element with data-composition-id in ${html.name}. That file is not a composition.")
+        val holes = Composition.audit(text)
+        if (holes.isNotEmpty()) {
+            return Outcome(false, "The reel does not cover its timeline. Fix the html, then render again.\n" + holes.joinToString("\n"))
+        }
         val seconds = info.seconds.takeIf { it > 0 } ?: MAX_SECONDS
         val job = Job(html, out, fps, maxSide)
         _job.value = job

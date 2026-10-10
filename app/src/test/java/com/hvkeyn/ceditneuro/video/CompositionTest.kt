@@ -40,6 +40,22 @@ class CompositionTest {
     }
 
     @Test
+    fun aHoleOrAShortReelIsRefused() {
+        assertTrue(Composition.audit(page).isEmpty())
+        val hole = page.replace(
+            "data-start=\"4\" data-duration=\"2.5\"",
+            "data-start=\"5\" data-duration=\"2\"",
+        ).replace("data-height=\"1920\"", "data-height=\"1920\" data-duration=\"8\"")
+        val notes = Composition.audit(hole)
+        assertTrue(notes.any { it.contains("hole") })
+        assertTrue(notes.any { it.contains("end at") })
+        val past = page.replace("data-height=\"1920\"", "data-height=\"1920\" data-duration=\"5\"")
+        assertTrue(Composition.audit(past).any { it.contains("past") })
+        val silent = page.replace("window.__timelines[\"intro\"]", "window.__timelines[\"other\"]")
+        assertTrue(Composition.audit(silent).any { it.contains("timeline") })
+    }
+
+    @Test
     fun theOutputKeepsTheAspectAndEvenSides() {
         val info = Composition.Info("a", 1920, 1080, 5.0)
         assertEquals(1280 to 720, Composition.outputSize(info, 1280))

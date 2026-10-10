@@ -57,7 +57,7 @@ class ShellTool(
         }
         val failed = raw.startsWith("exit=") && !raw.startsWith("exit=0")
         val noted = if (failed && "Do not repeat" !in raw) {
-            raw + "\nDo not repeat this exact command. Change the path, the arguments, or the tool."
+            raw + "\nThis command failed. The task is still open. Change it, or take the next step."
         } else {
             raw
         }

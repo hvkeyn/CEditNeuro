@@ -13,7 +13,8 @@ class RenderVideoTool(
     override val description =
         "Render an HTML composition (a root with data-composition-id and a paused timeline on window.__timelines) to an MP4. " +
             "The app seeks the timeline frame by frame in its own browser and encodes H.264 with the phone's encoder. " +
-            "No package is installed. The video has no sound track. " +
+            "No package is installed. Sound is mixed from the audio elements in the page. " +
+            "The render is refused when scenes leave a hole, run past the end, or never register the timeline. " +
             "path is the html file. out defaults to the same name with .mp4. fps is 24, 25, 30, or 60 (default 30). " +
             "size is the long side in pixels, 480 to 1920 (default 1280). Several minutes for a long piece."
     override val parameters = objectSchema(

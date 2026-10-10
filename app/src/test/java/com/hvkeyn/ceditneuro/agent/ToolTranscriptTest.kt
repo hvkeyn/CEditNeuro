@@ -174,6 +174,20 @@ class ToolTranscriptTest {
             listOf("python3 hints.py | sed 's/a/b/'" to "exit=1\nDo not pipe through sed"),
         )
         assertEquals(true, shell["run_command\nsed-pipe"])
+        val args = """{"command":"python3 a.py","timeout_seconds":120}"""
+        val notes = ToolTranscript.failureNotes(
+            listOf(
+                ChatMessage.assistant(
+                    toolCalls = listOf(ToolCall("c9", function = FunctionCall("run_command", args))),
+                ),
+                ChatMessage.tool("c9", "run_command", "exit=1\nmissing module"),
+            ),
+        )
+        assertEquals("exit=1\nmissing module", notes["run_command\npython3 a.py"])
+        val remembered = notes.keys.toMutableSet()
+        remembered += "http_request\nhost\nexample.com"
+        ToolTranscript.dropShellFailures(remembered)
+        assertEquals(setOf("http_request\nhost\nexample.com"), remembered)
         assertTrue(ShellShape.reject("python - <<'PY'")!!.contains("heredoc"))
         assertTrue(ShellShape.reject("python3 hints.py | sed 's/a/b/'")!!.contains("sed"))
     }

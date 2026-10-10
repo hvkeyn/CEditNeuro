@@ -117,6 +117,38 @@ object ToolTranscript {
         return state.filterValues { it }.keys
     }
 
+    /** The latest error text for each key that is still failed. */
+    fun failureNotes(messages: List<ChatMessage>): Map<String, String> {
+        val byId = HashMap<String, Pair<Set<String>, String?>>()
+        val notes = LinkedHashMap<String, String?>()
+        for (message in messages) {
+            if (message.role == "assistant") {
+                message.toolCalls.orEmpty().forEach { call ->
+                    byId[call.id] = callKeys(call.function.name, call.function.arguments) to
+                        hostKey(call.function.name, call.function.arguments)
+                }
+            } else if (message.role == "tool") {
+                val memory = byId[message.toolCallId] ?: continue
+                val content = message.content.orEmpty()
+                val failed = isFailedToolResult(content)
+                val note = if (failed) content.trim().take(800) else null
+                memory.first.forEach { notes[it] = note }
+                val host = memory.second
+                if (host != null && failed && hostFailure(content)) notes[host] = note
+                else if (host != null && !failed) notes[host] = null
+            }
+        }
+        return notes.mapNotNull { (key, note) -> note?.let { key to it } }.toMap()
+    }
+
+    fun isShellFailure(key: String): Boolean =
+        key.startsWith("run_command\n") || key.startsWith("shizuku_exec\n")
+
+    /** A later edit can make the same command worth running. Network blocks stay. */
+    fun dropShellFailures(keys: MutableSet<String>) {
+        keys.removeAll { isShellFailure(it) }
+    }
+
     /** Last outcome of each shell command, true when that last run failed. */
     fun shellOutcomes(commands: List<Pair<String, String>>): Map<String, Boolean> {
         val state = LinkedHashMap<String, Boolean>()
