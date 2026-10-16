@@ -69,7 +69,7 @@ fun MarkdownText(
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         for (block in blocks) {
             val drawing = block is MdBlock.Scheme ||
-                (block is MdBlock.Code && isSvgMarkup(block.lang, block.text))
+                (block is MdBlock.Code && (isSvgMarkup(block.lang, block.text) || isChartBlock(block.lang)))
             if (drawing) {
                 DrawBlock(block, color, linkColor, codeColor, codeBackground, projectRoot, onOpen)
             } else {
@@ -116,10 +116,10 @@ private fun DrawBlock(
                         ListRow("${index + 1}.", item, color, linkColor, codeColor, codeBackground, onOpen)
                     }
                 }
-                is MdBlock.Code -> if (isSvgMarkup(block.lang, block.text)) {
-                    SvgDrawing(block.text)
-                } else {
-                    CodeBlock(block.lang, block.text, color)
+                is MdBlock.Code -> when {
+                    isSvgMarkup(block.lang, block.text) -> SvgDrawing(block.text)
+                    isChartBlock(block.lang) -> ChartDrawing(block.text)
+                    else -> CodeBlock(block.lang, block.text, color)
                 }
                 is MdBlock.Scheme -> SchemeDrawing(block.path, projectRoot, linkColor, onOpen)
                 is MdBlock.Quote -> Row(modifier = Modifier.height(IntrinsicSize.Min).fillMaxWidth()) {
@@ -504,6 +504,9 @@ private fun attachSchemes(blocks: List<MdBlock>): List<MdBlock> {
     }
     return out
 }
+
+internal fun isChartBlock(lang: String): Boolean =
+    lang.equals("chart", ignoreCase = true) || lang.equals("chartli", ignoreCase = true)
 
 internal fun isSvgMarkup(lang: String, text: String): Boolean {
     val trimmed = text.trim()

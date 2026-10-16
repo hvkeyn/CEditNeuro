@@ -1,5 +1,25 @@
 # Active context
 
+v0.99.16 (versionCode 132). Installed on the phone. In the reel editor a block can be dragged along its track or onto another video or audio track, including an empty track. On the phone one picture block moved onto a new video track and stayed after save. Effects add blur and flip. Transitions are a hard cut, dissolve, wipe, and dip. A dissolve or a dip also fades the sound in.
+
+v0.99.15 (versionCode 131). Installed on the phone, not published. A motion scheme is the same video path: `video/plan.md` (promise, palette, type, each scene's start, end, and the state it hands off), one HTML composition, `render_video`, then `video/receipt.md`. Whole frames at 30 fps. A missing voice file means no invented timings. Music, effects, and voice are added only when the brief asked. The archive is not installed as a Claude or Codex skill, and its branding is not added.
+
+v0.99.14 (versionCode 130). Installed on the phone, not published. The reel editor can split a block, change its speed and volume, duplicate it, close a gap, and check the edit. Export writes an edit list and captions. Import reads an edit list, another reel, or captions. On the phone a clip was split, the check passed, the edit list exported, and importing it brought both halves back. The ideas follow FilmCraft's edit, audio, and interchange workflow. FilmCraft itself is not installed.
+
+v0.99.13 (versionCode 129). Installed on the phone. The reel editor stacks many videos and sounds. On the phone, three pictures and two sounds were still on their own layers after reopen. Concat is not installed. The phone does not remove a background.
+
+v0.99.12 (versionCode 128). Installed on the phone. The reel editor is a timeline: a main picture, a second picture, and music. On the phone, zoom, a second picture, and music were still there after reopen.
+
+v0.99.11 (versionCode 127). Installed on the phone. A video opens in a reel editor. On the phone, a piece from 0.95s to 2.17s was still there after the file was closed and opened again. The preview in the editor starts paused.
+
+v0.99.8 (versionCode 124). Installed on the phone. A chart of 1, 3, 2, 6, 4, 9 drew six columns in the chat. A 4 second reel rendered and played. A timeline stored through a variable that holds the composition id passes the encode check.
+
+v0.99.7 (versionCode 123). Any open video can be cut in the player: In, Out, a caption, then Cut. That writes a composition and renders it. The agent does the same with edit_video. A fade is a short overlap. A spoken line is the phone's own voiceover. Concat is not installed: its engine is AGPL and is not copied. The phone does not remove a background and does not clone a voice.
+
+v0.99.6 (versionCode 122), not released. The chat draws a chart from a stream of numbers: tool `chart`, types line, spark, bars, columns, heatmap. A fenced `chart` block in the reply is the picture. Chartli itself is not installed. A motion look from prompt-motion.com is one entry page the agent opens, then the words are changed to this brief and the reel still renders on the phone. The gallery's prompts are not stored in the app.
+
+Промпт для двух Windows с разными ИИ: `prompts/windows-two-machines.md`. Канал агентов — общий код на маяке. Целая папка проекта — тот же алгоритм, что `space_sync`, через SFTP, который человек указывает сам. Пароль в файл не входит.
+
 v0.99.5 (versionCode 121). A motion reel lists beats that cover the length, and render_video refuses a hole, a clip past the end, or a missing timeline. If the HyperFrames pages do not answer, the phone writes from the local skill and keeps going. A 30 second piece with no length given is six to eight moving beats.
 
 v0.99.4 (versionCode 120). A command that already failed does not end the turn. The model gets the last result and continues. After a file is written or another command succeeds, that shell command can run again. A certificate or HTTP 522 block stays.

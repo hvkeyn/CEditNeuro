@@ -217,11 +217,32 @@ private fun clock(ms: Long): String {
 
 /** A finished video with player controls: seek, five-second jumps, speed, loop, mute, and full screen. */
 @Composable
-fun VideoPreview(file: File, modifier: Modifier = Modifier) {
-    val state = remember(file.path, file.lastModified()) { PlayerState() }
+fun VideoPreview(
+    file: File,
+    modifier: Modifier = Modifier,
+    onEdit: () -> Unit = {},
+    showEdit: Boolean = true,
+    seekMs: Long? = null,
+    startPlaying: Boolean = true,
+    startLoop: Boolean = true,
+    onClock: (Long, Long, Int, Int) -> Unit = { _, _, _, _ -> },
+) {
+    val state = remember(file.path, file.lastModified()) {
+        PlayerState().apply {
+            playing = startPlaying
+            loop = startLoop
+        }
+    }
     var fullscreen by remember(file.path) { mutableStateOf(false) }
     if (!fullscreen) {
-        VideoSurface(file, state, modifier, fullscreen = false, onFullscreen = { fullscreen = true })
+        VideoSurface(
+            file, state, modifier, fullscreen = false,
+            onFullscreen = { fullscreen = true },
+            onEdit = onEdit,
+            showEdit = showEdit,
+            seekMs = seekMs,
+            onClock = onClock,
+        )
     } else {
         Box(modifier.fillMaxSize().background(Color.Black))
         val activity = LocalContext.current.activity()
@@ -234,7 +255,14 @@ fun VideoPreview(file: File, modifier: Modifier = Modifier) {
             val immersion = Immersion(activity).also { it.enter(state.width >= state.height) }
             val layer = androidx.compose.ui.platform.ComposeView(activity).apply {
                 setContent {
-                    VideoSurface(file, state, Modifier.fillMaxSize(), fullscreen = true, onFullscreen = { fullscreen = false })
+                    VideoSurface(
+                        file, state, Modifier.fillMaxSize(), fullscreen = true,
+                        onFullscreen = { fullscreen = false },
+                        onEdit = {},
+                        showEdit = false,
+                        seekMs = seekMs,
+                        onClock = onClock,
+                    )
                 }
             }
             decor.addView(layer, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
@@ -258,6 +286,10 @@ private fun VideoSurface(
     modifier: Modifier,
     fullscreen: Boolean,
     onFullscreen: () -> Unit,
+    onEdit: () -> Unit,
+    showEdit: Boolean,
+    seekMs: Long?,
+    onClock: (Long, Long, Int, Int) -> Unit,
 ) {
     var player by remember { mutableStateOf<MediaPlayer?>(null) }
     var video by remember { mutableStateOf<android.widget.VideoView?>(null) }
@@ -285,11 +317,16 @@ private fun VideoSurface(
         wake()
     }
 
+    LaunchedEffect(seekMs) {
+        if (seekMs != null) seek(seekMs)
+    }
+
     LaunchedEffect(video) {
         while (true) {
             val view = video
             if (view != null && player != null) {
                 state.position = view.currentPosition.toLong()
+                onClock(state.position, state.duration, state.width, state.height)
                 if (!view.isPlaying && state.playing && !state.loop && state.duration > 0 &&
                     state.position >= state.duration - 250
                 ) {
@@ -371,6 +408,15 @@ private fun VideoSurface(
                 video = null
             },
         )
+        if (!fullscreen && showEdit) {
+            TextButton(
+                onClick = onEdit,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .background(Color(0xCC000000)),
+            ) { Text("Edit", color = Color.White) }
+        }
         if (state.failed) {
             Text(
                 "This video cannot be played. The file is damaged or was not finished; render it again.",

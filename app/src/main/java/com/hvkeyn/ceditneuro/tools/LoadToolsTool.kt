@@ -17,7 +17,7 @@ class LoadToolsTool(private val session: ToolSession) : Tool {
             "skills: find_skills, review_skill. " +
             "design: design_system. " +
             "debug: debug_case. " +
-            "video: render_video, sound_effect, make_music, voiceover. " +
+            "video: render_video, edit_video, sound_effect, make_music, voiceover. " +
             "learn: learn. " +
             "crew: crew. " +
             "harness: harness_rrsi."

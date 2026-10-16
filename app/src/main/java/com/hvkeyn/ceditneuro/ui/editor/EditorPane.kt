@@ -68,6 +68,11 @@ fun EditorPane(
     onRun: () -> Unit = {},
     onStop: () -> Unit = {},
     onRender: (String) -> Unit = {},
+    onEdit: (String) -> Unit = {},
+    onSaveReel: (String, String) -> Unit = { _, _ -> },
+    onRenderReel: (String) -> Unit = {},
+    onExportReel: (String) -> Unit = {},
+    onImportReel: (String, String) -> Unit = { _, _ -> },
 ) {
     val activePath = state.activePath
     if (activePath == null || state.openFiles.isEmpty()) {
@@ -104,8 +109,17 @@ fun EditorPane(
             .fillMaxWidth()
             .weight(1f)
         when {
+            activePath.endsWith(".reel") && file != null -> ReelEditor(
+                reelFile = file,
+                text = contentProvider(activePath),
+                onSave = { onSaveReel(activePath, it) },
+                onRender = { onRenderReel(activePath) },
+                onExport = { onExportReel(activePath) },
+                onImport = { onImportReel(activePath, it) },
+                modifier = body,
+            )
             kind == "image" && file != null -> ImagePreview(file, body)
-            kind == "video" && file != null -> VideoPreview(file, body)
+            kind == "video" && file != null -> VideoPreview(file, body, onEdit = { onEdit(activePath) })
             kind != null && previewing -> {
                 val markup = contentProvider(activePath)
                 if (kind == "html" && com.hvkeyn.ceditneuro.video.Composition.isComposition(markup)) {

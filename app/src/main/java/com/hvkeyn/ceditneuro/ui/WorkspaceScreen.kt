@@ -911,6 +911,11 @@ private fun EditorSurface(
         onRun = viewModel::runActiveFile,
         onStop = viewModel::stopShellCommand,
         onRender = viewModel::renderComposition,
+        onEdit = viewModel::openReel,
+        onSaveReel = viewModel::saveReel,
+        onRenderReel = viewModel::renderReel,
+        onExportReel = viewModel::exportReel,
+        onImportReel = viewModel::importEdit,
     )
 }
 
