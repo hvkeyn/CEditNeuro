@@ -1,6 +1,6 @@
 # Active context
 
-v0.99.17 (versionCode 133). Installed on the phone. The agent shrinks a jpg, png, webp, or mp4 with compress_media. Quality is 1 to 100, and the longest side can be capped. The phone's own encoder writes the smaller file beside the source. CompressO, FFmpeg, pngquant, and jpegoptim are not installed.
+v0.99.17 (versionCode 133). Released and installed on the phone. The agent shrinks a jpg, png, webp, or mp4 with compress_media. Quality is 1 to 100, and the longest side can be capped. The phone's own encoder writes the smaller file beside the source. CompressO, FFmpeg, pngquant, and jpegoptim are not installed.
 
 v0.99.16 (versionCode 132). Released and installed on the phone. In the reel editor a block can be dragged along its track or onto another video or audio track, including an empty track. On the phone one picture block moved onto a new video track and stayed after save. Effects add blur and flip. Transitions are a hard cut, dissolve, wipe, and dip. A dissolve or a dip also fades the sound in.
 
