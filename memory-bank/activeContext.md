@@ -1,6 +1,6 @@
 # Active context
 
-v0.99.16 (versionCode 132). Installed on the phone. In the reel editor a block can be dragged along its track or onto another video or audio track, including an empty track. On the phone one picture block moved onto a new video track and stayed after save. Effects add blur and flip. Transitions are a hard cut, dissolve, wipe, and dip. A dissolve or a dip also fades the sound in.
+v0.99.16 (versionCode 132). Released and installed on the phone. In the reel editor a block can be dragged along its track or onto another video or audio track, including an empty track. On the phone one picture block moved onto a new video track and stayed after save. Effects add blur and flip. Transitions are a hard cut, dissolve, wipe, and dip. A dissolve or a dip also fades the sound in.
 
 v0.99.15 (versionCode 131). Installed on the phone, not published. A motion scheme is the same video path: `video/plan.md` (promise, palette, type, each scene's start, end, and the state it hands off), one HTML composition, `render_video`, then `video/receipt.md`. Whole frames at 30 fps. A missing voice file means no invented timings. Music, effects, and voice are added only when the brief asked. The archive is not installed as a Claude or Codex skill, and its branding is not added.
 

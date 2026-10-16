@@ -3,7 +3,7 @@
 Released: v0.45.0 through v0.75.0 (`frontend-design` rejects a bland draft: one mood, two type faces, no empty chips; see activeContext.md). Unit tests include `DesignCatalogTest` and `VideoBriefTest`. Unit tests include `ResearchRunTest`. Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, `SkillLibraryTest`, `ChatLinkTest`, `WebAppPackTest`, `HealthRecordTest`, `SkillAuditTest`, and `ReaderPlaceTest`.
 
 Known gaps:
-- v0.99.16 (versionCode 132). A reel block moves to another lane with `CutList.place`. On the phone one picture block was dragged onto a new video track and was still there after save. Wipe, dissolve, dip, blur, and flip round-trip through the reel file and the edit list. `CutListTest` covers that.
+- v0.99.16 (versionCode 132). Released. A reel block moves to another lane with `CutList.place`. On the phone one picture block was dragged onto a new video track and was still there after save. Wipe, dissolve, dip, blur, and flip round-trip through the reel file and the edit list. `CutListTest` covers that.
 - v0.99.15 (versionCode 131). Installed on the phone, not published. The hyperframes skill now keeps a motion scheme: one plan, scene handoffs, one render, one receipt. `DesignCatalogTest` checks those phrases and the 12_000 character cap.
 - v0.99.14 (versionCode 130). Installed on the phone, not published. Split, speed, volume, duplicate, close-gap, a check, and edit-list import and export. On the phone a split survived export and import. FilmCraft is not in the app.
 - v0.99.13 (versionCode 129). Installed on the phone. Three pictures and two sounds stayed after reopen. Concat is not in the app.
