@@ -1185,13 +1185,21 @@ private fun ToolBlock(label: String, text: String, error: Boolean) {
             )
             CopyLabel(text)
         }
-        SelectionContainer {
-            Text(
+        if (text.contains("```chart")) {
+            MarkdownText(
                 text = text,
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(top = 2.dp),
             )
+        } else {
+            SelectionContainer {
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
         }
     }
 }

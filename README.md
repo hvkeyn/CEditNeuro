@@ -15,10 +15,11 @@ Edit a project by hand. Open the agent when you want a change made. Read the rep
 | | |
 | --- | --- |
 | **Edit** | File tree, tabs, tree-sitter highlighting for Java, Kotlin, Python, JSON, and XML. Run an open `.py` or `.sh` from the editor. |
-| **Agent** | Tool calling, skills, project memory, and a Doctor report. The model is not trained. The harness around it can change. |
+| **Video** | A reel editor for a video already in the project. Drag a block along a track or onto another video or audio track. Add an effect or a transition, then render an MP4 on the phone. |
+| **Agent** | Tool calling, skills, project memory, and a Doctor report. The model is not trained. The harness around it can change. It can also write a motion reel and render it. |
 | **Read** | txt, Markdown, HTML, FB2, and EPUB, with pages, notes, bookmarks, and read-aloud. |
 | **Phone** | Install an APK, turn a web page into an app, a timer, mail, FTP, and SFTP. |
-| **Study** | A checked research report, a chart from numbers, and notes from a public video page. |
+| **Study** | A checked research report, a chart from numbers in the chat, and notes from a public video page. |
 
 DeepSeek is built in, through its API or a sign-in on this phone. Qwen web chat is the same idea: sign in once inside the app, no key and no computer. Other providers can be added in Settings.
 
@@ -62,6 +63,10 @@ That folder contains the API key and server passwords. Do not copy it into a rep
 `run_command` is mksh and toybox inside this app. It is not Termux: there is no `pkg` or `apt`. Git status and diff go through JGit. A JDK, the Android SDK tools, and other runtimes can be unpacked into this app's toolchain from the Termux mirror.
 
 An absolute path is a real directory on this phone. `HOME` is this app's private directory. `DOWNLOAD` is the public Downloads folder.
+
+## Video
+
+Open a video and tap **Edit**. The reel keeps picture tracks and sound tracks in one file next to the video. Hold a block and drag it along its track, or onto another track of the same kind. An empty track at the edge takes a block onto a new layer. Effects cover fade, gray, warm, zoom, mute, blur, and flip. Transitions are a hard cut, a dissolve, a wipe, and a dip to black. Save writes the same reel. Render encodes an MP4 in the project.
 
 ## Reading
 

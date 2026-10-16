@@ -791,6 +791,117 @@ class WorkspaceViewModel(
         }
     }
 
+    /** Opens the reel editor for this video, creating the saved edit if it is new. */
+    fun openReel(videoPath: String) {
+        val ws = workspace ?: return
+        val reelPath = videoPath.substringBeforeLast('.') + ".reel"
+        val existing = runCatching { ws.resolve(reelPath) }.getOrNull()
+        if (existing == null || !existing.isFile) {
+            val name = videoPath.substringAfterLast('/')
+            val text = com.hvkeyn.ceditneuro.video.CutList.write(
+                com.hvkeyn.ceditneuro.video.CutList.Project(name, 1080, 1920, emptyList()),
+            )
+            runCatching { ws.write(reelPath, text) }.getOrElse {
+                showMessage(it.message ?: "Could not start the edit.")
+                return
+            }
+            current?.let { refreshProjectTree(it, reelPath) }
+        }
+        openFile(reelPath)
+    }
+
+    /** Writes the open reel and keeps that file as the edit. */
+    fun saveReel(path: String, text: String) {
+        val ws = workspace ?: return
+        runCatching { ws.write(path, text) }.getOrElse {
+            showMessage(it.message ?: "Could not save the edit.")
+            return
+        }
+        current?.buffers?.set(path, text)
+        _state.update { state ->
+            state.copy(
+                openFiles = state.openFiles.map { if (it.path == path) it.copy(onDisk = text) else it },
+                dirtyPaths = state.dirtyPaths - path,
+                reloadCounter = state.reloadCounter + 1,
+            )
+        }
+        showMessage("Saved $path")
+    }
+
+    /** Renders the saved reel. The edit file stays, and the MP4 opens beside it. */
+    fun renderReel(path: String) {
+        val ws = workspace ?: return
+        val text = contentFor(path).ifBlank {
+            runCatching { ws.read(path) }.getOrDefault("")
+        }
+        val project = com.hvkeyn.ceditneuro.video.CutList.load(text)
+        if (project == null || project.clips.isEmpty()) {
+            showMessage("Add a video on the timeline, then render.")
+            return
+        }
+        val sheet = com.hvkeyn.ceditneuro.video.CutList.page(project)
+        if (sheet == null) {
+            showMessage("The cut stays under 300 seconds.")
+            return
+        }
+        val htmlPath = path.substringBeforeLast('.') + ".cut.html"
+        runCatching { ws.write(htmlPath, sheet.html) }.getOrElse {
+            showMessage(it.message ?: "Could not write the cut.")
+            return
+        }
+        renderComposition(htmlPath)
+    }
+
+    /** Writes an edit list and a caption file beside the reel. */
+    fun exportReel(path: String) {
+        val ws = workspace ?: return
+        val text = contentFor(path).ifBlank { runCatching { ws.read(path) }.getOrDefault("") }
+        val project = com.hvkeyn.ceditneuro.video.CutList.load(text)
+            ?: return showMessage("This edit cannot be exported.")
+        val stem = path.substringBeforeLast('.')
+        runCatching {
+            ws.write("$stem.edl", com.hvkeyn.ceditneuro.video.CutList.edl(project))
+            ws.write("$stem.srt", com.hvkeyn.ceditneuro.video.CutList.srt(project))
+        }.getOrElse {
+            showMessage(it.message ?: "Could not export.")
+            return
+        }
+        current?.let { refreshProjectTree(it, "$stem.edl") }
+        showMessage("Exported the edit list and the captions.")
+    }
+
+    /** Reads an edit list, another reel, or captions into this edit. */
+    fun importEdit(reelPath: String, from: String) {
+        val ws = workspace ?: return
+        val text = contentFor(reelPath).ifBlank { runCatching { ws.read(reelPath) }.getOrDefault("") }
+        val project = com.hvkeyn.ceditneuro.video.CutList.load(text)
+            ?: return showMessage("This edit cannot take a file.")
+        val incoming = runCatching { ws.read(from) }.getOrElse {
+            showMessage(it.message ?: "Could not read that file.")
+            return
+        }
+        val clips = com.hvkeyn.ceditneuro.video.CutList.takeIn(incoming, project.clips)
+            ?: return showMessage("That file is not an edit list or captions.")
+        saveReel(reelPath, com.hvkeyn.ceditneuro.video.CutList.write(project.copy(pieces = emptyList(), clips = clips)))
+    }
+
+    /** Cuts the open video into a composition and renders that MP4. */
+    fun exportCut(path: String, pieces: List<com.hvkeyn.ceditneuro.video.CutList.Piece>, width: Int, height: Int) {
+        val ws = workspace ?: return
+        val name = path.substringAfterLast('/')
+        val sheet = com.hvkeyn.ceditneuro.video.CutList.page(name, width, height, pieces)
+        if (sheet == null) {
+            showMessage("Add at least one piece. The cut stays under 300 seconds.")
+            return
+        }
+        val htmlPath = path.substringBeforeLast('.') + ".cut.html"
+        runCatching { ws.write(htmlPath, sheet.html) }.getOrElse {
+            showMessage(it.message ?: "Could not write the cut.")
+            return
+        }
+        renderComposition(htmlPath)
+    }
+
     fun openReader(path: String) {
         if (workspace == null) {
             showMessage("Open a project folder first.")
@@ -3116,6 +3227,7 @@ class WorkspaceViewModel(
             com.hvkeyn.ceditneuro.tools.CrewTool(ws, { linkName }) { beacon.relay("CREW $it") },
             com.hvkeyn.ceditneuro.tools.VideoBriefTool(agentNet) { settingsStore.current.networkEnabled },
             com.hvkeyn.ceditneuro.tools.CalculateTool(),
+            com.hvkeyn.ceditneuro.tools.ChartTool(),
             com.hvkeyn.ceditneuro.tools.ReferenceTool(agentNet) { settingsStore.current.networkEnabled },
             com.hvkeyn.ceditneuro.tools.CaptureDumpTool(appContext, ws),
             com.hvkeyn.ceditneuro.tools.DebugCaseTool(ws),
@@ -3126,6 +3238,7 @@ class WorkspaceViewModel(
             com.hvkeyn.ceditneuro.tools.OpenSettingsTool(appContext),
             com.hvkeyn.ceditneuro.tools.ClipboardTool(appContext),
             com.hvkeyn.ceditneuro.tools.OpenFileTool(appContext, ws),
+            com.hvkeyn.ceditneuro.tools.EditVideoTool(ws),
             com.hvkeyn.ceditneuro.tools.RenderVideoTool(ws) { path ->
                 if (project.epoch.get() != epochAtBuild) return@RenderVideoTool
                 refreshProjectTree(project, path)

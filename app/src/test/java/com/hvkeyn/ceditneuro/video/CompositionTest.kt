@@ -53,6 +53,11 @@ class CompositionTest {
         assertTrue(Composition.audit(past).any { it.contains("past") })
         val silent = page.replace("window.__timelines[\"intro\"]", "window.__timelines[\"other\"]")
         assertTrue(Composition.audit(silent).any { it.contains("timeline") })
+        val variable = page.replace(
+            "window.__timelines[\"intro\"] = tl;",
+            "var ID = 'intro'; var registry = window.__timelines = window.__timelines || {}; registry[ID] = tl;",
+        )
+        assertTrue(Composition.audit(variable).isEmpty())
     }
 
     @Test

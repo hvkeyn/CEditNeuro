@@ -36,8 +36,7 @@ object Composition {
         val info = parse(html) ?: return listOf("No element with data-composition-id.")
         val notes = ArrayList<String>()
         if (info.seconds <= 0.0) notes += "Set data-duration on the root to the length of the piece."
-        val stored = Regex("""__timelines\s*\[\s*["']${Regex.escape(info.id)}["']\s*\]""")
-        if (!stored.containsMatchIn(html)) {
+        if (!timelineStored(html, info.id)) {
             notes += "Store the paused timeline on window.__timelines[\"${info.id}\"]."
         }
         val spans = ArrayList<Pair<Double, Double>>()
@@ -70,6 +69,16 @@ object Composition {
             notes += "A clip runs past data-duration ${fmt(info.seconds)}s. Shorten it or raise the root duration."
         }
         return notes
+    }
+
+    /** A literal __timelines["id"] or a variable that was set to that id and then assigned. */
+    internal fun timelineStored(html: String, id: String): Boolean {
+        if (Regex("""__timelines\s*\[\s*["']${Regex.escape(id)}["']\s*\]""").containsMatchIn(html)) return true
+        if (!html.contains("__timelines")) return false
+        val names = Regex("""(?:var|let|const)\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*['"]${Regex.escape(id)}['"]""")
+            .findAll(html)
+            .map { it.groupValues[1] }
+        return names.any { name -> Regex("""\[\s*$name\s*\]\s*=""").containsMatchIn(html) }
     }
 
     private fun fmt(value: Double): String {
@@ -204,7 +213,23 @@ object Composition {
               var s = start(el);
               var d = parseFloat(el.getAttribute('data-duration'));
               var on = t >= s && (isNaN(d) || t < s + d);
-              if (el.tagName !== 'AUDIO') el.style.visibility = on ? '' : 'hidden';
+              if (el.tagName !== 'AUDIO') {
+                el.style.visibility = on ? '' : 'hidden';
+                el.style.clipPath = '';
+                var fade = parseFloat(el.getAttribute('data-fade')) || 0;
+                var tr = el.getAttribute('data-transition') || '';
+                if (on && tr === 'wipe') {
+                  var wp = Math.max(0, Math.min(1, (t - s) / 0.4));
+                  el.style.clipPath = 'inset(0 ' + ((1 - wp) * 100).toFixed(1) + '% 0 0)';
+                }
+                if (on && fade > 0 && !isNaN(d)) {
+                  var into = Math.min(1, (t - s) / fade);
+                  var outOf = Math.min(1, (s + d - t) / fade);
+                  el.style.opacity = Math.max(0, Math.min(into, outOf));
+                } else if (on && (tr === 'dip' || tr === 'dissolve')) {
+                  el.style.opacity = String(Math.min(1, (t - s) / 0.35));
+                } else if (on) el.style.opacity = '1';
+              }
               media(el, t, s, on, playing);
             }
           }
