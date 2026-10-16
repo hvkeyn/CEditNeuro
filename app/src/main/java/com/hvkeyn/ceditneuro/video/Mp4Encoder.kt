@@ -17,6 +17,7 @@ class Mp4Encoder(
     private val height: Int,
     private val fps: Int,
     private val audio: AudioMix.Encoded? = null,
+    private val bitrate: Int? = null,
 ) {
     private val codec: MediaCodec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
     private val muxer: MediaMuxer
@@ -33,7 +34,10 @@ class Mp4Encoder(
     init {
         val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height).apply {
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible)
-            setInteger(MediaFormat.KEY_BIT_RATE, (width.toLong() * height * fps / 6).coerceIn(1_000_000L, 20_000_000L).toInt())
+            setInteger(
+                MediaFormat.KEY_BIT_RATE,
+                (bitrate ?: (width.toLong() * height * fps / 6).toInt()).coerceIn(80_000, 20_000_000),
+            )
             setInteger(MediaFormat.KEY_FRAME_RATE, fps)
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
         }

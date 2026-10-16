@@ -66,7 +66,7 @@ An absolute path is a real directory on this phone. `HOME` is this app's private
 
 ## Video
 
-Open a video and tap **Edit**. The reel keeps picture tracks and sound tracks in one file next to the video. Hold a block and drag it along its track, or onto another track of the same kind. An empty track at the edge takes a block onto a new layer. Effects cover fade, gray, warm, zoom, mute, blur, and flip. Transitions are a hard cut, a dissolve, a wipe, and a dip to black. Save writes the same reel. Render encodes an MP4 in the project.
+Open a video and tap **Edit**. The reel keeps picture tracks and sound tracks in one file next to the video. Hold a block and drag it along its track, or onto another track of the same kind. An empty track at the edge takes a block onto a new layer. Effects cover fade, gray, warm, zoom, mute, blur, and flip. Transitions are a hard cut, a dissolve, a wipe, and a dip to black. Save writes the same reel. Render encodes an MP4 in the project. The agent can also shrink a jpg, png, webp, or mp4 that is already in the project. The phone's own encoder does that. CompressO is not installed.
 
 ## Reading
 

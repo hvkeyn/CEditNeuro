@@ -2618,6 +2618,7 @@ class WorkspaceViewModel(
             "learn" -> "Teaching"
             "crew" -> "Sharing the queue"
             "render_video" -> "Rendering a video"
+            "compress_media" -> "Shrinking a file"
             "sound_effect" -> "Adding a sound effect"
             "make_music" -> "Making music"
             "voiceover" -> "Recording a voiceover"
@@ -3239,6 +3240,7 @@ class WorkspaceViewModel(
             com.hvkeyn.ceditneuro.tools.ClipboardTool(appContext),
             com.hvkeyn.ceditneuro.tools.OpenFileTool(appContext, ws),
             com.hvkeyn.ceditneuro.tools.EditVideoTool(ws),
+            com.hvkeyn.ceditneuro.tools.CompressMediaTool(ws),
             com.hvkeyn.ceditneuro.tools.RenderVideoTool(ws) { path ->
                 if (project.epoch.get() != epochAtBuild) return@RenderVideoTool
                 refreshProjectTree(project, path)
