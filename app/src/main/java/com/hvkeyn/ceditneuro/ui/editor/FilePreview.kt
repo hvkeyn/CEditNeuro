@@ -59,6 +59,17 @@ internal fun svgAspect(markup: String): Float {
     return (height / width).coerceIn(0.28f, 1.7f)
 }
 
+/**
+ * Lets a chat card grow with its text. A fixed page height would clip the last rows.
+ */
+internal fun fitDocument(text: String): String {
+    val style = "<style id=\"cedit-fit\">html,body{height:auto!important;min-height:0!important;" +
+        "overflow:visible!important;margin:0}</style>"
+    if (text.contains("id=\"cedit-fit\"") || text.contains("id='cedit-fit'")) return text
+    val head = Regex("""(?i)<head[^>]*>""")
+    return if (head.containsMatchIn(text)) head.replace(text, "$0$style") else style + text
+}
+
 /** Wraps markup so a scheme fills the frame and keeps its colors on a white page. */
 internal fun previewPage(kind: String, text: String): String = when (kind) {
     "svg" -> "<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=8, user-scalable=yes\">" +
@@ -148,6 +159,7 @@ fun ExpandableMarkup(
     modifier: Modifier = Modifier,
     onZone: ((Float) -> Unit)? = null,
     onFlip: ((Int) -> Unit)? = null,
+    onContentHeight: ((Int, Int) -> Unit)? = null,
 ) {
     var open by remember { mutableStateOf(false) }
     MarkupPreview(
@@ -159,6 +171,7 @@ fun ExpandableMarkup(
         allowZoom = false,
         onZone = onZone,
         onFlip = onFlip,
+        onContentHeight = onContentHeight,
     )
     if (open) {
         com.hvkeyn.ceditneuro.ui.WebPictureStage(onClose = { open = false }) {
@@ -178,8 +191,12 @@ fun MarkupPreview(
     allowZoom: Boolean = false,
     onZone: ((Float) -> Unit)? = null,
     onFlip: ((Int) -> Unit)? = null,
+    onContentHeight: ((Int, Int) -> Unit)? = null,
 ) {
-    val page = remember(kind, text) { previewPage(kind, text) }
+    val page = remember(kind, text, onContentHeight != null) {
+        val body = previewPage(kind, text)
+        if (onContentHeight != null && kind != "svg") fitDocument(body) else body
+    }
     AndroidView(
         modifier = modifier.fillMaxSize(),
         factory = { context ->
@@ -197,6 +214,7 @@ fun MarkupPreview(
             view.onTap = onTap
             view.onZone = onZone
             view.onFlip = onFlip
+            view.onContentHeight = onContentHeight
             view.zoomEnabled = allowZoom
             val animate = kind != "svg" && text.contains("data-composition-id")
             view.settings.javaScriptEnabled = animate
@@ -224,6 +242,15 @@ private class PreviewWeb(context: Context) : WebView(context) {
     var onTap: (() -> Unit)? = null
     var onZone: ((Float) -> Unit)? = null
     var onFlip: ((Int) -> Unit)? = null
+    var onContentHeight: ((Int, Int) -> Unit)? = null
+
+    fun publishFit() {
+        val report = onContentHeight ?: return
+        val css = contentHeight
+        if (css <= 0 || height <= 0) return
+        val px = (css * scale).toInt()
+        if (px > 0) report(px, height)
+    }
     var zoomEnabled: Boolean = false
         set(value) {
             field = value
@@ -243,6 +270,9 @@ private class PreviewWeb(context: Context) : WebView(context) {
                 settings.setSupportZoom(zoomEnabled)
                 settings.builtInZoomControls = zoomEnabled
                 settings.displayZoomControls = false
+                (view as? PreviewWeb)?.publishFit()
+                view.post { (view as? PreviewWeb)?.publishFit() }
+                view.postDelayed({ (view as? PreviewWeb)?.publishFit() }, 150)
             }
         }
         setOnTouchListener { _, event ->

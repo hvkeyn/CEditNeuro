@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -23,9 +24,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -194,18 +197,32 @@ private fun ListRow(
 
 @Composable
 private fun HtmlDrawing(markup: String) {
-    BoxWithConstraints(
+    val density = LocalDensity.current
+    var heightPx by remember(markup) { mutableIntStateOf(0) }
+    var grows by remember(markup) { mutableIntStateOf(0) }
+    val height = with(density) {
+        if (heightPx <= 0) 240.dp else heightPx.toDp().coerceIn(120.dp, 4800.dp)
+    }
+    Box(
         modifier = Modifier
             .fillMaxWidth()
+            .height(height)
             .clip(RoundedCornerShape(8.dp)),
     ) {
         ExpandableMarkup(
             kind = "html",
             text = markup,
             baseDir = null,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(320.dp),
+            onContentHeight = { contentPx, viewPx ->
+                if (grows >= 4 || contentPx <= 0) return@ExpandableMarkup
+                val next = (contentPx + 16).coerceAtMost(with(density) { 4800.dp.roundToPx() })
+                val clipped = contentPx > viewPx + 8
+                if (!clipped && heightPx > 0) return@ExpandableMarkup
+                if (kotlin.math.abs(next - heightPx) <= 8) return@ExpandableMarkup
+                heightPx = next
+                grows++
+            },
+            modifier = Modifier.fillMaxSize(),
         )
     }
 }
