@@ -1,6 +1,7 @@
 package com.hvkeyn.ceditneuro.ui
 
 import com.hvkeyn.ceditneuro.agent.buildSetupPrompt
+import com.hvkeyn.ceditneuro.ui.editor.fitDocument
 import com.hvkeyn.ceditneuro.ui.editor.previewKind
 import com.hvkeyn.ceditneuro.ui.editor.previewPage
 import org.junit.Assert.assertEquals
@@ -38,6 +39,14 @@ class RunAndPreviewTest {
         assertTrue(page.contains("<svg></svg>"))
         assertTrue(page.contains("width:100%"))
         assertTrue(page.contains("height:auto"))
+    }
+
+    @Test
+    fun aChatCardGrowsWithItsText() {
+        val page = fitDocument("<html><head></head><body><p>one</p></body></html>")
+        assertTrue(page.contains("id=\"cedit-fit\""))
+        assertTrue(page.contains("height:auto"))
+        assertEquals(page, fitDocument(page))
     }
 
     @Test
