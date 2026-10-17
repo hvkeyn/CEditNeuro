@@ -31,6 +31,9 @@ class PacketDumpTest {
             assertTrue(text.contains("secret fields in cleartext: cookie header x1 (values not printed)"))
             assertTrue(text.contains("plain dns queries: 1, names 1"))
             assertTrue(text.contains("tcp calls answered: 0 of 1"))
+            assertTrue(text.contains("trails"))
+            assertTrue(text.contains("missing-host"))
+            assertFalse(text.contains("supersecretvalue"))
         } finally {
             dir.deleteRecursively()
         }

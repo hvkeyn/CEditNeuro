@@ -37,7 +37,14 @@ object PacketDump {
         if (kept > 0) out.write(packet, 0, kept)
     }
 
-    fun summarize(file: File): String {
+    /** Indicators saved next to a capture. A missing file is an empty trail set. */
+    fun trailsBeside(pcap: File): String {
+        val side = File(pcap.parentFile, "trails.txt")
+        if (!side.isFile || side.length() > 200_000) return ""
+        return runCatching { side.readText(Charsets.UTF_8) }.getOrDefault("")
+    }
+
+    fun summarize(file: File, trails: String = ""): String {
         if (!file.isFile || file.length() < 24) return "No dump to read."
         RandomAccessFile(file, "r").use { input ->
             val fileHeader = ByteArray(24)
@@ -98,7 +105,7 @@ object PacketDump {
                 }
                 if (flows.size > 40) append("... ").append(flows.size - 40).append(" more flows\n")
                 names.take(20).forEach { append("name ").append(it).append('\n') }
-                append(audit.report())
+                append(audit.report(trails))
                 append("Payloads are not printed.")
             }
         }
@@ -117,6 +124,7 @@ object PacketDump {
         val dnsNames = LinkedHashSet<String>()
         var plainDns = 0
         val quic = LinkedHashSet<String>()
+        val seen = LinkedHashMap<String, TrailMatch.Observation>()
 
         fun add(kind: Kind.Ip) {
             val out = "${kind.dst}:${kind.dport}"
@@ -134,9 +142,22 @@ object PacketDump {
                 }
                 if (kind.dport == 443) quic += out
             }
+            val obs = TrailMatch.Observation(
+                src = kind.src,
+                dst = kind.dst,
+                dport = kind.dport,
+                proto = kind.proto,
+                dns = if (kind.dport == 53 || kind.sport == 53) kind.note else "",
+                host = kind.host.ifBlank { if (kind.dport == 443) kind.note else "" },
+                path = kind.path,
+                method = kind.method,
+                agent = kind.agent,
+            )
+            val key = "${obs.dns}|${obs.host}|${obs.path}|${obs.dst}:${obs.dport}|${obs.agent}"
+            seen.putIfAbsent(key, obs)
         }
 
-        fun report(): String = buildString {
+        fun report(trails: String): String = buildString {
             append("audit\n")
             val confirmed = called.count { it in answered }
             append("tcp calls answered: ").append(confirmed).append(" of ").append(called.size).append('\n')
@@ -152,6 +173,7 @@ object PacketDump {
                 append(secrets.entries.joinToString(", ") { "${it.key} x${it.value}" })
                 append(" (values not printed)\n")
             }
+            append(TrailMatch.report(TrailMatch.scan(TrailMatch.parse(trails), seen.values.toList())))
         }
     }
 
@@ -167,6 +189,10 @@ object PacketDump {
             val ack: Boolean,
             val note: String,
             val secret: String = "",
+            val host: String = "",
+            val path: String = "",
+            val method: String = "",
+            val agent: String = "",
         ) : Kind()
         data object Arp : Kind()
         data object Skip : Kind()
@@ -213,13 +239,48 @@ object PacketDump {
         val dport = u16(body, at + 2)
         val flags = body[at + 13].toInt() and 0xff
         val header = ((body[at + 12].toInt() ushr 4) and 0xf) * 4
-        val note = if (dport == 443) sni(body, at + header) else ""
-        val secret = if (dport in CLEAR || sport in CLEAR) secretKind(body, at + header) else ""
+        val payloadAt = at + header
+        val note = if (dport == 443) sni(body, payloadAt) else ""
+        val clear = dport in CLEAR || sport in CLEAR
+        val secret = if (clear) secretKind(body, payloadAt) else ""
+        val http = if (clear) httpBits(body, payloadAt) else HttpBits()
         return Kind.Ip(
             "tcp", src, sport, dst, dport, ttl,
             syn = flags and 0x02 != 0, ack = flags and 0x10 != 0, note = note, secret = secret,
+            host = http.host, path = http.path, method = http.method, agent = http.agent,
         )
     }
+
+    private data class HttpBits(
+        val method: String = "",
+        val host: String = "",
+        val path: String = "",
+        val agent: String = "",
+    )
+
+    /** The request line and two headers. The rest of the payload is not kept. */
+    private fun httpBits(body: ByteArray, at: Int): HttpBits {
+        if (at >= body.size) return HttpBits()
+        val n = (body.size - at).coerceAtMost(180)
+        val text = String(body, at, n, Charsets.ISO_8859_1)
+        val line = text.lineSequence().firstOrNull().orEmpty()
+        val method = line.substringBefore(' ')
+        if (method !in METHODS) return HttpBits()
+        val target = line.substringAfter(' ', "").substringBefore(' ')
+        val path = target.substringBefore('?').take(80)
+        fun header(name: String): String {
+            val prefix = "$name:"
+            return text.lineSequence()
+                .firstOrNull { it.startsWith(prefix, ignoreCase = true) }
+                ?.substringAfter(':')
+                ?.trim()
+                ?.take(80)
+                .orEmpty()
+        }
+        return HttpBits(method, header("Host").substringBefore(':'), path, header("User-Agent"))
+    }
+
+    private val METHODS = setOf("GET", "POST", "HEAD", "PUT", "DELETE", "OPTIONS", "CONNECT")
 
     /** Names the kind of secret a cleartext payload carries. The value itself is never returned. */
     private fun secretKind(body: ByteArray, at: Int): String {

@@ -20,6 +20,7 @@ import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
+import com.hvkeyn.ceditneuro.net.TrailMatch
 import java.net.SocketTimeoutException
 
 /**
@@ -35,11 +36,12 @@ class NetAuditTool(
         "Audit the network this phone is joined to: link, gateway, DNS, private DNS, proxy, open service ports " +
             "on the gateway, and devices that announce themselves (SSDP, mDNS). sweep=true also checks a few " +
             "service ports on each address of this phone's own Wi-Fi /24. Connect only: no login, no payload, " +
-            "no other network. Ends with findings ranked high, medium, low."
+            "no other network. trails matches those addresses against indicators. Ends with findings ranked high, medium, low."
     override val parameters = objectSchema(
         properties = mapOf(
             "sweep" to boolProp("Also check the phone's own /24 for hosts and open ports. Default false."),
             "seconds" to intProp("How long to listen for SSDP and mDNS answers. Default 3, 1 to 8."),
+            "trails" to stringProp("Trail lines: a domain, URL, IP, IP:port, or ua:value, then a short label. A line starting with ! is ignored."),
         ),
     )
 
@@ -47,6 +49,8 @@ class NetAuditTool(
         if (!networkAllowed()) return@withContext ToolResult.error("Network access is off in settings.")
         val sweep = args.boolArg("sweep") ?: false
         val listen = (args.intArg("seconds") ?: 3).coerceIn(1, 8)
+        val trailText = args.stringArg("trails").orEmpty().take(200_000)
+        val watched = ArrayList<TrailMatch.Observation>()
         val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val network = manager.activeNetwork ?: return@withContext ToolResult.error("No active network.")
         val caps = manager.getNetworkCapabilities(network)
@@ -96,9 +100,21 @@ class NetAuditTool(
             if (proxy.host.isNotBlank()) findings += "medium" to "An HTTP proxy is set on this network. Cleartext web traffic passes through it."
         }
 
+        fun appendTrails() {
+            dns.forEach { server ->
+                val ip = server.hostAddress.orEmpty()
+                if (ip.isNotBlank()) watched += TrailMatch.Observation(dst = ip, dport = 53, proto = "udp")
+            }
+            if (trailText.isNotBlank() && watched.isNotEmpty()) {
+                val hits = TrailMatch.scan(TrailMatch.parse(trailText), watched, heuristics = false)
+                out.append('\n').append(TrailMatch.report(hits))
+            }
+        }
+
         val local = wifi || ethernet
         if (!local) {
             out.append("\nThe phone is not on Wi-Fi or Ethernet, so the gateway and devices are not probed.\n")
+            appendTrails()
             return@withContext ToolResult.ok(finish(out, findings))
         }
 
@@ -107,6 +123,13 @@ class NetAuditTool(
             out.append("\ngateway ").append(gateway.hostAddress).append('\n')
             val open = probe(gateway, GATEWAY_PORTS, 600)
             out.append("open ports: ").append(if (open.isEmpty()) "none of " + GATEWAY_PORTS.keys.joinToString(",") else open.joinToString(", ") { "$it ${GATEWAY_PORTS[it]}" }).append('\n')
+            val gatewayIp = gateway.hostAddress.orEmpty()
+            if (gatewayIp.isNotBlank()) {
+                watched += TrailMatch.Observation(dst = gatewayIp)
+                open.forEach { port ->
+                    watched += TrailMatch.Observation(dst = gatewayIp, dport = port, proto = "tcp")
+                }
+            }
             if (23 in open) findings += "high" to "The gateway answers telnet (23). Its login crosses the network in cleartext."
             if (21 in open) findings += "high" to "The gateway answers ftp (21). Logins and files cross in cleartext."
             if (80 in open && 443 !in open && 8443 !in open) {
@@ -158,6 +181,7 @@ class NetAuditTool(
                 }
             }
         }
+        appendTrails()
         ToolResult.ok(finish(out, findings))
     }
 

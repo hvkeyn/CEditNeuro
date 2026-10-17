@@ -119,7 +119,7 @@ class PacketCaptureService : VpnService() {
                 }
                 sink.close()
             }
-            val text = PacketDump.summarize(file) + "\nfile=" + file.absolutePath + " bytes=" + file.length()
+            val text = PacketDump.summarize(file, PacketDump.trailsBeside(file)) + "\nfile=" + file.absolutePath + " bytes=" + file.length()
             File(file.absolutePath + ".txt").writeText(text)
             PacketCaptureHub.finish(text)
         } finally {
