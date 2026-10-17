@@ -571,6 +571,11 @@ private fun ProviderCard(
             )
             BalanceLine(provider.apiUrl, provider.apiKey)
         }
+        if (provider.id != ModelCatalog.WEB_PHONE_ID && provider.id != ModelCatalog.QWEN_PHONE_ID) {
+            ModelsLine(provider.apiUrl, provider.apiKey) { names ->
+                onChange(provider.copy(models = ModelCatalog.adopt(names, provider.models)))
+            }
+        }
         provider.models.forEach { model ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -658,6 +663,41 @@ private fun BridgeLine(apiUrl: String) {
 }
 
 @Composable
+private fun ModelsLine(apiUrl: String, apiKey: String, onModels: (List<String>) -> Unit) {
+    var text by remember(apiUrl) { mutableStateOf("Ask the host which models it has. A local server needs no key.") }
+    val scope = rememberCoroutineScope()
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        TextButton(
+            onClick = {
+                text = "Fetching models…"
+                scope.launch {
+                    val fetched = withContext(Dispatchers.IO) { ProviderBalance.fetchModels(apiUrl, apiKey) }
+                    if (fetched.names.isEmpty()) {
+                        text = fetched.note
+                    } else {
+                        onModels(fetched.names)
+                        text = "Saved ${fetched.names.size}: " + fetched.names.take(6).joinToString(", ")
+                    }
+                }
+            },
+            modifier = Modifier.heightIn(min = 48.dp),
+        ) { Text("Models") }
+    }
+}
+
+@Composable
 private fun AddModelRow(onAdd: (name: String, displayName: String, reasoning: Boolean) -> Unit) {
     var name by rememberSaveable { mutableStateOf("") }
     var displayName by rememberSaveable { mutableStateOf("") }
@@ -707,6 +747,9 @@ private fun AddProviderForm(onAdd: (ModelProvider) -> Unit) {
     var apiKey by rememberSaveable { mutableStateOf("") }
     var modelId by rememberSaveable { mutableStateOf("") }
     var displayName by rememberSaveable { mutableStateOf("") }
+    var fetched by remember { mutableStateOf(emptyList<String>()) }
+    var fetchNote by remember { mutableStateOf("Leave the key empty for a local server, such as http://127.0.0.1:11434/v1.") }
+    val scope = rememberCoroutineScope()
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Add a provider", style = MaterialTheme.typography.titleSmall)
@@ -751,24 +794,55 @@ private fun AddProviderForm(onAdd: (ModelProvider) -> Unit) {
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = fetchNote,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            TextButton(
+                onClick = {
+                    fetchNote = "Fetching models…"
+                    scope.launch {
+                        val result = withContext(Dispatchers.IO) { ProviderBalance.fetchModels(apiUrl, apiKey) }
+                        fetched = result.names
+                        if (result.names.isEmpty()) {
+                            fetchNote = result.note
+                        } else {
+                            if (modelId.isBlank()) modelId = result.names.first()
+                            fetchNote = "Found ${result.names.size}: " + result.names.take(6).joinToString(", ")
+                        }
+                    }
+                },
+                enabled = apiUrl.isNotBlank(),
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) { Text("Models") }
+        }
         TextButton(
             onClick = {
                 val providerName = name.trim()
                 val url = apiUrl.trim()
                 val model = modelId.trim()
-                if (providerName.isEmpty() || url.isEmpty() || model.isEmpty()) return@TextButton
+                val ids = (fetched + model).map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+                if (providerName.isEmpty() || url.isEmpty() || ids.isEmpty()) return@TextButton
+                val models = ModelCatalog.adopt(ids, emptyList()).map { item ->
+                    if (item.name == model && displayName.isNotBlank()) item.copy(displayName = displayName.trim()) else item
+                }
                 onAdd(
                     ModelProvider(
                         id = "custom-" + System.currentTimeMillis().toString(36),
                         name = providerName,
                         apiUrl = url,
                         apiKey = apiKey.trim(),
-                        models = listOf(
-                            CatalogModel(
-                                name = model,
-                                displayName = displayName.trim().ifBlank { model },
-                            ),
-                        ),
+                        keyless = apiKey.isBlank(),
+                        models = models,
                     ),
                 )
                 name = ""
@@ -776,8 +850,10 @@ private fun AddProviderForm(onAdd: (ModelProvider) -> Unit) {
                 apiKey = ""
                 modelId = ""
                 displayName = ""
+                fetched = emptyList()
+                fetchNote = "Leave the key empty for a local server, such as http://127.0.0.1:11434/v1."
             },
-            enabled = name.isNotBlank() && apiUrl.isNotBlank() && modelId.isNotBlank(),
+            enabled = name.isNotBlank() && apiUrl.isNotBlank() && (modelId.isNotBlank() || fetched.isNotEmpty()),
         ) { Text("Add provider") }
     }
 }

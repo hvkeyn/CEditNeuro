@@ -43,8 +43,9 @@ data class ModelProvider(
 
 /**
  * Built-in models copied from the local Zed config for DeepSeek Flash.
- * `deepseek-flash` is the fully specified model (V4.1 Flash, 1M context, 32K output,
- * tools, interleaved reasoning). `deepseek-v4-flash` is the other Flash favorite.
+ * `deepseek-flash` is the model id. As of 17 Oct 2026 the API serves it with
+ * DeepSeek-V4.1-Flash-1017: 1M context, 32K output, tools, interleaved reasoning.
+ * `deepseek-v4-flash` is still accepted and answered by that same Flash.
  */
 object ModelCatalog {
     const val DEEPSEEK_ID = "deepseek"
@@ -62,7 +63,7 @@ object ModelCatalog {
         models = listOf(
             CatalogModel(
                 name = FLASH_MODEL,
-                displayName = "DeepSeek V4.1 Flash",
+                displayName = "DeepSeek V4.1 Flash 1017",
                 maxContextTokens = 1_000_000,
                 maxOutputTokens = 32_000,
                 supportsTools = true,
@@ -70,7 +71,7 @@ object ModelCatalog {
             ),
             CatalogModel(
                 name = V4_FLASH_MODEL,
-                displayName = "DeepSeek V4 Flash",
+                displayName = "DeepSeek V4 Flash (served by V4.1 1017)",
                 maxContextTokens = 1_000_000,
                 maxOutputTokens = 32_000,
                 supportsTools = true,
@@ -157,6 +158,27 @@ object ModelCatalog {
                 maxOutputTokens = 8_192,
             ),
     )
+
+    /**
+     * Models a host just listed, with names this catalog already knows kept as they are.
+     * A model that was typed by hand and was not in the list stays at the end.
+     */
+    fun adopt(ids: List<String>, previous: List<CatalogModel>): List<CatalogModel> {
+        val known = (previous + deepSeek().models).associateBy { it.name }
+        val fetched = ids.map { it.trim() }.filter { it.isNotEmpty() }.distinct().map { id ->
+            known[id] ?: CatalogModel(
+                name = id,
+                displayName = id,
+                maxContextTokens = if (id.contains("deepseek", true) || id.contains("flash", true)) 1_000_000 else 32_768,
+                maxOutputTokens = if (id == FLASH_MODEL || id.contains("v4.1", true)) 32_000 else 8_192,
+                supportsTools = !id.contains("embed", true),
+                supportsReasoning = id.contains("reason", true) || id.contains("deepseek", true) || id.contains("flash", true),
+                supportsVision = id.contains("vision", true) || id.contains("-vl", true) || id.contains("llava", true),
+            )
+        }
+        val extra = previous.filter { model -> fetched.none { it.name == model.name } }
+        return fetched + extra
+    }
 
     /** Keeps a saved API key and any extra models, and refreshes the built-in catalog. */
     fun merge(saved: List<ModelProvider>): List<ModelProvider> {
