@@ -1,6 +1,6 @@
 # Active context
 
-v0.99.22 (versionCode 138). Installed on the phone. A visual list or a card is drawn in the chat by `layout`. A chart of whole numbers separated by a comma stays two values. The Chartli program is not installed.
+v0.99.22 (versionCode 138). Released and installed on the phone. A visual list or a card is drawn in the chat by `layout`. A chart of whole numbers separated by a comma stays two values. The Chartli program is not installed.
 
 v0.99.21 (versionCode 137). Installed on the phone, not published. `chart` is sent on every turn, so a chart, a graph, or a numeric table is drawn in the chat instead of the agent calling a missing tool. Chartli's ascii, unicode, and braille names draw as a line. The Chartli program is not installed. A model name typed onto an existing provider is added only after that host accepts it.
 
