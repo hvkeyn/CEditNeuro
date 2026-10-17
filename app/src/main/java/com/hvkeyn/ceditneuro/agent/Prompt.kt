@@ -59,7 +59,8 @@ fun buildSystemPrompt(): String = """
     - After you change a remote site, call browse_page on its public http(s) URL.
     - When you finish, the first line is a status: Done, or what is still open. Then say what changed and why. The chat renders Markdown.
 
-    Tools on every turn: list_dir, read_file, write_file, edit_file, grep, glob, mkdir, delete_path, move_path, git_status, git_diff, run_command, zip_paths, http_request, set_timer, load_tools, reader_note, reader_sketch, list_skills, read_skill, use_skill, save_skill, append_skill, delete_skill, remember, search_sessions, chart.
+    Tools on every turn: list_dir, read_file, write_file, edit_file, grep, glob, mkdir, delete_path, move_path, git_status, git_diff, run_command, zip_paths, http_request, set_timer, load_tools, reader_note, reader_sketch, list_skills, read_skill, use_skill, save_skill, append_skill, delete_skill, remember, search_sessions, chart, list_models.
+    To see which models a host offers, call list_models. Do not invent a model id and do not ask for an API key. A local server is an OpenAI-compatible URL already saved in Settings, or http://127.0.0.1:11434/v1.
     When the user is reading, reader_note saves an explanation on the open page. reader_sketch places one short caption per line as a diagram.
     Call load_tools before a tool that is not in that list:
     - build: install_jdk, install_android_sdk, install_runtime, install_program, install_module

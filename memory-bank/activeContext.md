@@ -1,5 +1,7 @@
 # Active context
 
+v0.99.18 (versionCode 134). Installed on the phone. DeepSeek Flash is labeled DeepSeek V4.1 Flash 1017 and the API id stays `deepseek-flash`. Settings and the agent tool `list_models` fetch the models an OpenAI-compatible host is offering, including a local server with no key. On the phone the DeepSeek list came back as `deepseek-flash` and `deepseek-v4-pro`, and the new id was still there after Save. DeepSeek Harness is not installed. A live local server was not running.
+
 v0.99.17 (versionCode 133). Released and installed on the phone. The agent shrinks a jpg, png, webp, or mp4 with compress_media. Quality is 1 to 100, and the longest side can be capped. The phone's own encoder writes the smaller file beside the source. CompressO, FFmpeg, pngquant, and jpegoptim are not installed.
 
 v0.99.16 (versionCode 132). Released and installed on the phone. In the reel editor a block can be dragged along its track or onto another video or audio track, including an empty track. On the phone one picture block moved onto a new video track and stayed after save. Effects add blur and flip. Transitions are a hard cut, dissolve, wipe, and dip. A dissolve or a dip also fades the sound in.

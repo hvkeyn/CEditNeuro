@@ -32,6 +32,7 @@ object ToolGroups {
         "delete_skill",
         "remember",
         "search_sessions",
+        "list_models",
     )
 
     val groups: Map<String, List<String>> = linkedMapOf(

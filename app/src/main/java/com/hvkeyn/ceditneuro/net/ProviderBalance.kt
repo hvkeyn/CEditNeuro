@@ -59,10 +59,62 @@ object ProviderBalance {
             ?: "This address answers, but not with a model list."
     }
 
-    fun bridgeModels(body: String): List<String>? {
+    fun bridgeModels(body: String): List<String>? = modelNames(body)
+
+    /** OpenAI `data[].id`, or a local server's `models[].name`. */
+    fun modelNames(body: String): List<String>? {
         val root = runCatching { json.parseToJsonElement(body) as? JsonObject }.getOrNull() ?: return null
-        val data = root["data"] as? JsonArray ?: return null
-        return data.mapNotNull { (it as? JsonObject)?.text("id") }.takeIf { it.isNotEmpty() }
+        val data = root["data"] as? JsonArray
+        val fromData = data?.mapNotNull { (it as? JsonObject)?.text("id") }.orEmpty()
+        if (fromData.isNotEmpty()) return fromData
+        val models = root["models"] as? JsonArray ?: return null
+        return models.mapNotNull { element ->
+            val item = element as? JsonObject ?: return@mapNotNull null
+            item.text("name") ?: item.text("model") ?: item.text("id")
+        }.takeIf { it.isNotEmpty() }
+    }
+
+    /**
+     * The models one OpenAI-compatible host is offering right now.
+     * A blank key is sent with no Authorization header, which is what a local server expects.
+     * The key is never copied into the note.
+     */
+    fun fetchModels(apiUrl: String, apiKey: String): FetchModels {
+        val urls = modelUrls(apiUrl)
+        if (urls.isEmpty()) return FetchModels(note = "API URL is not a valid address.")
+        val key = apiKey.trim()
+        var rejected = false
+        for (url in urls) {
+            val response = runCatching { get(url, key, authorize = key.isNotEmpty()) }.getOrElse {
+                return FetchModels(note = "No answer from that host.")
+            }
+            when (response.code) {
+                401, 403 -> {
+                    rejected = true
+                    continue
+                }
+                in 200..299 -> {
+                    val names = modelNames(response.body)?.take(80)
+                    if (!names.isNullOrEmpty()) return FetchModels(names)
+                }
+            }
+        }
+        return if (rejected) {
+            FetchModels(note = "That host rejected the saved key.")
+        } else {
+            FetchModels(note = "That host did not return a model list.")
+        }
+    }
+
+    internal fun modelUrls(apiUrl: String): List<String> {
+        val base = apiUrl.trim().trimEnd('/')
+        val origin = originOf(base) ?: return emptyList()
+        val urls = LinkedHashSet<String>()
+        if (base.endsWith("/v1")) urls += "$base/models" else urls += "$base/v1/models"
+        if (!base.endsWith("/models")) urls += "$base/models"
+        urls += "$origin/v1/models"
+        urls += "$origin/api/tags"
+        return urls.toList()
     }
 
     /** Turns a balance JSON body into one line, or null when the shape is unknown. */
@@ -102,15 +154,14 @@ object ProviderBalance {
         )
     }
 
-    private fun get(url: String, apiKey: String): HttpText {
-        val request = Request.Builder()
-            .url(url)
-            .header("Authorization", "Bearer $apiKey")
-            .header("Accept", "application/json")
-            .build()
+    private fun get(url: String, apiKey: String, authorize: Boolean = true): HttpText {
+        val builder = Request.Builder().url(url).header("Accept", "application/json")
+        if (authorize && apiKey.isNotEmpty()) builder.header("Authorization", "Bearer $apiKey")
+        val request = builder.build()
         client.newCall(request).execute().use { response ->
-            val text = response.body?.string().orEmpty().take(8_000)
-            return HttpText(response.code, text.replace(apiKey, "••••"))
+            val text = response.body?.string().orEmpty().take(64_000)
+            val hidden = if (apiKey.isEmpty()) text else text.replace(apiKey, "••••")
+            return HttpText(response.code, hidden)
         }
     }
 
@@ -161,6 +212,8 @@ object ProviderBalance {
         if (root["total_granted"] == null && root["total_used"] == null) return null
         return "USD ${money(available)} left"
     }
+
+    data class FetchModels(val names: List<String> = emptyList(), val note: String = "")
 
     private fun originOf(apiUrl: String): String? {
         val trimmed = apiUrl.trim()

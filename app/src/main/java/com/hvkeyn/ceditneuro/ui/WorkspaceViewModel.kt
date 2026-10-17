@@ -2573,6 +2573,7 @@ class WorkspaceViewModel(
             "run_command" -> "Running a command"
             "zip_paths" -> "Packing a zip"
             "http_request" -> "Requesting a page"
+            "list_models" -> "Listing models"
             "set_timer" -> "Setting a timer"
             "load_tools" -> "Loading tools"
             "fetch_system_layout" -> "Reading the screen"
@@ -3229,6 +3230,10 @@ class WorkspaceViewModel(
             com.hvkeyn.ceditneuro.tools.VideoBriefTool(agentNet) { settingsStore.current.networkEnabled },
             com.hvkeyn.ceditneuro.tools.CalculateTool(),
             com.hvkeyn.ceditneuro.tools.ChartTool(),
+            com.hvkeyn.ceditneuro.tools.ListModelsTool(
+                current = { settingsStore.current },
+                replace = { settingsStore.replace(it) },
+            ),
             com.hvkeyn.ceditneuro.tools.ReferenceTool(agentNet) { settingsStore.current.networkEnabled },
             com.hvkeyn.ceditneuro.tools.CaptureDumpTool(appContext, ws),
             com.hvkeyn.ceditneuro.tools.DebugCaseTool(ws),
