@@ -38,6 +38,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import com.hvkeyn.ceditneuro.chat.ChartSheet
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
@@ -118,6 +119,7 @@ private fun DrawBlock(
                 }
                 is MdBlock.Code -> when {
                     isSvgMarkup(block.lang, block.text) -> SvgDrawing(block.text)
+                    isHtmlBlock(block.lang, block.text) -> HtmlDrawing(block.text)
                     isChartBlock(block.lang) -> ChartDrawing(block.text)
                     else -> CodeBlock(block.lang, block.text, color)
                 }
@@ -138,8 +140,30 @@ private fun DrawBlock(
                     )
                 }
                 MdBlock.Rule -> HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-                is MdBlock.Table -> TableBlock(block, color, linkColor, codeColor, codeBackground, onOpen)
+                is MdBlock.Table -> {
+                    val drawn = ChartSheet.fromTable(
+                        block.header.map { inlineText(it) },
+                        block.rows.map { row -> row.map { inlineText(it) } },
+                    )
+                    if (drawn != null) ChartDrawing(drawn)
+                    TableBlock(block, color, linkColor, codeColor, codeBackground, onOpen)
+                }
             }
+}
+
+private fun inlineText(nodes: List<MdInline>): String = buildString {
+    fun walk(list: List<MdInline>) {
+        for (node in list) {
+            when (node) {
+                is MdInline.Text -> append(node.value)
+                is MdInline.Code -> append(node.value)
+                is MdInline.Bold -> walk(node.children)
+                is MdInline.Italic -> walk(node.children)
+                is MdInline.Link -> walk(node.children)
+            }
+        }
+    }
+    walk(nodes)
 }
 
 @Composable
@@ -164,6 +188,24 @@ private fun ListRow(
             style = MaterialTheme.typography.bodyMedium,
             color = color,
             modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun HtmlDrawing(markup: String) {
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp)),
+    ) {
+        ExpandableMarkup(
+            kind = "html",
+            text = markup,
+            baseDir = null,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(320.dp),
         )
     }
 }
@@ -505,8 +547,20 @@ private fun attachSchemes(blocks: List<MdBlock>): List<MdBlock> {
     return out
 }
 
-internal fun isChartBlock(lang: String): Boolean =
-    lang.equals("chart", ignoreCase = true) || lang.equals("chartli", ignoreCase = true)
+internal fun isChartBlock(lang: String): Boolean {
+    val head = lang.trim().substringBefore(' ').substringBefore('\t').lowercase()
+    return head == "chart" || head == "chartli"
+}
+
+internal fun isHtmlBlock(lang: String, text: String): Boolean {
+    if (isSvgMarkup(lang, text)) return false
+    if (lang.equals("html", ignoreCase = true) || lang.equals("htm", ignoreCase = true)) {
+        return text.contains('<')
+    }
+    val trimmed = text.trim()
+    return trimmed.startsWith("<!doctype html", ignoreCase = true) ||
+        trimmed.startsWith("<html", ignoreCase = true)
+}
 
 internal fun isSvgMarkup(lang: String, text: String): Boolean {
     val trimmed = text.trim()

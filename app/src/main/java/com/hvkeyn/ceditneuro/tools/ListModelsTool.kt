@@ -22,7 +22,8 @@ class ListModelsTool(
         "Fetch the models an OpenAI-compatible host is offering and save them on that provider. " +
             "provider is a saved name or id. url is the address when it is not the active provider, " +
             "including a local server such as http://127.0.0.1:11434/v1. " +
-            "A local server needs no key. Do not ask for an API key, do not print one, and do not invent a model id."
+            "A remote host and a local server are the same request. A local server needs no key. " +
+            "Do not ask for an API key, do not print one, and do not invent a model id."
     override val parameters = objectSchema(
         properties = mapOf(
             "provider" to stringProp("Saved provider name or id. Omit to use the active provider."),
@@ -46,39 +47,30 @@ class ListModelsTool(
         }
         val fetched = fetch(target, known?.apiKey.orEmpty())
         if (fetched.names.isEmpty()) return@withContext ToolResult.error(redact(fetched.note, settings))
-        val models = ModelCatalog.adopt(fetched.names, known?.models.orEmpty())
-        val saved = when {
-            known != null -> {
-                replace(
-                    settings.copy(
-                        providers = settings.providers.map { item ->
-                            if (item.id == known.id) item.copy(models = models) else item
-                        },
-                    ),
-                )
-                known.name
-            }
-            localHost(target) -> {
-                val added = ModelProvider(
-                    id = "local-" + target.hashCode().toUInt().toString(16),
-                    name = hostOf(target) ?: "Local",
-                    apiUrl = target,
-                    keyless = true,
-                    models = models,
-                )
-                replace(settings.copy(providers = settings.providers + added))
-                added.name
-            }
-            else -> null
+        val models = ModelCatalog.adopt(fetched.names, known?.models.orEmpty(), fetched.contextTokens)
+        val saved = if (known != null) {
+            replace(
+                settings.copy(
+                    providers = settings.providers.map { item ->
+                        if (item.id == known.id) item.copy(models = models) else item
+                    },
+                ),
+            )
+            known.name
+        } else {
+            val added = ModelProvider(
+                id = "host-" + target.hashCode().toUInt().toString(16),
+                name = hostOf(target) ?: "Host",
+                apiUrl = target,
+                keyless = true,
+                models = models,
+            )
+            replace(settings.copy(providers = settings.providers + added))
+            added.name
         }
         val listed = fetched.names.take(20).joinToString(", ")
         val more = if (fetched.names.size > 20) " and ${fetched.names.size - 20} more" else ""
-        val where = if (saved == null) {
-            "Not saved. Add that host in Settings first."
-        } else {
-            "Saved on $saved."
-        }
-        ToolResult.ok(redact("$where ${fetched.names.size} models: $listed$more.", settings))
+        ToolResult.ok(redact("Saved on $saved. ${fetched.names.size} models: $listed$more.", settings))
     }
 
     private fun find(settings: AgentSettings, asked: String, url: String): ModelProvider? {

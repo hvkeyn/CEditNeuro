@@ -1185,7 +1185,10 @@ private fun ToolBlock(label: String, text: String, error: Boolean) {
             )
             CopyLabel(text)
         }
-        if (text.contains("```chart")) {
+        if (text.contains("```chart") || text.contains("```html") || text.contains("```svg") ||
+            text.trimStart().startsWith("<svg") || text.trimStart().startsWith("<!doctype html") ||
+            text.trimStart().startsWith("<html")
+        ) {
             MarkdownText(
                 text = text,
                 color = MaterialTheme.colorScheme.onSurface,

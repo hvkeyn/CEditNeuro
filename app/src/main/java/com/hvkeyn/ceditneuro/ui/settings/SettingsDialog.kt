@@ -572,8 +572,12 @@ private fun ProviderCard(
             BalanceLine(provider.apiUrl, provider.apiKey)
         }
         if (provider.id != ModelCatalog.WEB_PHONE_ID && provider.id != ModelCatalog.QWEN_PHONE_ID) {
-            ModelsLine(provider.apiUrl, provider.apiKey) { names ->
-                onChange(provider.copy(models = ModelCatalog.adopt(names, provider.models)))
+            ModelsLine(provider.apiUrl, provider.apiKey) { fetched ->
+                onChange(
+                    provider.copy(
+                        models = ModelCatalog.adopt(fetched.names, provider.models, fetched.contextTokens),
+                    ),
+                )
             }
         }
         provider.models.forEach { model ->
@@ -595,7 +599,7 @@ private fun ProviderCard(
                 }
             }
         }
-        AddModelRow { name, displayName, reasoning ->
+        AddModelRow(provider.apiUrl, provider.apiKey, provider.models.map { it.name }) { name, displayName, reasoning ->
             onChange(
                 provider.copy(
                     models = provider.models + CatalogModel(
@@ -663,7 +667,7 @@ private fun BridgeLine(apiUrl: String) {
 }
 
 @Composable
-private fun ModelsLine(apiUrl: String, apiKey: String, onModels: (List<String>) -> Unit) {
+private fun ModelsLine(apiUrl: String, apiKey: String, onModels: (ProviderBalance.FetchModels) -> Unit) {
     var text by remember(apiUrl) { mutableStateOf("Ask the host which models it has. A local server needs no key.") }
     val scope = rememberCoroutineScope()
     Row(
@@ -687,7 +691,7 @@ private fun ModelsLine(apiUrl: String, apiKey: String, onModels: (List<String>) 
                     if (fetched.names.isEmpty()) {
                         text = fetched.note
                     } else {
-                        onModels(fetched.names)
+                        onModels(fetched)
                         text = "Saved ${fetched.names.size}: " + fetched.names.take(6).joinToString(", ")
                     }
                 }
@@ -698,12 +702,24 @@ private fun ModelsLine(apiUrl: String, apiKey: String, onModels: (List<String>) 
 }
 
 @Composable
-private fun AddModelRow(onAdd: (name: String, displayName: String, reasoning: Boolean) -> Unit) {
+private fun AddModelRow(
+    apiUrl: String,
+    apiKey: String,
+    existing: List<String>,
+    onAdd: (name: String, displayName: String, reasoning: Boolean) -> Unit,
+) {
     var name by rememberSaveable { mutableStateOf("") }
     var displayName by rememberSaveable { mutableStateOf("") }
     var reasoning by rememberSaveable { mutableStateOf(false) }
+    var note by remember(apiUrl) { mutableStateOf("A hidden name is added only after this host accepts it.") }
+    val scope = rememberCoroutineScope()
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Add a model", style = MaterialTheme.typography.labelLarge)
+        Text(
+            text = note,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         OutlinedTextField(
             value = name,
             onValueChange = { name = it },
@@ -730,10 +746,25 @@ private fun AddModelRow(onAdd: (name: String, displayName: String, reasoning: Bo
             onClick = {
                 val trimmed = name.trim()
                 if (trimmed.isEmpty()) return@TextButton
-                onAdd(trimmed, displayName.trim(), reasoning)
-                name = ""
-                displayName = ""
-                reasoning = false
+                if (existing.any { it.equals(trimmed, ignoreCase = true) }) {
+                    note = "Already in this list."
+                    return@TextButton
+                }
+                note = "Checking $trimmed…"
+                scope.launch {
+                    val verdict = withContext(Dispatchers.IO) {
+                        ProviderBalance.probeModel(apiUrl, apiKey, trimmed)
+                    }
+                    if (!verdict.startsWith("This host has ")) {
+                        note = verdict
+                        return@launch
+                    }
+                    onAdd(trimmed, displayName.trim(), reasoning)
+                    name = ""
+                    displayName = ""
+                    reasoning = false
+                    note = verdict
+                }
             },
             enabled = name.isNotBlank(),
         ) { Text("Add model") }
@@ -747,8 +778,8 @@ private fun AddProviderForm(onAdd: (ModelProvider) -> Unit) {
     var apiKey by rememberSaveable { mutableStateOf("") }
     var modelId by rememberSaveable { mutableStateOf("") }
     var displayName by rememberSaveable { mutableStateOf("") }
-    var fetched by remember { mutableStateOf(emptyList<String>()) }
-    var fetchNote by remember { mutableStateOf("Leave the key empty for a local server, such as http://127.0.0.1:11434/v1.") }
+    var fetched by remember { mutableStateOf(ProviderBalance.FetchModels()) }
+    var fetchNote by remember { mutableStateOf("Connecting asks the host for its model list. A local server needs no key.") }
     val scope = rememberCoroutineScope()
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -812,12 +843,11 @@ private fun AddProviderForm(onAdd: (ModelProvider) -> Unit) {
                     fetchNote = "Fetching models…"
                     scope.launch {
                         val result = withContext(Dispatchers.IO) { ProviderBalance.fetchModels(apiUrl, apiKey) }
-                        fetched = result.names
-                        if (result.names.isEmpty()) {
-                            fetchNote = result.note
+                        fetched = result
+                        fetchNote = if (result.names.isEmpty()) {
+                            result.note
                         } else {
-                            if (modelId.isBlank()) modelId = result.names.first()
-                            fetchNote = "Found ${result.names.size}: " + result.names.take(6).joinToString(", ")
+                            "Found ${result.names.size}: " + result.names.take(6).joinToString(", ")
                         }
                     }
                 },
@@ -829,31 +859,47 @@ private fun AddProviderForm(onAdd: (ModelProvider) -> Unit) {
             onClick = {
                 val providerName = name.trim()
                 val url = apiUrl.trim()
-                val model = modelId.trim()
-                val ids = (fetched + model).map { it.trim() }.filter { it.isNotEmpty() }.distinct()
-                if (providerName.isEmpty() || url.isEmpty() || ids.isEmpty()) return@TextButton
-                val models = ModelCatalog.adopt(ids, emptyList()).map { item ->
-                    if (item.name == model && displayName.isNotBlank()) item.copy(displayName = displayName.trim()) else item
+                val typed = modelId.trim()
+                if (providerName.isEmpty() || url.isEmpty()) return@TextButton
+                scope.launch {
+                    val result = if (fetched.names.isNotEmpty()) {
+                        fetched
+                    } else {
+                        fetchNote = "Fetching models…"
+                        withContext(Dispatchers.IO) { ProviderBalance.fetchModels(url, apiKey) }
+                    }
+                    val ids = result.names.ifEmpty { listOf(typed).filter { it.isNotEmpty() } }
+                    if (ids.isEmpty()) {
+                        fetchNote = result.note.ifBlank { "That host did not return a model list." }
+                        return@launch
+                    }
+                    val models = ModelCatalog.adopt(ids, emptyList(), result.contextTokens).map { item ->
+                        if (result.names.isEmpty() && item.name == typed && displayName.isNotBlank()) {
+                            item.copy(displayName = displayName.trim())
+                        } else {
+                            item
+                        }
+                    }
+                    onAdd(
+                        ModelProvider(
+                            id = "custom-" + System.currentTimeMillis().toString(36),
+                            name = providerName,
+                            apiUrl = url,
+                            apiKey = apiKey.trim(),
+                            keyless = apiKey.isBlank(),
+                            models = models,
+                        ),
+                    )
+                    name = ""
+                    apiUrl = ""
+                    apiKey = ""
+                    modelId = ""
+                    displayName = ""
+                    fetched = ProviderBalance.FetchModels()
+                    fetchNote = "Connecting asks the host for its model list. A local server needs no key."
                 }
-                onAdd(
-                    ModelProvider(
-                        id = "custom-" + System.currentTimeMillis().toString(36),
-                        name = providerName,
-                        apiUrl = url,
-                        apiKey = apiKey.trim(),
-                        keyless = apiKey.isBlank(),
-                        models = models,
-                    ),
-                )
-                name = ""
-                apiUrl = ""
-                apiKey = ""
-                modelId = ""
-                displayName = ""
-                fetched = emptyList()
-                fetchNote = "Leave the key empty for a local server, such as http://127.0.0.1:11434/v1."
             },
-            enabled = name.isNotBlank() && apiUrl.isNotBlank() && (modelId.isNotBlank() || fetched.isNotEmpty()),
+            enabled = name.isNotBlank() && apiUrl.isNotBlank(),
         ) { Text("Add provider") }
     }
 }

@@ -32,6 +32,8 @@ object ToolGroups {
         "delete_skill",
         "remember",
         "search_sessions",
+        "chart",
+        "layout",
         "list_models",
     )
 

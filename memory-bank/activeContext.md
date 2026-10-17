@@ -1,5 +1,11 @@
 # Active context
 
+v0.99.22 (versionCode 138). Installed on the phone. A visual list or a card is drawn in the chat by `layout`. A chart of whole numbers separated by a comma stays two values. The Chartli program is not installed.
+
+v0.99.21 (versionCode 137). Installed on the phone, not published. `chart` is sent on every turn, so a chart, a graph, or a numeric table is drawn in the chat instead of the agent calling a missing tool. Chartli's ascii, unicode, and braille names draw as a line. The Chartli program is not installed. A model name typed onto an existing provider is added only after that host accepts it.
+
+v0.99.19 (versionCode 135). Installed on the phone, not published. A remote host and a local server are asked once, at `{base}/models` or `{base}/v1/models`. The saved list is the ids that answer returned. On the phone DeepSeek returned `deepseek-flash` and `deepseek-v4-pro`, the Flash row stayed labeled V4.1 Flash 1017, and that list was still there after a cold start. A context size is stored only when the row includes one. DeepSeek Harness is not installed. A live local server was not running.
+
 v0.99.18 (versionCode 134). Released and installed on the phone. DeepSeek Flash is labeled DeepSeek V4.1 Flash 1017 and the API id stays `deepseek-flash`. Settings and the agent tool `list_models` fetch the models an OpenAI-compatible host is offering, including a local server with no key. On the phone the DeepSeek list came back as `deepseek-flash` and `deepseek-v4-pro`, and the new id was still there after Save. DeepSeek Harness is not installed. A live local server was not running.
 
 v0.99.17 (versionCode 133). Released and installed on the phone. The agent shrinks a jpg, png, webp, or mp4 with compress_media. Quality is 1 to 100, and the longest side can be capped. The phone's own encoder writes the smaller file beside the source. CompressO, FFmpeg, pngquant, and jpegoptim are not installed.

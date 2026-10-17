@@ -160,24 +160,20 @@ object ModelCatalog {
     )
 
     /**
-     * Models a host just listed, with names this catalog already knows kept as they are.
-     * A model that was typed by hand and was not in the list stays at the end.
+     * The models a host just listed. A name this catalog already knows keeps its label and limits.
+     * A new name stays as the server wrote it. A context size is applied only when the server sent one.
      */
-    fun adopt(ids: List<String>, previous: List<CatalogModel>): List<CatalogModel> {
+    fun adopt(
+        ids: List<String>,
+        previous: List<CatalogModel>,
+        contextTokens: Map<String, Int> = emptyMap(),
+    ): List<CatalogModel> {
         val known = (previous + deepSeek().models).associateBy { it.name }
-        val fetched = ids.map { it.trim() }.filter { it.isNotEmpty() }.distinct().map { id ->
-            known[id] ?: CatalogModel(
-                name = id,
-                displayName = id,
-                maxContextTokens = if (id.contains("deepseek", true) || id.contains("flash", true)) 1_000_000 else 32_768,
-                maxOutputTokens = if (id == FLASH_MODEL || id.contains("v4.1", true)) 32_000 else 8_192,
-                supportsTools = !id.contains("embed", true),
-                supportsReasoning = id.contains("reason", true) || id.contains("deepseek", true) || id.contains("flash", true),
-                supportsVision = id.contains("vision", true) || id.contains("-vl", true) || id.contains("llava", true),
-            )
+        return ids.map { it.trim() }.filter { it.isNotEmpty() }.distinct().map { id ->
+            val base = known[id] ?: CatalogModel(name = id, displayName = id)
+            val context = contextTokens[id]
+            if (context == null || context <= 0) base else base.copy(maxContextTokens = context)
         }
-        val extra = previous.filter { model -> fetched.none { it.name == model.name } }
-        return fetched + extra
     }
 
     /** Keeps a saved API key and any extra models, and refreshes the built-in catalog. */
@@ -185,13 +181,15 @@ object ModelCatalog {
         val builtinIds = builtins().map { it.id }.toSet()
         val mergedBuiltins = builtins().map { builtin ->
             val previous = saved.find { it.id == builtin.id } ?: return@map builtin
-            val extras = previous.models.filter { model ->
-                builtin.models.none { it.name == model.name }
+            val models = if (previous.models.isEmpty()) {
+                builtin.models
+            } else {
+                previous.models.map { model -> builtin.models.find { it.name == model.name } ?: model }
             }
             builtin.copy(
                 apiKey = previous.apiKey,
                 apiUrl = previous.apiUrl.ifBlank { builtin.apiUrl },
-                models = builtin.models + extras,
+                models = models,
             )
         }
         return mergedBuiltins + saved.filter { it.id !in builtinIds }
