@@ -495,6 +495,7 @@ object StarterSkills {
             11. Do not copy a cookie, a token, a password, or a page body into the note, the diagram, the audit, or the chat. Say that a private field was present and leave the value out.
             12. Call research_figure name=net-map with one small SVG. Boxes are devices. Lines are links. Labels are only values a packet printed. Guesses stay in parentheses. Unconfirmed hosts are dashed. A new fact is not drawn until the packet that supports it has been read.
             13. End with what the dump does not show. Do not say the whole network was seen. When the diagram and the audit are written, call use_skill name=net-map scope=app on=false.
+            14. Trail match. A trail is one indicator, the same idea Maltrail uses, done on this phone. research/trails.txt holds one indicator per line, then a short label. A line starting with ! is ignored. A line is a domain, a URL, an IP address, an IP and port, or a User-Agent written as ua:value. read_dump reads that file from the capture folder. net_audit takes the same lines in trails. A shorter name can match a listed parent. A URL is checked as host and path before the host alone. The audit prints the kind, the indicator, the label, and whether it was a listed trail or a heuristic. Heuristics are a scan shape, a very long or random-looking name, a cleartext download of a program, a proxy probe, a missing host, and a traversal-shaped or script-shaped address. Do not install Maltrail. Do not download a trail list. Do not print a payload, a cookie, or a password. Do not record another device.
         """.trimIndent() + "\n",
         "ru-translate" to """
             # Translate into Russian
@@ -781,9 +782,22 @@ object StarterSkills {
         val file = File(appDir, "net-map.md")
         if (!file.isFile) return
         val current = file.readText(Charsets.UTF_8)
-        if (current.contains("audit block")) return
         if (!current.contains("Do not record another device")) return
-        file.writeText(skills.getValue("net-map"), Charsets.UTF_8)
+        if (!current.contains("audit block")) {
+            file.writeText(skills.getValue("net-map"), Charsets.UTF_8)
+            return
+        }
+        if (current.contains("Trail match")) return
+        file.writeText(
+            current.trimEnd() + "\n\n" +
+                "Trail match. research/trails.txt holds one indicator per line, then a short label. A line starting with ! is ignored. " +
+                "A line is a domain, a URL, an IP address, an IP and port, or a User-Agent written as ua:value. " +
+                "read_dump matches the capture. net_audit takes the same lines in trails. A shorter name can match a listed parent. " +
+                "A URL is checked as host and path before the host alone. Report the kind, the indicator, and the label. " +
+                "A heuristic can name a scan shape, a very long or random-looking name, a cleartext program download, a proxy probe, a missing host, or a traversal-shaped or script-shaped address. " +
+                "Do not install Maltrail. Do not download a trail list. Do not print a payload, a cookie, or a password.\n",
+            Charsets.UTF_8,
+        )
     }
 
     /** Phones that saved the first translation skill gain the full cycle. A user-edited file stays as they left it. */

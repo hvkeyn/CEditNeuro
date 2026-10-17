@@ -3,6 +3,8 @@
 Released: v0.45.0 through v0.75.0 (`frontend-design` rejects a bland draft: one mood, two type faces, no empty chips; see activeContext.md). Unit tests include `DesignCatalogTest` and `VideoBriefTest`. Unit tests include `ResearchRunTest`. Unit tests include `RunAndPreviewTest`, `ToolTranscriptTest`, `SkillLibraryTest`, `ChatLinkTest`, `WebAppPackTest`, `HealthRecordTest`, `SkillAuditTest`, and `ReaderPlaceTest`.
 
 Known gaps:
+- v0.99.24 (versionCode 140). `TrailMatch` checks a domain, a URL, an IP, an IP and port, and a User-Agent. `TrailMatchTest` covers a parent name, a URL before the host, a whitelist, a random-looking label, and a scan shape. Maltrail is not installed.
+- v0.99.23 (versionCode 139). Installed on the phone, not published. A chat card is as tall as its text. On the phone the last row and the note under it stayed inside the picture.
 - v0.99.22 (versionCode 138). Released and installed on the phone. `layout` draws a list or a card in the chat. `ChartSheetTest` covers `6,1` as two values. `LayoutCardTest` covers a plain list and a removed script.
 - v0.99.21 (versionCode 137). Installed on the phone, not published. `chart` is in the tools on every turn. `ChartSheetTest` covers Chartli's ascii and bar names and a numeric table. A typed model id is kept only when `probeModel` says the host has it.
 - v0.99.19 (versionCode 135). Installed on the phone, not published. One models request for a remote host and a local server. `ModelFetchTest` covers that single address, a context size sent by the server, and a remote URL saved the same way as a local one. On the phone the DeepSeek list after a cold start was `deepseek-flash` and `deepseek-v4-pro`.

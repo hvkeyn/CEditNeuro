@@ -50,7 +50,9 @@ class CaptureDumpTool(private val context: Context, private val workspace: Works
 class ReadDumpTool(private val workspace: Workspace) : Tool {
     override val name = "read_dump"
     override val description =
-        "Summarize a pcap: hosts, ports, DNS names, and TLS names. Does not print payloads, cookies, or passwords."
+        "Summarize a pcap: hosts, ports, DNS names, and TLS names. Matches domains, URLs, IP addresses, " +
+            "IP and port pairs, and User-Agent values against research/trails.txt when that file is present. " +
+            "Does not print payloads, cookies, or passwords."
     override val parameters = objectSchema(
         properties = mapOf("path" to stringProp("Path of the pcap in the project or an absolute path.")),
         required = listOf("path"),
@@ -63,7 +65,7 @@ class ReadDumpTool(private val workspace: Workspace) : Tool {
         }
         return withContext(Dispatchers.IO) {
             if (!file.isFile) return@withContext ToolResult.error("No dump at that path.")
-            val text = runCatching { PacketDump.summarize(file) }.getOrElse {
+            val text = runCatching { PacketDump.summarize(file, PacketDump.trailsBeside(file)) }.getOrElse {
                 return@withContext ToolResult.error("That file is not a pcap this app can read.")
             }
             ToolResult.ok(text + "\nfile=" + file.absolutePath + " bytes=" + file.length())
