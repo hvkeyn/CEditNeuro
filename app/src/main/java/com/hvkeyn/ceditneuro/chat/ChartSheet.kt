@@ -7,6 +7,16 @@ package com.hvkeyn.ceditneuro.chat
  */
 object ChartSheet {
     val types = setOf("line", "spark", "bars", "columns", "heatmap")
+
+    /** Chartli's names, drawn by this chat. ascii, unicode, and braille become a line. */
+    fun canonicalType(asked: String): String? = when (asked.lowercase()) {
+        "line", "ascii", "unicode", "braille" -> "line"
+        "spark" -> "spark"
+        "bars", "bar", "barh" -> "bars"
+        "columns", "column", "col" -> "columns"
+        "heatmap", "heat" -> "heatmap"
+        else -> null
+    }
     private val keys = setOf("type", "title", "x", "y", "series")
     private const val MAX_POINTS = 240
     private const val MAX_SERIES = 8
@@ -39,10 +49,7 @@ object ChartSheet {
             val key = directive(line)
             if (key != null && data.isEmpty()) {
                 when (key.first) {
-                    "type" -> {
-                        val asked = key.second.lowercase()
-                        type = if (asked in types) asked else return null
-                    }
+                    "type" -> type = canonicalType(key.second) ?: return null
                     "title" -> title = key.second.take(80)
                     "x" -> xLabel = key.second.take(40)
                     "y" -> yLabel = key.second.take(40)
@@ -92,6 +99,27 @@ object ChartSheet {
         return Sheet(type, title, xLabel, yLabel, names.take(count), xLabels, columns)
     }
 
+    /**
+     * A markdown table whose cells are numbers, or a label plus numbers.
+     * Returns the chart text when there is enough to draw, and null when a cell is a sentence.
+     */
+    fun fromTable(header: List<String>, rows: List<List<String>>): String? {
+        if (rows.size !in 2..MAX_POINTS) return null
+        val width = rows.first().size
+        if (width !in 1..MAX_SERIES + 1) return null
+        if (rows.any { it.size != width }) return null
+        val cells = if (header.size == width) header + rows.flatten() else rows.flatten()
+        if (cells.any { cell -> cell.isBlank() || cell.any { it.isWhitespace() } }) return null
+        val text = buildString {
+            append("type: columns\n")
+            if (header.size == width) append(header.joinToString(" ")).append('\n')
+            rows.forEach { append(it.joinToString(" ")).append('\n') }
+        }
+        val sheet = parse(text) ?: return null
+        if (sheet.points < 2) return null
+        return text
+    }
+
     /** One row of block glyphs, the compact chart a terminal would print. */
     fun spark(values: List<Double>): String {
         if (values.isEmpty()) return ""
@@ -126,8 +154,10 @@ object ChartSheet {
 
     private fun tokenize(line: String): List<String> {
         val spaced = line.split(Regex("\\s+")).filter { it.isNotEmpty() }
-        if (spaced.size == 1 && spaced[0].count { it == ',' } >= 2) {
-            return spaced[0].split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        if (spaced.size == 1 && spaced[0].contains(',')) {
+            val parts = spaced[0].split(',').map { it.trim() }.filter { it.isNotEmpty() }
+            val wholeNumbers = parts.size >= 2 && parts.all { it.matches(Regex("""\d+""")) }
+            if (wholeNumbers || parts.size >= 3) return parts
         }
         return spaced
     }

@@ -6,8 +6,11 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.intOrNull
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
 /**
@@ -61,60 +64,111 @@ object ProviderBalance {
 
     fun bridgeModels(body: String): List<String>? = modelNames(body)
 
-    /** OpenAI `data[].id`, or a local server's `models[].name`. */
-    fun modelNames(body: String): List<String>? {
+    /** Ids from one OpenAI model list. A local server may use `models[].name` in that same body. */
+    fun modelNames(body: String): List<String>? = listedModels(body)?.map { it.name }
+
+    /**
+     * The model rows in one list response. A context size is kept only when that row carries it.
+     * Nothing else in the body is read.
+     */
+    fun listedModels(body: String): List<ListedModel>? {
         val root = runCatching { json.parseToJsonElement(body) as? JsonObject }.getOrNull() ?: return null
-        val data = root["data"] as? JsonArray
-        val fromData = data?.mapNotNull { (it as? JsonObject)?.text("id") }.orEmpty()
-        if (fromData.isNotEmpty()) return fromData
+        val data = (root["data"] as? JsonArray)?.mapNotNull { element -> listed(element as? JsonObject, "id") }.orEmpty()
+        if (data.isNotEmpty()) return data
         val models = root["models"] as? JsonArray ?: return null
         return models.mapNotNull { element ->
             val item = element as? JsonObject ?: return@mapNotNull null
-            item.text("name") ?: item.text("model") ?: item.text("id")
+            listed(item, "name") ?: listed(item, "model") ?: listed(item, "id")
         }.takeIf { it.isNotEmpty() }
     }
 
+    private fun listed(item: JsonObject?, field: String): ListedModel? {
+        if (item == null) return null
+        val name = item.text(field) ?: return null
+        val context = item.int("context_length")
+            ?: item.int("max_model_len")
+            ?: item.int("context_window")
+        return ListedModel(name, context)
+    }
+
     /**
-     * The models one OpenAI-compatible host is offering right now.
-     * A blank key is sent with no Authorization header, which is what a local server expects.
-     * The key is never copied into the note.
+     * Asks one host for its model list: `{base}/models` when the base already ends in `/v1`,
+     * otherwise `{base}/v1/models`. A remote server and a local server use this same request.
+     * A blank key sends no Authorization header. The key is never copied into the note.
      */
     fun fetchModels(apiUrl: String, apiKey: String): FetchModels {
-        val urls = modelUrls(apiUrl)
-        if (urls.isEmpty()) return FetchModels(note = "API URL is not a valid address.")
+        val url = modelUrl(apiUrl) ?: return FetchModels(note = "API URL is not a valid address.")
         val key = apiKey.trim()
-        var rejected = false
-        for (url in urls) {
-            val response = runCatching { get(url, key, authorize = key.isNotEmpty()) }.getOrElse {
-                return FetchModels(note = "No answer from that host.")
-            }
-            when (response.code) {
-                401, 403 -> {
-                    rejected = true
-                    continue
-                }
-                in 200..299 -> {
-                    val names = modelNames(response.body)?.take(80)
-                    if (!names.isNullOrEmpty()) return FetchModels(names)
-                }
-            }
+        val response = runCatching { get(url, key, authorize = key.isNotEmpty()) }.getOrElse {
+            return FetchModels(note = "No answer from that host.")
         }
-        return if (rejected) {
-            FetchModels(note = "That host rejected the saved key.")
-        } else {
-            FetchModels(note = "That host did not return a model list.")
+        if (response.code == 401 || response.code == 403) {
+            return FetchModels(note = "That host rejected the saved key.")
+        }
+        if (response.code !in 200..299) return FetchModels(note = "That host did not return a model list.")
+        val listed = listedModels(response.body)?.take(80).orEmpty()
+        if (listed.isEmpty()) return FetchModels(note = "That host did not return a model list.")
+        return FetchModels(
+            names = listed.map { it.name },
+            contextTokens = listed.mapNotNull { model -> model.contextTokens?.let { model.name to it } }.toMap(),
+        )
+    }
+
+    /**
+     * Asks the host to accept one model id with a one-token completion.
+     * A hidden id can pass this even when the model list omitted it.
+     * The key and the response body are not returned.
+     */
+    fun probeModel(apiUrl: String, apiKey: String, model: String): String {
+        val name = model.trim()
+        if (!name.matches(Regex("""[A-Za-z0-9_.:/+-]{1,80}"""))) return "Model id has an unsupported character."
+        val url = probeUrl(apiUrl) ?: return "API URL is not a valid address."
+        val key = apiKey.trim()
+        val payload = """{"model":"$name","messages":[{"role":"user","content":"ping"}],"max_tokens":16}"""
+        val response = runCatching { post(url, key, payload) }.getOrElse {
+            return "No answer from that host."
+        }
+        return when (modelVerdict(response.code, response.body)) {
+            "rejected" -> "That host rejected the saved key."
+            "missing" -> "This host does not have $name."
+            "present" -> "This host has $name."
+            else -> "This host did not confirm $name."
         }
     }
 
-    internal fun modelUrls(apiUrl: String): List<String> {
+    internal fun probeUrl(apiUrl: String): String? {
         val base = apiUrl.trim().trimEnd('/')
-        val origin = originOf(base) ?: return emptyList()
-        val urls = LinkedHashSet<String>()
-        if (base.endsWith("/v1")) urls += "$base/models" else urls += "$base/v1/models"
-        if (!base.endsWith("/models")) urls += "$base/models"
-        urls += "$origin/v1/models"
-        urls += "$origin/api/tags"
-        return urls.toList()
+        if (originOf(base) == null) return null
+        return if (base.endsWith("/chat/completions")) base else "$base/chat/completions"
+    }
+
+    /** present, missing, rejected, or unknown. The body is only scanned for an unknown-model phrase. */
+    internal fun modelVerdict(code: Int, body: String): String {
+        val missing = modelMissing(body)
+        return when {
+            code == 401 || code == 403 -> "rejected"
+            code == 404 || missing -> "missing"
+            code in 200..299 && "\"choices\"" in body -> "present"
+            else -> "unknown"
+        }
+    }
+
+    private fun modelMissing(body: String): Boolean {
+        val text = body.lowercase()
+        return "model_not_found" in text || "does not exist" in text || "do not exist" in text ||
+            "not exist" in text || "model not found" in text || "unknown model" in text ||
+            "invalid model" in text || "no such model" in text
+    }
+
+    /** The single models address for an OpenAI-compatible base URL. */
+    internal fun modelUrl(apiUrl: String): String? {
+        val base = apiUrl.trim().trimEnd('/')
+        if (originOf(base) == null) return null
+        return when {
+            base.endsWith("/models") -> base
+            base.endsWith("/v1") -> "$base/models"
+            else -> "$base/v1/models"
+        }
     }
 
     /** Turns a balance JSON body into one line, or null when the shape is unknown. */
@@ -152,6 +206,19 @@ object ProviderBalance {
             "$origin/api/v1/credits",
             "$origin/v1/dashboard/billing/credit_grants",
         )
+    }
+
+    private fun post(url: String, apiKey: String, jsonBody: String): HttpText {
+        val builder = Request.Builder()
+            .url(url)
+            .header("Accept", "application/json")
+            .post(jsonBody.toRequestBody("application/json".toMediaType()))
+        if (apiKey.isNotEmpty()) builder.header("Authorization", "Bearer $apiKey")
+        client.newCall(builder.build()).execute().use { response ->
+            val text = response.body?.string().orEmpty().take(4_000)
+            val hidden = if (apiKey.isEmpty()) text else text.replace(apiKey, "••••")
+            return HttpText(response.code, hidden)
+        }
     }
 
     private fun get(url: String, apiKey: String, authorize: Boolean = true): HttpText {
@@ -213,7 +280,13 @@ object ProviderBalance {
         return "USD ${money(available)} left"
     }
 
-    data class FetchModels(val names: List<String> = emptyList(), val note: String = "")
+    data class ListedModel(val name: String, val contextTokens: Int? = null)
+
+    data class FetchModels(
+        val names: List<String> = emptyList(),
+        val note: String = "",
+        val contextTokens: Map<String, Int> = emptyMap(),
+    )
 
     private fun originOf(apiUrl: String): String? {
         val trimmed = apiUrl.trim()
@@ -223,6 +296,12 @@ object ProviderBalance {
 
     private fun JsonObject.text(name: String): String? =
         (this[name] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+
+    private fun JsonObject.int(name: String): Int? {
+        val primitive = this[name] as? JsonPrimitive ?: return null
+        primitive.intOrNull?.let { return it }
+        return primitive.contentOrNull?.toDoubleOrNull()?.toInt()
+    }
 
     private fun JsonObject.number(name: String): Double? {
         val primitive = this[name] as? JsonPrimitive ?: return null

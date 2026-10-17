@@ -44,4 +44,34 @@ class ChartSheetTest {
         assertNull(ChartSheet.parse("hello"))
         assertNull(ChartSheet.parse(""))
     }
+
+    @Test
+    fun aCommaBetweenWholeNumbersIsTwoValues() {
+        val sheet = ChartSheet.parse("type: bars\n6,1\n")
+        requireNotNull(sheet)
+        assertEquals(listOf(6.0, 1.0), sheet.columns.single())
+    }
+
+    @Test
+    fun chartliNamesDrawAsTheSameCharts() {
+        assertEquals("line", ChartSheet.parse("type: ascii\n1 3 2")!!.type)
+        assertEquals("line", ChartSheet.parse("type: braille\n1 3 2")!!.type)
+        assertEquals("bars", ChartSheet.parse("type: bar\n1 3 2")!!.type)
+    }
+
+    @Test
+    fun aNumberTableBecomesColumnsAndASentenceDoesNot() {
+        val drawn = ChartSheet.fromTable(
+            listOf("day", "sales"),
+            listOf(listOf("mon", "10"), listOf("tue", "14")),
+        )
+        requireNotNull(drawn)
+        assertEquals(listOf(10.0, 14.0), ChartSheet.parse(drawn)!!.columns.single())
+        assertNull(
+            ChartSheet.fromTable(
+                listOf("day", "note"),
+                listOf(listOf("mon", "busy"), listOf("tue", "quiet")),
+            ),
+        )
+    }
 }

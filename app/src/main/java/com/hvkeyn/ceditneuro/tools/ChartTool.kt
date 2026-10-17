@@ -8,10 +8,11 @@ class ChartTool : Tool {
     override val name = "chart"
     override val description =
         "Draw a chart in the chat from a stream of numbers. " +
-            "type is line, spark, bars, columns, or heatmap. " +
+            "Call this whenever the user should see a chart, a graph, a numeric list, or a plot. " +
+            "type is line, spark, bars, columns, or heatmap. ascii, unicode, and braille are drawn as a line. " +
             "data is rows of numbers, whitespace or commas, with an optional header and an optional label in the first column. " +
             "The reply must include the chart block this returns, unchanged. " +
-            "Do not install chartli and do not run npx."
+            "Do not run npx and do not install Chartli. This tool is the drawing."
     override val parameters = objectSchema(
         properties = mapOf(
             "data" to stringProp("The number rows. A header line is allowed."),

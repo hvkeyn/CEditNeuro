@@ -19,7 +19,7 @@ Edit a project by hand. Open the agent when you want a change made. Read the rep
 | **Agent** | Tool calling, skills, project memory, and a Doctor report. The model is not trained. The harness around it can change. It can also write a motion reel and render it. |
 | **Read** | txt, Markdown, HTML, FB2, and EPUB, with pages, notes, bookmarks, and read-aloud. |
 | **Phone** | Install an APK, turn a web page into an app, a timer, mail, FTP, and SFTP. |
-| **Study** | A checked research report, a chart from numbers in the chat, and notes from a public video page. |
+| **Study** | A checked research report, a chart or a card drawn in the chat, and notes from a public video page. |
 
 DeepSeek is built in, through its API or a sign-in on this phone. The API model is `deepseek-flash`, shown as DeepSeek V4.1 Flash 1017. Settings can fetch the models a host is offering, including another OpenAI-compatible service and a local server with no key. Qwen web chat is the same idea: sign in once inside the app, no key and no computer. Other providers can be added in Settings.
 
