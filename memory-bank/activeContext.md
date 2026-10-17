@@ -1,8 +1,8 @@
 # Active context
 
-v0.99.24 (versionCode 140). Installed on the phone. The network audit matches trails: a domain, a URL, an IP address, an IP and port, and a User-Agent. A child name can match a listed parent. Heuristics name a scan shape, a long or random-looking name, and a few cleartext shapes. Maltrail is not installed, and its trail list is not downloaded.
+v0.99.24 (versionCode 140). Released and installed on the phone. The network audit matches trails: a domain, a URL, an IP address, an IP and port, and a User-Agent. A child name can match a listed parent. Heuristics name a scan shape, a long or random-looking name, and a few cleartext shapes. Maltrail is not installed, and its trail list is not downloaded.
 
-v0.99.23 (versionCode 139). Installed on the phone, not published. A chat card grows to its text, so the last rows stay inside the picture.
+v0.99.23 (versionCode 139). The card-height fix shipped in v0.99.24. A chat card grows to its text, so the last rows stay inside the picture.
 
 v0.99.22 (versionCode 138). Released and installed on the phone. A visual list or a card is drawn in the chat by `layout`. A chart of whole numbers separated by a comma stays two values. The Chartli program is not installed.
 
