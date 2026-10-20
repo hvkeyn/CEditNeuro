@@ -228,7 +228,7 @@ object Composition {
                   el.style.opacity = Math.max(0, Math.min(into, outOf));
                 } else if (on && (tr === 'dip' || tr === 'dissolve')) {
                   el.style.opacity = String(Math.min(1, (t - s) / 0.35));
-                } else if (on) el.style.opacity = '1';
+                }
               }
               media(el, t, s, on, playing);
             }

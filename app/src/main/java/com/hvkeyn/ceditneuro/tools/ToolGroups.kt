@@ -115,6 +115,7 @@ object ToolGroups {
         "video" to listOf(
             "render_video",
             "edit_video",
+            "download_video",
             "compress_media",
             "sound_effect",
             "make_music",

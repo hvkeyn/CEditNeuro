@@ -45,7 +45,7 @@ import java.io.File
 /** image, video, svg, html, or null when the file is only text. */
 fun previewKind(path: String): String? = when (path.substringAfterLast('.', "").lowercase()) {
     "png", "jpg", "jpeg", "webp", "gif", "bmp" -> "image"
-    "mp4", "webm", "3gp", "mkv", "m4v" -> "video"
+    "mp4", "webm", "3gp", "mkv", "m4v", "ts" -> "video"
     "svg" -> "svg"
     "html", "htm" -> "html"
     else -> null

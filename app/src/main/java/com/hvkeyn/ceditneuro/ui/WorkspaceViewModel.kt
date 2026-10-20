@@ -42,6 +42,7 @@ import com.hvkeyn.ceditneuro.data.StoredChat
 import com.hvkeyn.ceditneuro.data.StoredSession
 import com.hvkeyn.ceditneuro.data.StoredShell
 import com.hvkeyn.ceditneuro.net.AgentNet
+import com.hvkeyn.ceditneuro.net.ExtensionBridge
 import com.hvkeyn.ceditneuro.net.RemoteClient
 import com.hvkeyn.ceditneuro.shell.DeviceShell
 import com.hvkeyn.ceditneuro.workspace.StoragePaths
@@ -90,6 +91,7 @@ import com.hvkeyn.ceditneuro.tools.ZipPathsTool
 import com.hvkeyn.ceditneuro.tools.GitDiffTool
 import com.hvkeyn.ceditneuro.tools.GitStatusTool
 import com.hvkeyn.ceditneuro.tools.DeletePathTool
+import com.hvkeyn.ceditneuro.tools.DownloadVideoTool
 import com.hvkeyn.ceditneuro.tools.GlobTool
 import com.hvkeyn.ceditneuro.tools.MkdirTool
 import com.hvkeyn.ceditneuro.tools.MovePathTool
@@ -114,11 +116,18 @@ import com.hvkeyn.ceditneuro.tools.ToolRegistry
 import com.hvkeyn.ceditneuro.tools.WriteFileTool
 import com.hvkeyn.ceditneuro.workspace.FileEntry
 import com.hvkeyn.ceditneuro.workspace.Workspace
+import com.hvkeyn.ceditneuro.video.MediaProgress
+import com.hvkeyn.ceditneuro.video.VideoEngine
+import com.hvkeyn.ceditneuro.video.VideoSource
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.put
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -332,6 +341,11 @@ class WorkspaceViewModel(
         DeepSeekBackend(settingsProvider = { settingsStore.current }, web = webBackend, qwen = qwenBackend)
     }
     private val agentNet = AgentNet { settingsStore.current.proxy }
+    /** Reads a page or a link into the project. Shared by the agent tool and the browser handoff. */
+    private val videoEngine by lazy {
+        VideoEngine(deviceShell.toolchain, agentNet, { settingsStore.current.networkEnabled })
+    }
+    private val pendingDownloads = ArrayDeque<Pair<String, String>>()
     private val execMutex = Mutex()
     private var execWaiter: CompletableDeferred<Boolean>? = null
     private val hostMutex = Mutex()
@@ -379,6 +393,7 @@ class WorkspaceViewModel(
 
     init {
         watchNetwork()
+        startExtensionBridge()
         settingsStore.afterChange = { scheduleProfile() }
         library.afterChange = { scheduleProfile() }
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
@@ -662,6 +677,7 @@ class WorkspaceViewModel(
         readerStack.clear()
         readerMentions = emptyList()
         sourceText = ""
+        viewModelScope.launch { flushPendingDownload() }
         val restore = _state.value.reader?.path
         if (restore != null) {
             viewModelScope.launch {
@@ -1914,6 +1930,169 @@ class WorkspaceViewModel(
         startPrompt(project, prepared.prompt, images, fromPeer = false)
     }
 
+    /**
+     * A video link from a browser extension, a share sheet, or a `vidbee://download` link.
+     * It becomes one agent turn; if no project is open or the agent is busy, it waits.
+     */
+    suspend fun requestDownload(url: String, quality: String = "best"): Boolean =
+        withContext(Dispatchers.Main.immediate) {
+            val clean = url.trim()
+            if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
+                showMessage("That link is not an http(s) page.")
+                return@withContext false
+            }
+            val chosen = normalizeQuality(quality)
+            val project = current
+            if (project == null) {
+                pendingDownloads += clean to chosen
+                showMessage("Open a project folder; the video link is waiting.")
+                return@withContext true
+            }
+            if (project.agentJob?.isActive == true) {
+                pendingDownloads += clean to chosen
+                showMessage("The agent is busy; the video link is kept for the next run.")
+                return@withContext true
+            }
+            if (!_state.value.online) {
+                pendingDownloads += clean to chosen
+                showMessage("No connection; the video link is kept.")
+                return@withContext true
+            }
+            startExternalDownload(project, clean, chosen)
+            true
+        }
+
+    private fun normalizeQuality(raw: String): String =
+        raw.trim().lowercase().takeIf { it in VIDEO_QUALITIES } ?: "best"
+
+    private suspend fun flushPendingDownload() {
+        val project = current ?: return
+        if (pendingDownloads.isEmpty()) return
+        if (project.agentJob?.isActive == true) return
+        if (!_state.value.online) return
+        val (url, quality) = pendingDownloads.removeFirst()
+        startExternalDownload(project, url, quality)
+    }
+
+    private fun startExternalDownload(project: LiveProject, url: String, quality: String) {
+        val prompt = buildString {
+            append("A browser extension sent this video link. Download it into the project with download_video.\n")
+            append("First call load_tools group=video.\n")
+            append("url: ").append(url).append('\n')
+            append("quality: ").append(quality).append('\n')
+            append("folder: downloads\n")
+            append("Pass this url exactly to download_video; do not read the page first and do not replace the url ")
+            append("with a media link you found. The tool resolves the page itself.\n")
+            append("When the file is saved, report its project path, its size, and its format. ")
+            append("If the page is DRM-protected, paid, or needs a login, say so and stop. Do not look for a bypass.")
+        }
+        sendPrompt(prompt)
+        if (current === project) showMessage("Video link received. The agent is downloading it.")
+    }
+
+    private suspend fun installPythonRuntime() {
+        val installer = InstallRuntimeTool(
+            toolchain = deviceShell.toolchain,
+            net = agentNet,
+            networkAllowed = { settingsStore.current.networkEnabled },
+            ensureExec = this@WorkspaceViewModel::ensureExecAllowed,
+        )
+        val result = installer.execute(buildJsonObject { put("name", "python") })
+        if (result.isError) throw java.io.IOException(result.content)
+    }
+
+    /** The same download engine the agent tool calls, without waiting for a model turn. */
+    suspend fun checkDownload(url: String, quality: String, destDir: File): String = withContext(Dispatchers.IO) {
+        runCatching {
+            destDir.mkdirs()
+            val report = videoEngine.download(
+                url = url,
+                quality = normalizeQuality(quality),
+                maxBytes = 4096L * 1024L * 1024L,
+                destDir = destDir,
+                allowYtDlpInstall = true,
+                installPython = { installPythonRuntime() },
+            )
+            "ok ${report.file.absolutePath} ${report.bytes} ${report.engine} ${report.note}".trim()
+        }.getOrElse { "error ${it.message ?: it.javaClass.simpleName}" }
+    }
+
+    private fun startExtensionBridge() {
+        val started = runCatching {
+            ExtensionBridge.start(
+                info = { url -> bridgeVideoInfo(url) },
+                download = { url, quality ->
+                    runBlocking { withTimeoutOrNull(25_000) { requestDownload(url, quality) } ?: false }
+                },
+            )
+        }.getOrDefault(false)
+        if (!started) showMessage("The browser handoff port is busy; the rest of the app still works.")
+    }
+
+    /** The JSON the VidBee-shaped popup expects: title, duration, thumbnail, formats. */
+    private suspend fun bridgeVideoInfo(url: String): JsonObject = withContext(Dispatchers.IO) {
+        val result = videoEngine.inspect(url, allowYtDlpInstall = false)
+        val formats = ArrayList<JsonObject>()
+        result.ytInfo?.formats?.filter { it.muxed }?.forEach { format ->
+            formats += buildJsonObject {
+                put("format_id", format.id)
+                put("ext", format.ext)
+                format.height?.let { put("height", it) }
+                format.width?.let { put("width", it) }
+                put("vcodec", format.vcodec)
+                put("acodec", format.acodec)
+                format.filesize?.let { put("filesize", it) }
+                put("resolution", if (format.height != null) "${format.width ?: 0}x${format.height}" else format.ext)
+            }
+        }
+        result.info.links.take(10).forEachIndexed { index, link ->
+            formats += buildJsonObject {
+                put("format_id", "native-$index")
+                put("ext", link.ext)
+                link.height?.let { put("height", it) }
+                put("resolution", link.height?.let { "${it}p" } ?: link.label)
+                put("vcodec", "unknown")
+                put("acodec", "unknown")
+                link.bytes?.let { put("filesize", it) }
+                put("format_note", link.kind.name.lowercase())
+            }
+        }
+        buildJsonObject {
+            put("title", result.info.title.ifBlank { url })
+            put("thumbnail", result.info.thumbnail)
+            result.info.durationSeconds?.let { put("duration", it) }
+            put("webpage_url", url)
+            put("engine", result.engine)
+            if (result.info.note.isNotBlank()) put("note", result.info.note)
+            put("formats", buildJsonArray { formats.forEach { add(it) } })
+        }
+    }
+
+    /** Keeps the status shade honest during a long film download. */
+    private fun noteVideoProgress(project: LiveProject, progress: MediaProgress) {
+        val now = System.currentTimeMillis()
+        if (now - project.lastNoticeAt < 900) return
+        project.lastNoticeAt = now
+        val detail = buildString {
+            progress.percent?.let { append(it).append("% · ") }
+            append(VideoSource.formatBytes(progress.receivedBytes))
+            if (progress.speedBytesPerSecond > 0) {
+                append(" · ").append(VideoSource.formatBytes(progress.speedBytesPerSecond)).append("/s")
+            }
+            if (progress.label.isNotBlank()) append(" · ").append(progress.label)
+        }
+        AgentNotifications.publish(
+            appContext,
+            agentStatus(
+                project,
+                "Downloading a video · $detail",
+                "",
+                "",
+                project.ui.agentActivity?.startedAt ?: now,
+            ),
+        )
+    }
+
     private fun startPrompt(
         project: LiveProject,
         prompt: String,
@@ -2016,6 +2195,11 @@ class WorkspaceViewModel(
             val report = (summary ?: outcome ?: "done").take(180)
             if (_state.value.linkActive > 1) settleCrew(project, report, failed = outcome != null)
             persistNow(project)
+        }
+        // A link that arrived while this run was busy starts after the job is really done;
+        // inside the job `agentJob.isActive` is still true and the next start would be dropped.
+        project.agentJob?.invokeOnCompletion {
+            viewModelScope.launch(Dispatchers.Main) { flushPendingDownload() }
         }
     }
 
@@ -2621,6 +2805,7 @@ class WorkspaceViewModel(
             "learn" -> "Teaching"
             "crew" -> "Sharing the queue"
             "render_video" -> "Rendering a video"
+            "download_video" -> "Downloading a video"
             "compress_media" -> "Shrinking a file"
             "sound_effect" -> "Adding a sound effect"
             "make_music" -> "Making music"
@@ -3248,6 +3433,21 @@ class WorkspaceViewModel(
             com.hvkeyn.ceditneuro.tools.ClipboardTool(appContext),
             com.hvkeyn.ceditneuro.tools.OpenFileTool(appContext, ws),
             com.hvkeyn.ceditneuro.tools.EditVideoTool(ws),
+            DownloadVideoTool(
+                workspace = ws,
+                engine = videoEngine,
+                networkAllowed = { settingsStore.current.networkEnabled },
+                installPython = { installPythonRuntime() },
+                onProgress = { progress -> noteVideoProgress(project, progress) },
+                onSaved = { path ->
+                    viewModelScope.launch(Dispatchers.Main) {
+                        if (project.epoch.get() == epochAtBuild) {
+                            refreshProjectTree(project, path)
+                            if (current === project) openFile(path)
+                        }
+                    }
+                },
+            ),
             com.hvkeyn.ceditneuro.tools.CompressMediaTool(ws),
             com.hvkeyn.ceditneuro.tools.RenderVideoTool(ws) { path ->
                 if (project.epoch.get() != epochAtBuild) return@RenderVideoTool
@@ -3479,6 +3679,9 @@ class WorkspaceViewModel(
         if (up) linkDown = false
         val online = up && !linkDown
         if (_state.value.online != online) _state.update { it.copy(online = online) }
+        if (online && pendingDownloads.isNotEmpty()) {
+            viewModelScope.launch(Dispatchers.Main) { flushPendingDownload() }
+        }
         if (online) {
             linkWatch?.cancel()
         } else {
@@ -3513,6 +3716,7 @@ class WorkspaceViewModel(
     }
 
     override fun onCleared() {
+        ExtensionBridge.stop()
         linkWatch?.cancel()
         networkCallback?.let { callback ->
             val manager = appContext.getSystemService(ConnectivityManager::class.java)
@@ -3537,6 +3741,7 @@ class WorkspaceViewModel(
         private const val MAX_STORED_CHAT = 400
         private const val MAX_STORED_SHELL = 200
         private const val MAX_STORED_CONVERSATION = 80
+        private val VIDEO_QUALITIES = setOf("best", "1080", "720", "480", "360", "worst", "audio")
 
         fun factory(context: Context, settingsStore: SettingsStore): ViewModelProvider.Factory {
             val appContext = context.applicationContext

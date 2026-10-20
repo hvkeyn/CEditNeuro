@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CEditNeuro</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <span class="mark">CN</span>
+      <div>
+        <h1>CEditNeuro</h1>
+        <p id="phone">Looking for the phone…</p>
+      </div>
+      <span id="dot" class="dot wait"></span>
+    </header>
+
+    <main id="main">
+      <p id="status" class="status">Start CEditNeuro on the phone and keep it open.</p>
+
+      <section id="video" class="video hidden">
+        <h2 id="title">Video</h2>
+        <p id="meta" class="meta"></p>
+        <label class="row" for="quality">
+          <span>Quality</span>
+          <select id="quality">
+            <option value="best">Best</option>
+            <option value="1080">1080p</option>
+            <option value="720">720p</option>
+            <option value="480">480p</option>
+            <option value="audio">Audio only</option>
+          </select>
+        </label>
+        <button id="send" type="button">Download on the phone</button>
+        <p id="formats" class="formats"></p>
+      </section>
+
+      <button id="retry" class="secondary" type="button">Check again</button>
+    </main>
+
+    <footer>
+      <p>
+        The phone listens on 127.0.0.1:27100–27120. On a computer, run
+        <code>adb reverse tcp:27100 tcp:27100</code> once.
+      </p>
+    </footer>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

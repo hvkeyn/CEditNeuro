@@ -34,6 +34,7 @@ class CompositionTest {
         val registry = hosted.indexOf("window.__timelines=window.__timelines||{}")
         assertTrue(registry in 0 until hosted.indexOf("window.__timelines[\"intro\"]"))
         assertTrue(hosted.contains("__hfFrame"))
+        assertFalse(hosted.contains("el.style.opacity = '1'"))
         assertFalse(hosted.contains("window.__hfPlay();"))
         assertTrue(Composition.hosted(page, play = true).contains("window.__hfPlay();"))
         assertTrue(hosted.trimEnd().endsWith("</html>"))

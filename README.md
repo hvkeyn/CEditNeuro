@@ -16,6 +16,7 @@ Edit a project by hand. Open the agent when you want a change made. Read the rep
 | --- | --- |
 | **Edit** | File tree, tabs, tree-sitter highlighting for Java, Kotlin, Python, JSON, and XML. Run an open `.py` or `.sh` from the editor. |
 | **Video** | A reel editor for a video already in the project. Drag a block along a track or onto another video or audio track. Add an effect or a transition, then render an MP4 on the phone. |
+| **Download** | A film, a clip, or a stream from a page is saved into the project. A direct MP4, an HLS playlist including AES-128, or a site yt-dlp can read. A browser extension sends the current tab to the agent. |
 | **Agent** | Tool calling, skills, project memory, and a Doctor report. The model is not trained. The harness around it can change. It can also write a motion reel and render it. |
 | **Read** | txt, Markdown, HTML, FB2, and EPUB, with pages, notes, bookmarks, and read-aloud. |
 | **Phone** | Install an APK, turn a web page into an app, a timer, mail, FTP, and SFTP. |
@@ -66,7 +67,20 @@ An absolute path is a real directory on this phone. `HOME` is this app's private
 
 ## Video
 
-Open a video and tap **Edit**. The reel keeps picture tracks and sound tracks in one file next to the video. Hold a block and drag it along its track, or onto another track of the same kind. An empty track at the edge takes a block onto a new layer. Effects cover fade, gray, warm, zoom, mute, blur, and flip. Transitions are a hard cut, a dissolve, a wipe, and a dip to black. Save writes the same reel. Render encodes an MP4 in the project. The agent can also shrink a jpg, png, webp, or mp4 that is already in the project. The phone's own encoder does that. CompressO is not installed.
+Open a video and tap **Edit**. The reel keeps picture tracks and sound tracks in one file next to the video. Hold a block and drag it along its track, or onto another track of the same kind. An empty track at the edge takes a block onto a new layer. Effects cover fade, gray, warm, zoom, mute, blur, and flip. Transitions are a hard cut, a dissolve, a wipe, and a dip to black. Save writes the same reel. Render encodes an MP4 in the project. While a reel gathers pictures and sound, it also searches one Scrolltide template and keeps only the motion that page printed. A layer starts at its first frame and fades in. It does not pop on, and it does not cover a layer that is still in the shot. The catalog is not stored. The agent can also shrink a jpg, png, webp, or mp4 that is already in the project. The phone's own encoder does that. CompressO is not installed.
+
+## Download
+
+Ask the agent for a film or a clip, paste a video page, or send the page from the browser extension. `download_video` saves it under `downloads/` in the project, then the video tab opens it and the reel editor can cut it.
+
+- A direct MP4, WebM, or MOV is streamed to disk and resumes from its `.part`.
+- An HLS playlist is resolved on the phone, including AES-128 segments. An MPEG-TS result is remuxed to MP4 with the phone's own extractor, so it plays here.
+- A page yt-dlp knows goes through yt-dlp. The first such page may install Python and yt-dlp into the app's toolchain; this happens on the phone and does not install a second app.
+- A DRM-protected, paid, or login-only video is refused. The app does not bypass DRM or log in for the user.
+- A site that offers only separate picture and sound tracks is refused when yt-dlp is the engine. An HLS master with a separate audio group saves the picture track and says so; the phone has no ffmpeg to join them.
+
+**[Browser extension](tools/extension)** · The popup sends the current tab to the phone. It calls the app on `127.0.0.1:27100–27120` and needs the token from `/token`. The app also listens for a `vidbee://download?url=` link and for the Android share sheet, so the VidBee extension and any browser can hand off a page. The bridge is loopback-only, and a request from a web page is refused.
+
 
 ## Reading
 

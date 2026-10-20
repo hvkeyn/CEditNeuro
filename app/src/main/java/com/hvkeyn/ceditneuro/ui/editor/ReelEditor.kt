@@ -552,7 +552,7 @@ private fun library(root: File?): List<MediaFile> {
             if (child.isDirectory) walk(child, rel, depth + 1)
             else {
                 val kind = when (child.extension.lowercase()) {
-                    "mp4", "webm", "3gp", "mov", "mkv" -> "video"
+                    "mp4", "webm", "3gp", "mov", "mkv", "ts" -> "video"
                     "wav", "mp3", "ogg", "m4a" -> "music"
                     else -> null
                 }
