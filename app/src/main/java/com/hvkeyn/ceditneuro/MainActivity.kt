@@ -37,6 +37,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         maybeMonitor(intent)
         maybeCapture(intent)
+        maybeDownload(intent)
 
         val app = application as CEditNeuroApp
 
@@ -60,6 +61,36 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         maybeMonitor(intent)
         maybeCapture(intent)
+        maybeDownload(intent)
+    }
+
+    /**
+     * A browser share or the VidBee extension's `vidbee://download?url=` link becomes one
+     * agent turn. The extension bridge uses the same entry point, so both paths behave alike.
+     */
+    private fun maybeDownload(intent: Intent?) {
+        if (intent == null) return
+        val url = when {
+            intent.action == Intent.ACTION_SEND && intent.type?.startsWith("text/") == true ->
+                firstUrl(intent.getStringExtra(Intent.EXTRA_TEXT))
+            intent.data?.scheme.equals("vidbee", ignoreCase = true) ->
+                intent.data?.getQueryParameter("url")
+            intent.data?.scheme.equals("ceeditneuro", ignoreCase = true) ->
+                intent.data?.getQueryParameter("url")
+            else -> null
+        }?.trim()?.takeIf { it.startsWith("http://") || it.startsWith("https://") } ?: return
+        intent.removeExtra(Intent.EXTRA_TEXT)
+        intent.data = null
+        val app = application as CEditNeuroApp
+        lifecycleScope.launch {
+            app.workspaceModel.requestDownload(url)
+        }
+    }
+
+    private fun firstUrl(text: String?): String? {
+        if (text.isNullOrBlank()) return null
+        val match = Regex("""https?://[^\s<>"']+""").find(text) ?: return null
+        return match.value.trimEnd('.', ',', ';', ')', ']', '}', '!', '?')
     }
 
     /** The computer's adb tunnel opens the extra display. Only a loopback page is accepted here. */
@@ -77,6 +108,20 @@ class MainActivity : ComponentActivity() {
 
     /** A same-app start used to check the recorder. The VPN prompt and the notification still apply. */
     private fun maybeCapture(intent: Intent?) {
+        if (intent?.getBooleanExtra("cedit_download", false) == true) {
+            val dir = java.io.File(getExternalFilesDir(null), "download-check").apply { mkdirs() }
+            val url = intent.getStringExtra("url").orEmpty()
+            val quality = intent.getStringExtra("quality") ?: "best"
+            if (url.isBlank()) {
+                java.io.File(dir, "check.txt").writeText("error no url")
+                return
+            }
+            lifecycleScope.launch {
+                val text = (application as CEditNeuroApp).workspaceModel.checkDownload(url, quality, dir)
+                java.io.File(dir, "check.txt").writeText(text)
+            }
+            return
+        }
         if (intent?.getBooleanExtra("cedit_shell", false) == true) {
             val dir = getExternalFilesDir(null) ?: return
             lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {

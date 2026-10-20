@@ -386,7 +386,7 @@ object StarterSkills {
             1. Call load_tools group=design. Name the surface: web, desktop, Android, or iOS. Restate who it is for and the one job of the screen.
             2. If the project already has DESIGN.md or a style block, follow that. Otherwise pick one public DESIGN.md. http_request https://styles.refero.design/ or one raw file from https://github.com/voltagent/awesome-design-md. If they name a design system, call design_system with that name. Quote only the swatches the tool printed. If load_tools says the group has no tools, http_request that system's public page on https://www.designsystems.one/ instead. Write the quoted colors, type, and spacing into DESIGN.md in the project root. Say which page you used and what you took.
             3. Components. Say in the chat what you will look up, then http_request https://component.gallery/ and use only a pattern that page printed. There is no 21st.dev MCP on this phone. http_request https://21st.dev/ or ask the user to paste the component. Do not invent the markup.
-            4. Motion, only when the screen needs it. http_request https://kinetics.colorion.co/ and copy only CSS that page printed. A press answers at once. Motion follows the finger and can be stopped. Honor reduced motion. No remote script and no library this phone cannot run.
+            4. Motion, only when the screen needs it. http_request https://kinetics.colorion.co/ and copy only CSS that page printed. A cinematic landing, a portfolio, a 3D scene, a hero, or one component from scrolltide.co is one named piece: http_request https://www.scrolltide.co/templates and follow only a prompt that page printed, then change the words to this brief. One piece, not the catalog. A video of that motion uses use_skill hyperframes. Do not paste the prompt into Claude, Cursor, or Codex. A press answers at once. Motion follows the finger and can be stopped. Honor reduced motion. No remote script and no library this phone cannot run.
             5. Platform, on top of the quoted style. Web: one HTML file, system fonts, a plain style block. Desktop: visible keyboard focus, a label as well as a shortcut, hover is extra, do not lay it out as a phone. Android: a target is at least 48dp, content clears the system bars, the system back leaves the screen. iOS: a target is at least 44pt, content clears the safe area and the home indicator. A vendor rule that is not in this list is fetched with http_request. If that fetch fails, stop.
             6. Before code, write a short plan in the chat: who it is for, the one job, one mood, two type roles, and one signature element that belongs to this brief. The mood is one of these, and only one: editorial (a serif display face, wide space, a light ground), technical (dense rows, monospace for metadata, a visible grid), warm (soft cards, pill buttons, round corners), refined minimal (one accent, wide margins, product chrome), swiss (a strict grid, one type family, no decoration), brutalist (raw type, hard edges, almost no color), or playful (a clear shape, one bright accent, still one job). Do not mix them. If that plan would fit any other product, change it. Do not default to Inter, Roboto, or Arial unless the project already uses that face. Name one display face and one body face. For an Apple-like feel, hold to purpose, agency, responsibility, familiarity, flexibility, simplicity, craft, and delight.
             Craft. Adapted from AkyRayy/Frontend-Design-SKILLS-for-AI (MIT). http_request https://raw.githubusercontent.com/AkyRayy/Frontend-Design-SKILLS-for-AI/main/SKILL.md and follow only a step that page printed and this phone can do. Open one extra file from that repo only when that page names it. If the page cannot be read, keep going with these rules. Put colors in one style block: one accent on a small part of the page, one paper, one ink, one muted ink, one hairline. Rewrite the page if it has a purple-to-blue gradient, glass on every card, a blob background, emoji as icons, a pill on every control, three identical feature cards, or a headline that says Welcome, Empowering, or three stacked adjectives. Write real words, not placeholder copy. Every control has a hover, a focus ring, and a disabled state. Empty, loading, and error each have their own text. Then remove one element. If the page is clearer, that element was decoration.
@@ -452,9 +452,9 @@ object StarterSkills {
 
             Adapted from heygen-com/hyperframes. Every scene enters. Scenes hand off with a transition. The first render is a draft: three variations of the weakest beat, then one kept cut.
 
-            1. Name the piece in one sentence: the subject, the length in seconds, and the kind. A navigable deck is a slideshow. Captions on footage stay captions. A short unnarrated sting is motion. A site or product promo is a launch. A topic with no site is an explainer. A showreel or a motion graphic is motion. Anything else is a general video. Write real words for that subject. A placeholder sentence is a failed draft. When they name a length, that number is data-duration. A motion piece with no length is 30 seconds. A URL in the brief is read with http_request first. A fact on screen is a fact that page printed. Before HTML, list the beats: start, duration, the one idea, the entrance. Beats are 3 to 6 seconds. Neighbors overlap by about 0.4 seconds, and the last beat ends on the root duration. A 30 second reel is six to eight beats. A beat that does not move is a failed draft. The beats cover the whole duration. A look from prompt-motion.com is one entry the user named, opened with http_request. Follow only a prompt or skill step that page printed, then change the words, the subject, and the timing to this brief. Do not copy a video file. Do not install After Effects, Remotion, or a Claude plugin. The piece still renders on this phone with render_video. Skip a glow on every layer, a particle burst, a caption stuck in a corner, and a crossfade on every cut. One process moves from start to finish, and each beat says what is on screen and how it moves.
+            1. Name the piece in one sentence: the subject, the length in seconds, and the kind. Write real words for that subject. A placeholder sentence is a failed draft. When they name a length, that number is data-duration. A motion piece with no length is 30 seconds. A URL in the brief is read with http_request first. A fact on screen is a fact that page printed. Before HTML, list the beats: start, duration, the one idea, the entrance. Beats are 3 to 6 seconds. The last beat ends on the root duration. A later beat fades in with data-fade of about 0.5 instead of covering the previous picture. A beat that does not move is a failed draft. The beats cover the whole duration. A look from prompt-motion.com is one entry the user named, opened with http_request. Follow only a prompt or skill step that page printed, then change the words, the subject, and the timing to this brief. Do not install a renderer. The piece still renders on this phone with render_video. Each beat says what is on screen and how it moves.
             2. http_request https://raw.githubusercontent.com/heygen-com/hyperframes/main/skills/hyperframes-core/SKILL.md and follow only a step that page printed and this phone can do. Do not invent a timing attribute. For more than a title card, also http_request https://raw.githubusercontent.com/heygen-com/hyperframes/main/skills/hyperframes-creative/references/house-style.md and https://raw.githubusercontent.com/heygen-com/hyperframes/main/skills/hyperframes-creative/references/video-composition.md. For more than one scene, http_request https://raw.githubusercontent.com/heygen-com/hyperframes/main/skills/hyperframes-animation/SKILL.md and follow only the entrance and transition step that page printed. Open one extra file only when that page names it. If a page does not answer, write from this skill and keep going.
-            3. The local bar, used when a style page did not print a step. One background, one foreground, one accent, the same background in every scene. Tint a neutral toward that accent. Two faces from fonts.googleapis.com, one display and one text, not Inter, Roboto, or Arial unless the project already uses that face. Headlines are heavy and large enough to read on a phone. Each scene keeps two to five slow layers (ghost type, a hairline, grain, or one shape from the subject) on one shared breath. An entrance is 0.3 to 0.6 seconds and moves as well as fades. Between scenes use a wipe, a reveal, or a short overlap. A hard cut only when the brief asked for a cut. Do not use gradient text, a purple-to-blue gradient, cyan on black, identical cards, or a frame where everything sits in the center at the same weight. Do not call Math.random or Date.now. A scene that pops in is a failed draft.
+            3. The local bar, used when a style page did not print a step. One background, one foreground, one accent, the same background in every scene. Tint a neutral toward that accent. Two faces from fonts.googleapis.com, one display and one text, not Inter, Roboto, or Arial unless the project already uses that face. Headlines are heavy and large enough to read on a phone. Each scene keeps two to five slow layers (ghost type, a hairline, grain, or one shape from the subject) on one shared breath. An entrance is 0.6 to 1.2 seconds and moves as well as fades. Between scenes the next picture fades in. A hard cut only when the brief asked for a cut. Do not use gradient text, a purple-to-blue gradient, cyan on black, identical cards, or a frame where everything sits in the center at the same weight. Do not call Math.random or Date.now. A scene that pops in is a failed draft.
             4. write_file one index.html in the project. The root is one div in the body, not inside a template. It carries data-composition-id, data-start of 0, data-width, data-height, and data-duration. A phone reel is 1080 by 1920 unless they asked for a wide frame. Its CSS width and height stay 100 percent. html and body fill the window. Each scene is class clip with data-start, data-duration, and data-track-index. Times are seconds and match the beat list. One gsap.timeline stays paused and is stored on window.__timelines under that composition id. Do not tween visibility on a clip. Type moves in, a layer travels, and the next scene overlaps the handoff. Do not leave a gap between scenes.
             5. The page has to play when opened by itself. Before the timeline, remember whether window.__timelines already exists. Then set window.__timelines to that object or to a new one. Store the timeline on it under the composition id. If the registry was missing, set the root to its data width and height in pixels, scale the page into the window, hide each clip whose start and duration do not contain the playhead, and call play. If the registry already existed, do not play and do not hide clips. The runtime owns that.
             6. You choose the search, and you choose which materials and facts this piece needs. Call load_tools group=video. A bed, an effect, a picture, a short insert, or a number on screen is collected only when that scene uses it. Do not fetch a file the piece will not show. Look in the project first: a file the user already put in the project is used as it is and credited in assets/media-credit.txt as user material, and you go to the web only for a scene the project cannot fill.
@@ -469,7 +469,9 @@ object StarterSkills {
             10. The first render is a draft. In video/takes.md name the weakest beat: a scene with no entrance, a jump with no transition, type that is hard to read, a flat scene where a picture was found, a hit off the picture, or a bed that fights the voice. Write three variations of that beat only. One changes the entrance or the transition. One changes the picture, the crop, or the insert. One changes the sound: another downloaded file, or make_music with another seed. Keep the variation that serves the brief. edit_file that span. render_video again. Say in one sentence which variation you kept and why. Do not rewrite the whole file. Do not ship the first render.
             11. A later change the user asks for is edit_file on that span, then render_video again. When the video is done, call use_skill name=hyperframes scope=app on=false.
             12. Any video already in the project is cut with edit_video, then render_video on the html it wrote. Each line is a start and an end in seconds, then the caption. fade overlaps the handoff. A spoken line is voiceover first, then voice: that wav on the line. Do not install Concat, Whisper, or a voice-clone model. This phone does not remove a background.
-            13. A motion scheme with a plan and separate scenes is still this phone. Write video/plan.md before HTML: the promise, one palette, two type faces, and each scene as start, end, the idea, the entrance, and the state handed to the next scene. Local scene time maps onto the one timeline. Durations are whole frames at 30 fps. When a voice was asked for and the wav is not in the project yet, do not invent its timings. Do not add music, a sound effect, or a voice the brief did not ask for. Motion carries the story. A row of still cards is a failed draft. If crew is linked, one scene can be a task on another phone. This phone still writes one index.html and calls render_video. The draft in step 10 still applies to the weakest beat. When render_video prints a path, write video/receipt.md with the seconds, the byte size, the frame count, and the check it printed. A later note names the scene and the time. edit_file that span and render_video again. Do not install Claude, Codex, or another video engine. Do not say you watched the motion. Uploading stays a separate ask.
+            13. A motion scheme with a plan and separate scenes is still this phone. Write video/plan.md before HTML: the promise, one palette, two type faces, and each scene as start, end, the idea, the entrance, and the state handed to the next scene. Durations are whole frames at 30 fps. When a voice was asked for and the wav is not in the project yet, do not invent its timings. Do not add music, a sound effect, or a voice the brief did not ask for. This phone still writes one index.html and calls render_video. When render_video prints a path, write video/receipt.md with the seconds, the byte size, the frame count, and the check it printed. Do not install Claude, Codex, or another video engine. Do not say you watched the motion.
+            14. In the same material pass, web_search one scrolltide.co template for this brief, then http_request that page or https://www.scrolltide.co/templates. Use only the motion it printed: one piece, not the library. Fit the words to this brief. A scroll becomes beats. Do not paste the prompt into Claude, Cursor, or Codex. If the search prints nothing, write the motion from this skill.
+            15. Quality is the cut. The CSS is frame 0: a layer that fades in has opacity 0, and its transform is the start pose. Do not unveil with overflow, clip, visibility, or display. Move at most 80px, for at least 0.6s, with an in-out ease. One layer does not cover another that is still meant to be seen. A later scene has data-fade of about 0.5. Two tweens do not share one property. A pop, a jump, or a cover is a failed draft: fix that layer, then render_video again.
         """.trimIndent() + "\n",
         "net-map" to """
             # Map a network from a dump
@@ -536,6 +538,19 @@ object StarterSkills {
             1. Windows, when this phone is connected by adb: the picture is at http://127.0.0.1:8791/ through that adb tunnel. second_monitor action=open with that address. If the page does not open, the tunnel is not up. Do not invent an address. Do not use SSH for this.
             2. Linux: load_tools group=remote and remote_connect to the computer the user already put in Settings. Do not invent a host or a password. second_monitor action=script os=linux. remote_write that text unchanged. ssh_exec runs nohup python3 -u that file, with output redirected to second-monitor.log, then a trailing ampersand. remote_read the state path the log prints. If the log says the desktop cannot add a virtual monitor, stop and say so. Do not claim a display was added. second_monitor action=open with the address it printed.
             3. To stop Linux, ssh_exec the same file with the argument stop. Do not change, repack, or sell a display program. Do not print the address in the chat. Do not upload a picture of the computer. When the extra display is up, use_skill name=second-monitor scope=app on=false.
+        """.trimIndent() + "\n",
+        "video-download" to """
+            # Video download
+
+            Use this when the user wants a film, a movie, a clip, a stream, or a video page saved into the project. A note about a video is video-notes; this skill saves the file.
+
+            1. load_tools group=video. A direct .mp4, .webm, .m3u8, or .mpd address is download_video with that url. A page is the same call with the page url. Do not save a media page with http_request.
+            2. quality is best unless the user named a height. 1080, 720, 480, and 360 pick that ceiling. audio saves the sound only. worst is a small sample. folder defaults to downloads. name overrides the title.
+            3. The phone reads a direct MP4, an HLS stream including AES-128, and a page yt-dlp knows. A TS stream is remuxed to MP4 on the phone. A page that needs the extractor may install Python and yt-dlp once in this app. Do not install ffmpeg. When yt-dlp offers only separate picture and sound tracks, the tool refuses and says so; do not invent a merge. An HLS master that lists a separate audio group saves the picture track and says so in the result.
+            4. A DRM-protected, paid, or login-only video is refused. Do not look for a bypass, a mirror, a converter, or another site. Do not log in for the user.
+            5. When a browser extension, a share sheet, or a vidbee://download link sends an address, the first message already names it. Call download_video on that address, then report the saved path, the byte size, the format, and the seconds.
+            6. A film takes minutes. Do not cancel it, do not start a second download, and do not repeat the same call. The status shade shows the percent while it runs. The file opens in a video tab and the reel editor can cut it.
+            7. When the task is done, use_skill name=video-download scope=app on=false.
         """.trimIndent() + "\n",
         "rrsi" to """
             # Harness self-improvement
@@ -667,9 +682,20 @@ object StarterSkills {
         val file = File(appDir, "hyperframes.md")
         if (!file.isFile) return
         val current = file.readText(Charsets.UTF_8)
-        if (current.contains("video/plan.md")) return
         if (!current.contains("data-composition-id")) return
-        file.writeText(skills.getValue("hyperframes"), Charsets.UTF_8)
+        if (!current.contains("frame 0")) {
+            file.writeText(skills.getValue("hyperframes"), Charsets.UTF_8)
+            return
+        }
+        if (current.contains("same material pass")) return
+        file.writeText(
+            current.trimEnd() + "\n\n" +
+                "In the same material pass, web_search one scrolltide.co template for this brief, then http_request that page or https://www.scrolltide.co/templates. " +
+                "Use only the motion it printed. One piece, not the library. Fit the words to this brief. " +
+                "A scroll becomes beats: entrance, travel, handoff. Do not paste the prompt into Claude, Cursor, or Codex. " +
+                "If the search prints nothing, write the motion from this skill.\n",
+            Charsets.UTF_8,
+        )
     }
 
     /** Phones that saved the first video skill also learn search, a channel, a playlist, and a batch of three. */
@@ -715,10 +741,12 @@ object StarterSkills {
         if (current.contains("ai-ui-design-google-ai-studio")) {
             appendCraft(file)
             appendVideoSkill(file)
+            appendScrolltide(file)
             return
         }
         if (!current.contains("Design a page") && !current.contains("Design a screen") && !current.contains("styles.refero.design")) {
             appendVideoSkill(file)
+            appendScrolltide(file)
             return
         }
         file.writeText(
@@ -732,6 +760,7 @@ object StarterSkills {
         )
         appendCraft(file)
         appendVideoSkill(file)
+        appendScrolltide(file)
     }
 
     /** An old design skill learns the craft bar: one aesthetic, tokens, and a reject list. */
@@ -747,6 +776,20 @@ object StarterSkills {
                     "Colors live in one style block: one accent, one paper, one ink, one muted ink, one hairline. " +
                     "Rewrite a purple-to-blue gradient, glass on every card, a blob background, emoji as icons, a pill on every control, three identical feature cards, or a Welcome or Empowering headline. " +
                     "Then remove one element. If the page is clearer, that element was decoration.\n",
+            Charsets.UTF_8,
+        )
+    }
+
+    /** An old design skill can take one Scrolltide piece without storing the catalog. */
+    private fun appendScrolltide(file: File) {
+        val current = file.readText(Charsets.UTF_8)
+        if (current.contains("scrolltide.co")) return
+        if (!current.contains("Design a page") && !current.contains("Design a screen") && !current.contains("use_skill hyperframes")) return
+        file.writeText(
+            current.trimEnd() + "\n\n" +
+                "A cinematic landing, a portfolio, a 3D scene, a hero, or one component from scrolltide.co is one named piece. " +
+                "http_request https://www.scrolltide.co/templates and follow only a prompt that page printed, then change the words to this brief. " +
+                "One piece, not the catalog. A video of that motion uses use_skill hyperframes. Do not paste the prompt into Claude, Cursor, or Codex.\n",
             Charsets.UTF_8,
         )
     }
