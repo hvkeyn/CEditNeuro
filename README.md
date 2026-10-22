@@ -81,6 +81,9 @@ Ask the agent for a film or a clip, paste a video page, or send the page from th
 
 **[Browser extension](tools/extension)** · The popup sends the current tab to the phone. It calls the app on `127.0.0.1:27100–27120` and needs the token from `/token`. The app also listens for a `vidbee://download?url=` link and for the Android share sheet, so the VidBee extension and any browser can hand off a page. The bridge is loopback-only, and a request from a web page is refused.
 
+## Skills
+
+The agent loads Markdown procedures from `CEditNeuro/skills` on this phone and from `.ceditneuro/skills` in the project. It can also search a public catalog, check a downloaded file, and save only the adapted procedure. **[SKILLS.md](SKILLS.md)** is the complete catalog: all 28 skills, their triggers and tools, the file contract, the activation path, and how to move one to another agent.
 
 ## Reading
 
