@@ -55,6 +55,15 @@ between a confused model and `../../` walks, so it is deliberately the narrowest
 set. Models reach for the shortest unique anchor they can find, and a silent wrong-site edit is
 far more expensive to debug than a retry.
 
+## Skills
+
+A skill is a Markdown procedure in `CEditNeuro/skills` (this phone, every project) or
+`<project>/.ceditneuro/skills` (one project). `SkillLibrary` lists both, `use_skill` switches
+one on for the chat, and the setup prompt gets a catalog plus the full text of each active
+skill. A skill never adds a tool or a permission. `SkillAudit` blocks a hidden command, a
+secret, or a prompt injection before the file is saved or followed. The complete inventory
+and the porting rules are in [`../SKILLS.md`](../SKILLS.md).
+
 ## Deliberate limits on Android
 
 - **No local toolchain.** The built-in shell is toybox. It cannot install packages or run a
