@@ -11,7 +11,7 @@ import java.nio.file.Files
 class SkillWiringTest {
     private val known = ToolGroups.core.toSet() + ToolGroups.groups.values.flatten()
 
-    /** Words in snake case that are arguments or file names, not tools. */
+    /** Words in snake case that are arguments, file names, or graph terms, not tools. */
     private val notTools = setOf(
         "delay_seconds",
         "control_flow",
@@ -21,6 +21,10 @@ class SkillWiringTest {
         "save_path",
         "page_size",
         "topic_id",
+        "contains_flow",
+        "flow_step",
+        "depends_on",
+        "node_modules",
     )
 
     @Test
@@ -110,6 +114,15 @@ class SkillWiringTest {
             .forEach { assertTrue("diff-tour lacks $it", text.contains(it, ignoreCase = true)) }
         assertTrue(text.length <= ACTIVE_SKILL_CHARS)
         assertTrue(buildSystemPrompt().contains("use_skill diff-tour"))
+    }
+
+    @Test
+    fun understandAnythingKeepsTheGraphAndTheStaticMap() {
+        val text = StarterSkills.skills.getValue("understand-anything")
+        listOf("knowledge-graph.json", "understand.html", ".ua", "layout", "open_file", "MIT", "node_modules", "layers", "tour")
+            .forEach { assertTrue("understand-anything lacks $it", text.contains(it, ignoreCase = true)) }
+        assertTrue(text.length <= ACTIVE_SKILL_CHARS)
+        assertTrue(buildSystemPrompt().contains("use_skill understand-anything"))
     }
 
     @Test
