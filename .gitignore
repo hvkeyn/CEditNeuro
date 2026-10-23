@@ -21,3 +21,9 @@ secrets.properties
 # Local-only skill transfer bundle and private prompts
 SKILLS.transfer.md
 prompts/
+
+# Understand Anything local scratch
+.ua/intermediate/
+.ua/diff-overlay.json
+.understand-anything/intermediate/
+.understand-anything/diff-overlay.json

@@ -1,8 +1,8 @@
 # CEditNeuro skills
 
-A complete snapshot of every skill available in CEditNeuro **0.99.29 (versionCode 145)**, taken on **2026-10-22**, updated **2026-10-23**, from the phone's app-scope folder and the built-in source.
+A complete snapshot of every skill available in CEditNeuro **0.99.30 (versionCode 146)**, taken on **2026-10-22**, updated **2026-10-24**, from the phone's app-scope folder and the built-in source.
 
-**30 skills:** 28 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
+**31 skills:** 29 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
 
 This file is a catalog and a porting guide. The app does not load `SKILLS.md`; it loads the `.md` files in the two skill folders described below. The JSON at the end is the same inventory in a machine-readable form.
 
@@ -215,10 +215,11 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 | 24 | [second-monitor](#second-monitor) | starter | the phone becomes an extra monitor | remote | 1,556 |
 | 25 | [security](#security) | starter | the task touches keys, logins, accounts, or another app | — | 415 |
 | 26 | [systematic-debugging](#systematic-debugging) | starter | a failure needs a cause before a fix | debug | 2,095 |
-| 27 | [video-download](#video-download) | starter | a film, clip, stream, or video page must be saved | video | 1,615 |
-| 28 | [video-notes](#video-notes) | starter | the point of a YouTube/RuTube/Yandex/Dzen video | study | 1,679 |
-| 29 | [web-reach](#web-reach) | starter | read a link, page, article, repo, thread, or feed | study | 3,454 |
-| 30 | [web-to-app](#web-to-app) | starter | a website or HTML file must become an Android app | device | 793 |
+| 27 | [understand-anything](#understand-anything) | starter | a repository or docs tree must be understood as a whole | device | 11,086 |
+| 28 | [video-download](#video-download) | starter | a film, clip, stream, or video page must be saved | video | 1,615 |
+| 29 | [video-notes](#video-notes) | starter | the point of a YouTube/RuTube/Yandex/Dzen video | study | 1,679 |
+| 30 | [web-reach](#web-reach) | starter | read a link, page, article, repo, thread, or feed | study | 3,454 |
+| 31 | [web-to-app](#web-to-app) | starter | a website or HTML file must become an Android app | device | 793 |
 
 ## Every skill
 
@@ -484,6 +485,16 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 
 **Shape:** `debug_case open` → reproduce with the same check and `result=fail` (or `flaky`, find the condition) → facts from `git_diff`, `read_file`, `grep` → one hypothesis → one test (`supports`/`rules-out`) → cause → smallest fix → verify with the same check and `pass`; after three failed fixes stop and question the design; `use_skill review`; turn off. An Android screen uses `android-debug` as the same verify check.
 
+### understand-anything
+
+**Scope:** app · **Origin:** starter · **File:** `understand-anything.md` · **Size:** 11,086 chars
+
+**Use when:** a repository, a subsystem, or a documentation or wiki tree must be understood as a whole: architecture, dependencies, layers, a guided reading order, or the impact of a change.
+
+**Tools:** `list_dir`, `glob`, `read_file`, `grep`, `run_command`, `git_status`, `git_diff`, `write_file`, `open_file`, `layout`, `load_tools` (group `device` for `open_file`).
+
+**Shape:** resolve the project root and commit; skip generated, vendor, and secret files; bound the pass to 300 files and 1,500 nodes; inventory files and manifests; add file, function, class, config, service, endpoint, table, and document nodes with stable IDs; add imports, contains, calls, depends_on, configures, deploys, and documents edges; assign layers; build a 5–10 step tour; write `.ua/knowledge-graph.json`; draw a static `.ua/understand.html` and a `layout` card. It is the phone adaptation of Understand Anything (MIT); the original Node, pnpm, tree-sitter, five-agent, React dashboard is a PC tool and is not installed here.
+
 ### video-download
 
 **Scope:** app · **Origin:** starter · **File:** `video-download.md` · **Size:** 1,615 chars
@@ -531,9 +542,9 @@ The JSON below is the same inventory. `origin` is `starter`, `builtin`, or `user
 ```json
 {
   "schema": 1,
-  "app": "CEditNeuro 0.99.29 (versionCode 145)",
-  "generated": "2026-10-23",
-  "skill_count": 30,
+  "app": "CEditNeuro 0.99.30 (versionCode 146)",
+  "generated": "2026-10-24",
+  "skill_count": 31,
   "limits": {
     "skill_chars": 12000,
     "active_skill_chars": 12000,
@@ -585,6 +596,7 @@ The JSON below is the same inventory. `origin` is `starter`, `builtin`, or `user
     {"name": "second-monitor", "scope": "app", "origin": "starter", "trigger": "the phone becomes an extra monitor", "groups": ["remote"], "tools": ["second_monitor", "remote_connect", "remote_write", "remote_read", "ssh_exec"], "chars": 1556, "file": "second-monitor.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "security", "scope": "app", "origin": "starter", "trigger": "the task touches keys, logins, accounts, or another app", "groups": [], "tools": [], "chars": 415, "file": "security.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "systematic-debugging", "scope": "app", "origin": "starter", "trigger": "a failure needs a cause before a fix", "groups": ["debug"], "tools": ["debug_case", "run_command", "read_file", "grep", "git_diff"], "requires_skills": ["review", "android-debug"], "chars": 2095, "file": "systematic-debugging.md", "source": "ResearchSkill.kt#StarterSkills"},
+    {"name": "understand-anything", "scope": "app", "origin": "starter", "trigger": "a repository or docs tree must be understood as a whole", "groups": ["device"], "tools": ["list_dir", "glob", "read_file", "grep", "run_command", "git_status", "git_diff", "write_file", "open_file", "layout", "load_tools"], "chars": 11086, "file": "understand-anything.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "video-download", "scope": "app", "origin": "starter", "trigger": "a film, clip, stream, or video page must be saved", "groups": ["video"], "tools": ["download_video"], "chars": 1615, "file": "video-download.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "video-notes", "scope": "app", "origin": "starter", "trigger": "the point of a YouTube or RuTube or Yandex or Dzen video", "groups": ["study"], "tools": ["video_brief", "calculate"], "chars": 1679, "file": "video-notes.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "web-reach", "scope": "app", "origin": "starter", "trigger": "read a link, page, article, repo, thread, or feed", "groups": ["study"], "tools": ["http_request", "web_search", "video_brief"], "requires_skills": ["video-notes"], "chars": 3454, "file": "web-reach.md", "source": "ResearchSkill.kt#StarterSkills"},
