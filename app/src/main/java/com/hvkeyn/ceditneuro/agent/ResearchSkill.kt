@@ -196,6 +196,7 @@ object StarterSkills {
             16. The isolation is the developer's choice: this test project, a second install, another profile, or another device. Use the one asked for, and say which one was used. A native library is run only when the user asks for it.
             17. When the test is done, delete the copy unless the user wants to keep it.
             18. The raw material does not stay: keep the APK, the unpacked tree, and the full decompiled sources out of the project, and delete them when the check is done. The test copy from step 15 is the only part that may remain.
+            19. If the question is the real algorithm, a hidden branch, a key, a protocol, or a backdoor, use_skill reverse-engineering and follow it. This skill stops at the APK surface. A suspected malware sample is not run on this phone; use a disposable device or stop at static analysis.
         """.trimIndent() + "\n",
         "book-notes" to """
             # Notes from a book
@@ -220,6 +221,85 @@ object StarterSkills {
             5. Post a finding as soon as another agent can use it. crew action=post kind=FACT and one line of text. A wrong approach is kind=FAIL. When the task is finished, crew action=done, then action=post kind=DONE.
             6. Do not repeat a FAIL that is already in the notes. Do not wait for another phone to assign the next piece.
             7. When your piece is finished, use_skill name=crew scope=app on=false.
+        """.trimIndent() + "\n",
+        "reverse-engineering" to """
+            # Reverse engineering a program
+
+            Use this when a program, an APK or DEX, a native library, a firmware image, or a script must be understood beyond its screen: recover the real algorithm, a hidden branch, a key, a protocol, a packer, or a backdoor inserted by a developer or by someone redistributing the software. A surface APK check is android-apk; this skill goes to the logic.
+
+            ## Before the sample
+
+            1. Authorization and provenance. Analyze only software you own or are allowed to inspect. Record the SHA-256, the size, the source, the date, and who asked. Work on a copy. A sample from a victim is evidence: do not clean it, rename it, or run it in place.
+            2. Isolation. Static analysis first. A suspected malware sample is not run on this daily phone. Dynamic work uses a disposable device, a second profile, an emulator, or a PC that can be wiped. If no isolation is available, stop at static analysis and say so. Never contact a live command server, log in, pay, or replay a request. Capture traffic with capture_dump and read it with read_dump; do not send a payload to a remote host.
+            3. Evidence. Hash every file you touch (SHA-256 at minimum; MD5, SHA-1, and imphash when a corpus uses them). Note the file type, architecture, bitness, sections, entropy, imports, exports, signatures, manifest, and the exact tool command. Keep the sample outside the project in a quarantine folder; put only hashes, notes, and extracted facts in the project. Do not upload the sample to a reader, a scanner, a paste host, or a model.
+            4. No fabrication. A function exists only where an address, a disassembly, or a cross-reference supports it. A key is recovered only when a test vector decrypts. A backdoor is proven only by a trigger and an action path, not by one suspicious string. Say "proven", "inferred", or "unresolved" for each claim. Do not name a malware family from a single string.
+
+            ## Map the target
+
+            - File type and container: APK (ZIP), DEX/ODEX/VDEX, ELF shared object, PE, Mach-O, firmware, or script. Architecture: AArch64, ARM32 or Thumb, x86, x86-64. Bitness, endianness, and whether the file is packed.
+            - Android layers: Java or Kotlin to DEX and smali; JNI to a native library; assets and resources; split APKs and dynamic features; React Native, Flutter, Unity, Cordova, or Xamarin; packers such as Jiagu, Bangcle, Legu, DexGuard, or a custom loader; encrypted DEX and dynamic loading; virtual-machine protectors.
+            - First pass: sha256sum, unzip -l, file, strings -a and strings -el, readelf -h -S -l -d -s, objdump -d, aapt2 dump badging, apktool d, jadx. Check the signing certificate, the manifest, exported components, permissions, native libraries, and every asset that is not an image.
+            - Annotations: keep a table of address or offset, name, what it does, and the evidence. Use the same names in every note. Paranoia and the desktop tools key annotations by SHA-256, so the same sample keeps its names.
+
+            ## Recover the logic
+
+            1. Entry points. Manifest components, services, receivers, providers, Application, the native JNI_OnLoad, the init array, exported functions, TLS callbacks, and main. For each, the first question is what input reaches it and what output leaves it.
+            2. Call graph and cross-references. Walk from the entry to the decision. Name functions by behavior, not by a guessed source name. Follow reflection, dynamic loading, JNI RegisterNatives, invoke-custom, and string decryption. Do not trust a function name that the obfuscator left behind.
+            3. Data first. Recover constants, ASCII and UTF-16 strings, resources, encrypted blobs, keys, IVs, URLs, user agents, headers, JSON or protobuf schemes, file paths, package names, certificate pins, and feature flags. Map each value to the code that reads it and to the code that acts on it.
+            4. Control flow. Branches, switches, loops, state machines, and exception handlers. Build a decision table: input or environment, condition, action. Look for triggers: time or date, locale, SIM or carrier, build properties, installed package, network answer, license, debugger, emulator, root, signature, battery or screen state, and a second stage.
+            5. Algorithm. Identify crypto by constants and structure: AES S-box and round count, SHA initial words, ChaCha or Salsa constants, RC4, CRC, Base64, XOR, compression (zlib, gzip, lz4), serialization, and custom bytecode. Recover the key schedule, the IV or nonce, the mode, and every transform around the cipher. Reproduce it in Python or Java and check it against a known plaintext, a captured request, or a test vector. A decryptor is not proven until it round-trips.
+            6. Native code. ELF headers, sections, imports (libc, JNI, OpenSSL, curl), JNI entry points, syscalls, anti-debug checks (ptrace, TracerPid, /proc/self/status), anti-VM checks (QEMU properties, sensors, build fields), packing, and the init array. Use readelf, objdump, strings, and Paranoia on a PC. Note that ARM32 and Thumb are not covered by Paranoia; use objdump or radare2 there.
+            7. Dynamic work, only when isolated. Logcat filtered to the package, a filesystem watch, a memory dump of a decrypted DEX or a native payload, Java and JNI hooks with Frida if the disposable device already has it, and a network capture. Do not install a hooking framework on the daily phone. Do not let the sample reach its live server.
+            8. Reconstruct. Write the recovered function as C-like pseudocode, the data structures, the protocol messages, the key schedule, and the state table. Mark every original name as a guess. Keep a list of what is still unresolved.
+
+            ## Paranoia on a computer
+
+            Paranoia (github.com/Altumptic/paranoia, Apache-2.0) is a local-first disassembler and analysis platform for PE, ELF, and Mach-O on x86, x86-64, and AArch64. Its CLI is useful when a PC is available:
+
+            ```
+            paranoia info SAMPLE
+            paranoia functions SAMPLE
+            paranoia disasm SAMPLE --at main -n 40
+            paranoia pseudo SAMPLE main
+            paranoia xrefs SAMPLE CreateFileW
+            paranoia strings --referenced SAMPLE --json
+            ```
+
+            It provides recursive-descent function discovery, basic blocks, switch-table recovery, imports and exports, cross-references, a call graph, a partial x86/x64 pseudocode view, entropy, sections, mitigations (ASLR, DEP, CFG, RELRO, PIE, canaries, FORTIFY), bookmarks, patching, and IDC export. Use it on a copy; it has no network access and never uploads the file. Do not install it on this phone.
+
+            Limits to state in the report: no DEX or APK loader, no ARM32 or Thumb, no debugger, no type libraries or FLIRT signatures, and the pseudocode is partial (x86/x64 only, no full SSA or types). It is not a full decompiler and it does not recover original source. For an Android APK, use apktool, jadx, smali, and the native tools; for a PE or ELF on a PC, Paranoia is a fast first pass. A user-owned remote PC with the CLI can be reached with remote_put and ssh_exec; never send a sample to a third-party server.
+
+            ## Backdoors and supply-chain insertions
+
+            Compare the official build with the redistributed build: signature and certificate, SHA-256, section and asset hashes, manifest and permissions, component list, native libraries, endpoints, and build metadata. An extra class, asset, native library, permission, receiver, or endpoint is a lead, not a verdict.
+
+            Look for both halves of a backdoor:
+
+            - Trigger: a date or time, a locale or country, a carrier or SIM, a device property, an installed app, a server response, a license check, a debugger or emulator check, a root check, a signature check, a first-run counter, a file marker, or a remote configuration flag.
+            - Action: exfiltration of contacts, SMS, call log, clipboard, files, screen, camera, microphone, or keys; an overlay or accessibility abuse; device admin; notification access; a remote shell; an install or update; a crypto miner; ransomware; a proxy; a DNS tunnel; steganography; an encrypted configuration; a kill switch.
+            - Evasion: packers, string encryption, control-flow flattening, virtual-machine protectors, anti-debug and anti-VM checks, certificate pinning, split payloads, dynamic loading, reflection, native code, direct syscalls, timing checks, and environment fingerprints. Name the protection only when a signature or a behavior supports it; otherwise say "custom or unknown".
+
+            A hidden branch is proven when the trigger is reached in a controlled copy and the action is observed or reconstructed. A suspicious URL alone is an indicator, not a backdoor. Report indicators (domains, IPs, paths, registry keys, certificates, mutexes, user agents, hashes) without copying a secret payload.
+
+            ## Prove it and report
+
+            - Every claim gets an evidence line: address or offset, function, tool, and the bytes or output that support it. A table with Claim, Evidence, and Confidence is enough.
+            - A crypto recovery gets a test vector: input, key, IV, expected output, and the command that produced it. A protocol gets at least one captured message and a decoded reply.
+            - A backdoor gets a trigger and an action path, plus what would happen on a clean device. A packer gets a signature or an unpacking trace.
+            - Report the sample hash and provenance, the protection, the entry points, the call graph, the algorithms, the triggers, the indicators, the capabilities, the confidence, the commands that were not run, and the containment or removal advice.
+            - Keep the sample out of the project and out of the chat. Do not paste a key, a cookie, a password, or a private payload; name the field and its location instead.
+
+            ## On this phone
+
+            `run_command`, `read_file`, `write_file`, `edit_file`, `grep`, `http_request`, and `load_tools` are already on every turn. Call `load_tools group=build` for `install_android_sdk`, `install_jdk`, `install_module`, and `install_program`; `group=device` for `shizuku_exec`, `install_apk`, and `open_file`; `group=study` for `capture_dump`, `read_dump`, and `net_audit`; `group=remote` only for `remote_put` and `ssh_exec` to the user's own PC. Aapt2, java, apktool, and jadx come through those installers on this phone. Keep the sample outside the project; `open_file` a report, not the sample.
+
+            ## Quality gates
+
+            - Static first; dynamic only in isolation. No live command server, no credentials, no exploitation, no payment, no upload of the sample.
+            - A function, a key, a packer, or a backdoor is not claimed without evidence. A failed command stays failed; do not rerun it unchanged.
+            - Keep the original and every patched copy hashed. Patch only a copy, never the evidence.
+            - If the target is Android malware and no disposable device is available, stop at static analysis and say the dynamic behavior was not observed.
+            - When the question is only "is this APK safe to install", use android-apk; when it is "what does this program really do", stay here and go to the logic.
         """.trimIndent() + "\n",
         "review" to """
             # Review a change
@@ -422,6 +502,134 @@ object StarterSkills {
             8. The record stays in this project and is not copied to the other phone. Do not upload it.
             9. When the health task is finished, call use_skill name=health scope=app on=false.
         """.trimIndent() + "\n",
+        "diff-tour" to """
+            # Diff tour
+
+            Use this when a branch, commit, pull request, working-tree diff, or a change the agent just wrote must be explained visually, reviewed, or handed to someone who will own it. A one-line fix is review; a tour is for a change whose why is not obvious from the diff.
+
+            ## Read before you draw
+
+            1. Collect the change. `git_status` for the branch and dirty files. `git_diff` for the working tree or the index. For a branch or a commit, `run_command git diff BASE..HEAD` and `run_command git log -1 BASE..HEAD` when git is installed; if it is not, tour the working-tree diff and say so. Record the real base and head refs.
+            2. Read around every hunk with `read_file`. Read the unchanged files on the path: the caller, the schema, the test, the config. Do not explain a function you did not read, and do not quote a line you did not see.
+            3. Say the purpose in one sentence: who has a problem, what changes for them. Then name the three promises the old code kept that this change must not break.
+            4. Map the files: core, mechanical, test, config, docs. A changed line in a mechanical file gets a quick look; the core file gets the tour. Include unchanged files that are part of the flow.
+            5. If the diff is over 30,000 characters or 20 files, split it into chapters and say what was skipped. Do not dump a whole file.
+
+            ## Build the tour data
+
+            The portable format is diff-tour v1 (MIT, github.com/init-co-jp/diff-tour). A saved tour is one JSON object:
+
+            ```
+            {
+              "version": 1,
+              "title": "What this change is for",
+              "base": "main",
+              "head": "feature/x",
+              "chapters": [
+                {"title": "The change", "steps": [
+                  {"title": "Two commits, one feature", "blocks": [
+                    {"target": true},
+                    {"quote": "the commit message, as a claim to check"},
+                    {"p": "Who has the problem and what changes.", "basis": "fact"}
+                  ]}
+                ]}
+              ]
+            }
+            ```
+
+            Every step has a title and a non-empty `blocks`. Every block has exactly one kind:
+
+            - `p` with optional `basis`; `quote`; `list`; `pre`; `table` with `head` and `rows`.
+            - `code` with `file`, `lines` as two line numbers, optional `show` as two numbers, optional `note`, optional `marks` of `line` and `text`. `at` is `base` or `head`; default `head`.
+            - `diff` with `file` and optional `hunks` as indexes.
+            - `snippet` for code that is not in the repository; its `label` must say it is an example, and `lang` is optional.
+            - `schema` with `migrations`, optional `tables` and `focus`; `rows` with `label`, `head`, `data`, optional `tag` and `added`.
+            - `flow` with `nodes`: `label`, optional `kind` (`same`, `changed`, `new`, `external`), optional `note`, optional `next`, optional `start`.
+            - `timeline` with `lanes` (1 to 4) and `events`: `lane`, optional `to`, `text`, optional `mark` (`ok`, `bad`, `note`).
+            - `files` with `roles`: `file`, `role` (`core`, `mechanical`, `test`, `config`, `docs`), optional `note`.
+            - `target: true` only on the first step that names the change.
+
+            `basis` is only on `p`: `fact` (verified by code, tests, or commit messages), `inferred` (read from the structure), `opinion` (a senior view). Use the same words in the visual page: **Verified**, **From the code**, **Senior view**.
+
+            A question step sets `question: true` and its blocks only ask; the next step answers. Do not put `asks` on the question step or the step before it; the question wording must not reveal the answer. After the answer, the next chapter moves on.
+
+            Check every file and line before you save: `read_file` the range, `grep` the symbol, `git_diff` the hunk. The real `tour` checks refs when it plays the JSON; a wrong line is worse than no line. If the change is uncommitted, the JSON has no real head: keep the visual page and do not fake a ref. A saved JSON is for a committed branch or commit.
+
+            ## Draw the chat card
+
+            Call `layout` with a compact HTML card; the tool wraps it and returns a fenced block that must be reproduced unchanged. The card is the visual summary in the chat, not the whole tour. Keep it under 12,000 characters and use inline styles only, with no script and no event handler. A useful card has:
+
+            - the tour title, `base → head`, and the one-sentence purpose;
+            - the chapters with step counts;
+            - file chips with the role (core, mechanical, test), at most eight;
+            - one flow row: boxes with arrows drawn with text or simple table cells, including one unchanged box;
+            - the top three findings with `must`, `suggestion`, or `nit`;
+            - the line `Full tour: tour.html`.
+
+            LayoutCard draws on white. Use `#1c1b1f` for ink, `#5f6368` for muted, `#0b6bcb` for accent, `#d0d7de` for a rule. No remote font, image, or script.
+
+            ## Write tour.html
+
+            Write one self-contained `tour.html` in the project with `write_file`, then open it with `open_file` (call `load_tools group=device` first if it is not loaded). The page is the full visual tour; the app preview runs no script, so use HTML and CSS only. Anchors and `<details>` work.
+
+            The page order:
+
+            1. Header: title, `base → head`, purpose, and a legend for **Verified**, **From the code**, **Senior view**.
+            2. Contents: links to each chapter and step. Use `id` on every step.
+            3. Each chapter: a short lead, then each step with a number, title, prose, code or diff, marks, and one visual (flow, timeline, table, schema, or file map).
+            4. A question step: the question is visible; the answer is inside `<details><summary>Think first</summary>...</details>` on the next step, so the reader can answer before opening it.
+            5. Findings: a table with severity (`must`, `suggestion`, `nit`), the finding, and the evidence line. Then what looks risky but is fine and why, what is done well, and whether the change makes the codebase better.
+            6. Footer: what was not read or not run, and one line of confidence.
+
+            Style that works on the phone preview:
+
+            ```
+            body{max-width:920px;margin:0 auto;padding:24px;background:#fff;color:#1c1b1f;font:16px/1.55 system-ui,sans-serif}
+            h1{font-size:28px;line-height:1.2} h2{margin-top:32px;border-bottom:1px solid #d0d7de;padding-bottom:6px}
+            .step{border-left:3px solid #d0d7de;padding:8px 16px;margin:20px 0}
+            pre{background:#f6f8fa;border:1px solid #d0d7de;border-radius:6px;padding:12px;overflow:auto;font:13px/1.5 ui-monospace,monospace}
+            .add{background:#e6ffec;color:#116329}.del{background:#ffebe9;color:#82071e}
+            .chip{display:inline-block;border:1px solid #d0d7de;border-radius:999px;padding:2px 9px;margin:3px 4px 3px 0;font-size:13px}
+            .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}
+            .box{border:1px solid #d0d7de;border-radius:6px;padding:8px 10px;background:#fafbfc}
+            .changed{border-color:#0b6bcb}.new{border-color:#116329}.external{background:#f6f8fa}
+            .badge{font-size:12px;border-radius:4px;padding:1px 6px;background:#eef2f6;color:#5f6368}
+            .must{color:#b42318;font-weight:600}.suggestion{color:#9a6700}.nit{color:#5f6368}
+            ```
+
+            Show focused code, not a whole file: the hunk plus two lines of context, with line numbers and marks. Mark a removed line as `del`, an added line as `add`, and label unchanged code `unchanged`. A code block that is not in the repository gets a visible **Example** label. A diff line must come from `git_diff`, not from memory.
+
+            Do not read `.env`, credentials, ignored files, or anything outside the project for a tour. Do not copy a secret into the page; name the field and its location only.
+
+            ## Senior questions
+
+            The tour exists to show how a senior reads the change. For each chapter, ask and answer:
+
+            - What promise did the old code keep, and does the new code keep it?
+            - What happens on a failure, a retry, a double click, or two requests at once?
+            - Can it be rolled out and rolled back safely?
+            - Who can call it, and with what input? What is the trust boundary?
+            - What happens at 100 times the data or a slow dependency?
+            - Is the next change easier or harder after this one?
+            - Would the tests fail if the code broke? Name the test that covers each promise; if none, say so.
+
+            Findings are `must` (blocks the change), `suggestion` (worth doing), or `nit` (style). Say what looks risky but is fine and why. Say what is done well. End with whether the change makes the codebase better overall.
+
+            ## Verify and report
+
+            - Every file, line, symbol, and test in the tour was read in this run. A failed command stays failed; do not rerun it unchanged.
+            - Do not claim a test passed unless you ran it. Say what was not run.
+            - If the tour JSON cannot be checked, keep the HTML and say the JSON is unverified.
+            - The final message names the base and head, the chapters, the top findings, what was not read, and how to play the JSON on a computer with `tour tour.json`.
+            - This phone does not install Go, the diff-tour TUI, or a terminal renderer. The HTML page and the chat card are the visual tour here; the JSON is for a PC that already has `tour`.
+
+            ## Output order
+
+            1. `layout` card in the chat.
+            2. `write_file` `tour.html`, then `open_file` it.
+            3. `write_file` `tour.json` when the base and head are real refs.
+            4. A short report: base, head, chapters, findings, gaps, and the PC command.
+        """.trimIndent() + "\n",
         "dreams" to """
             # Dream work in the Jungian way
 
@@ -616,12 +824,16 @@ object StarterSkills {
         file.writeText(skills.getValue("android-app"), Charsets.UTF_8)
     }
 
-    /** Phones that saved the first android-apk skill gain the phased check and the test copy. */
+    /** Phones that saved the first android-apk skill gain the phased check, the test copy, and the deep-logic handoff. */
     private fun extendAndroidApk(appDir: File) {
         val file = File(appDir, "android-apk.md")
         if (!file.isFile) return
         val current = file.readText(Charsets.UTF_8)
-        if (current.contains("Reproducing a behavior is allowed")) return
+        if (current.contains("Reproducing a behavior is allowed") &&
+            current.contains("use_skill reverse-engineering")
+        ) {
+            return
+        }
         file.writeText(skills.getValue("android-apk"), Charsets.UTF_8)
     }
 
