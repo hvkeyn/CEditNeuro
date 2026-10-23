@@ -17,3 +17,7 @@ dist/
 seed-api-key
 *.secret
 secrets.properties
+
+# Local-only skill transfer bundle and private prompts
+SKILLS.transfer.md
+prompts/

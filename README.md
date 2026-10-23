@@ -83,7 +83,7 @@ Ask the agent for a film or a clip, paste a video page, or send the page from th
 
 ## Skills
 
-The agent loads Markdown procedures from `CEditNeuro/skills` on this phone and from `.ceditneuro/skills` in the project. It can also search a public catalog, check a downloaded file, and save only the adapted procedure. **[SKILLS.md](SKILLS.md)** is the complete catalog: all 28 skills, their triggers and tools, the file contract, the activation path, and how to move one to another agent.
+The agent loads Markdown procedures from `CEditNeuro/skills` on this phone and from `.ceditneuro/skills` in the project. It can also search a public catalog, check a downloaded file, and save only the adapted procedure. **[SKILLS.md](SKILLS.md)** is the complete catalog: all 30 skills, their triggers and tools, the file contract, the activation path, and how to move one to another agent.
 
 ## Reading
 

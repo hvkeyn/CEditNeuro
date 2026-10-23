@@ -95,6 +95,24 @@ class SkillWiringTest {
     }
 
     @Test
+    fun reverseEngineeringKeepsEvidenceAndIsolation() {
+        val text = StarterSkills.skills.getValue("reverse-engineering")
+        listOf("Paranoia", "test vector", "trigger and an action path", "daily phone", "android-apk", "not a full decompiler")
+            .forEach { assertTrue("reverse-engineering lacks $it", text.contains(it, ignoreCase = true)) }
+        assertTrue(text.length <= ACTIVE_SKILL_CHARS)
+        assertTrue(buildSystemPrompt().contains("use_skill reverse-engineering"))
+    }
+
+    @Test
+    fun diffTourKeepsTheVisualAndThePortableTour() {
+        val text = StarterSkills.skills.getValue("diff-tour")
+        listOf("tour.json", "tour.html", "layout", "open_file", "Verified", "From the code", "Senior view", "diff-tour")
+            .forEach { assertTrue("diff-tour lacks $it", text.contains(it, ignoreCase = true)) }
+        assertTrue(text.length <= ACTIVE_SKILL_CHARS)
+        assertTrue(buildSystemPrompt().contains("use_skill diff-tour"))
+    }
+
+    @Test
     fun oldPhoneSkillsGainTheirFixes() {
         val dir = Files.createTempDirectory("skills-wiring").toFile()
         java.io.File(dir, "frontend-design.md").writeText("# Design\n2. call design_system with that name.\n")
