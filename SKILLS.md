@@ -1,8 +1,8 @@
 # CEditNeuro skills
 
-A complete snapshot of every skill available in CEditNeuro **0.99.30 (versionCode 146)**, taken on **2026-10-22**, updated **2026-10-24**, from the phone's app-scope folder and the built-in source.
+A complete snapshot of every skill available in CEditNeuro **0.99.31 (versionCode 147)**, taken on **2026-10-22**, updated **2026-10-24**, from the phone's app-scope folder and the built-in source.
 
-**31 skills:** 29 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
+**33 skills:** 31 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
 
 This file is a catalog and a porting guide. The app does not load `SKILLS.md`; it loads the `.md` files in the two skill folders described below. The JSON at the end is the same inventory in a machine-readable form.
 
@@ -161,7 +161,7 @@ The tools below are this app's names. A port must provide an equivalent or rewri
 
 ### Core, on every request
 
-`list_dir`, `read_file`, `write_file`, `edit_file`, `grep`, `glob`, `mkdir`, `delete_path`, `move_path`, `git_status`, `git_diff`, `run_command`, `zip_paths`, `http_request`, `set_timer`, `load_tools`, `reader_note`, `reader_sketch`, `list_skills`, `read_skill`, `use_skill`, `save_skill`, `append_skill`, `delete_skill`, `remember`, `search_sessions`, `chart`, `layout`, `list_models`.
+`list_dir`, `read_file`, `write_file`, `edit_file`, `grep`, `glob`, `mkdir`, `delete_path`, `move_path`, `git_status`, `git_diff`, `run_command`, `zip_paths`, `http_request`, `set_timer`, `load_tools`, `reader_note`, `reader_sketch`, `list_skills`, `read_skill`, `use_skill`, `save_skill`, `append_skill`, `delete_skill`, `remember`, `search_sessions`, `chart`, `layout`, `network_card`, `list_models`.
 
 ### Optional groups
 
@@ -173,7 +173,7 @@ The tools below are this app's names. A port must provide an equivalent or rewri
 | desk | notifications, notification_reply, notification_dismiss, mail_list, mail_read, mail_send |
 | study | research_log, research_report, research_figure, research_plot, research_run, video_brief, web_search, calculate, reference, capture_dump, read_dump, net_audit |
 | health | health_log, health_panel, health_trend, health_index |
-| skills | find_skills, review_skill |
+| skills | find_skills, review_skill, scan_skill |
 | design | design_system (declared, not registered; `load_tools design` says the group has no tools) |
 | debug | debug_case |
 | video | render_video, edit_video, download_video, compress_media, sound_effect, make_music, voiceover, web_search |
@@ -206,20 +206,22 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 | 15 | [hyperframes](#hyperframes) | starter | a video, animation, title card, or HyperFrames composition | video | 11,930 |
 | 16 | [learn](#learn) | starter | learn a subject, be taught, or practice | learn | 2,501 |
 | 17 | [net-map](#net-map) | starter | a network must be drawn from packets | study | 5,603 |
-| 18 | [photo-ocr](#photo-ocr) | user | a photo arrived and the message has only paths | — | 1,491 |
-| 19 | [research](#research) | builtin | a study question, a claim to check, a measured build | study | 4,340 |
-| 20 | [reverse-engineering](#reverse-engineering) | starter | a program must be understood to its real algorithm or a backdoor | build, device, study, remote | 10,747 |
-| 21 | [review](#review) | starter | before saying a code change works | — | 364 |
-| 22 | [rrsi](#rrsi) | starter | improve the agent's own harness | harness | 1,749 |
-| 23 | [ru-translate](#ru-translate) | starter | translate into Russian or polish Russian | — | 4,809 |
-| 24 | [second-monitor](#second-monitor) | starter | the phone becomes an extra monitor | remote | 1,556 |
-| 25 | [security](#security) | starter | the task touches keys, logins, accounts, or another app | — | 415 |
-| 26 | [systematic-debugging](#systematic-debugging) | starter | a failure needs a cause before a fix | debug | 2,095 |
-| 27 | [understand-anything](#understand-anything) | starter | a repository or docs tree must be understood as a whole | device | 11,086 |
-| 28 | [video-download](#video-download) | starter | a film, clip, stream, or video page must be saved | video | 1,615 |
-| 29 | [video-notes](#video-notes) | starter | the point of a YouTube/RuTube/Yandex/Dzen video | study | 1,679 |
-| 30 | [web-reach](#web-reach) | starter | read a link, page, article, repo, thread, or feed | study | 3,454 |
-| 31 | [web-to-app](#web-to-app) | starter | a website or HTML file must become an Android app | device | 793 |
+| 18 | [network-study](#network-study) | starter | a network concept or topology must be taught with a drawing | study, device | 6,531 |
+| 19 | [photo-ocr](#photo-ocr) | user | a photo arrived and the message has only paths | — | 1,491 |
+| 20 | [research](#research) | builtin | a study question, a claim to check, a measured build | study | 4,340 |
+| 21 | [reverse-engineering](#reverse-engineering) | starter | a program must be understood to its real algorithm or a backdoor | build, device, study, remote | 10,747 |
+| 22 | [review](#review) | starter | before saying a code change works | — | 364 |
+| 23 | [rrsi](#rrsi) | starter | improve the agent's own harness | harness | 1,749 |
+| 24 | [ru-translate](#ru-translate) | starter | translate into Russian or polish Russian | — | 4,809 |
+| 25 | [second-monitor](#second-monitor) | starter | the phone becomes an extra monitor | remote | 1,556 |
+| 26 | [security](#security) | starter | the task touches keys, logins, accounts, or another app | — | 415 |
+| 27 | [skill-security](#skill-security) | starter | a skill must be checked for vulnerabilities before install | skills | 6,001 |
+| 28 | [systematic-debugging](#systematic-debugging) | starter | a failure needs a cause before a fix | debug | 2,095 |
+| 29 | [understand-anything](#understand-anything) | starter | a repository or docs tree must be understood as a whole | device | 11,086 |
+| 30 | [video-download](#video-download) | starter | a film, clip, stream, or video page must be saved | video | 1,615 |
+| 31 | [video-notes](#video-notes) | starter | the point of a YouTube/RuTube/Yandex/Dzen video | study | 1,679 |
+| 32 | [web-reach](#web-reach) | starter | read a link, page, article, repo, thread, or feed | study | 3,454 |
+| 33 | [web-to-app](#web-to-app) | starter | a website or HTML file must become an Android app | device | 793 |
 
 ## Every skill
 
@@ -393,6 +395,16 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 
 **Shape:** `net_audit` for this phone's own Wi-Fi; `capture_dump` for its public conversations, or `read_dump` for a saved pcap; walk packets in order; Ethernet, DHCP, ARP, CDP/LLDP, routing advertisements, TCP handshakes; audit block (answered/silent, cleartext, plain DNS, QUIC, a secret field in the clear — never the value); `research/net-map.md` and `research/net-audit.md`; trail match against `research/trails.txt`; one small SVG with `research_figure`; say what the dump does not show. Never print a payload, cookie, or password.
 
+### network-study
+
+**Scope:** app · **Origin:** starter · **File:** `network-study.md` · **Size:** 6,531 chars
+
+**Use when:** a network concept, topology, packet path, subnet, or troubleshooting lesson should be taught with a drawing in the chat.
+
+**Tools:** `net_audit`, `capture_dump`, `read_dump`, `write_file`, `network_card`, `open_file`, `load_tools` (groups `study`, `device`).
+
+**Shape:** one idea per card; ask for a prediction; call `network_card` with 1–8 devices and their links; the tool draws the glyphs, labels, subnet boundary, legend, and packet path and returns the `html` block, which is included unchanged; optionally write an interactive `network.html` canvas and open it; use `net_audit`, `capture_dump`, and `read_dump` for observed data, and `net-map` for a pcap map. Phone adaptation of Computer-Network (MIT): the chat card is the lesson, the browser canvas is the larger builder. No scan or device exposure without consent.
+
 ### photo-ocr
 
 **Scope:** app · **Origin:** user (not in the APK) · **File:** `photo-ocr.md` on the phone only · **Size:** 1,491 chars
@@ -475,6 +487,16 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 
 **Shape:** never write a token, password, or key into a file, skill, or chat; read another app's files when the task needs them (the shell can); do not invent an Android permission; a failed host or command is not tried again.
 
+### skill-security
+
+**Scope:** app · **Origin:** starter · **File:** `skill-security.md` · **Size:** 6,001 chars
+
+**Use when:** a skill must be checked for vulnerabilities, compared with another skill, or judged safe to install.
+
+**Tools:** `scan_skill`, `review_skill`, `find_skills`, `save_skill`, `load_tools` (group `skills`).
+
+**Shape:** load `skills`; `scan_skill` a saved skill, a pasted text, or a remote candidate after `review_skill`; read the 0–100 score, severity, recommendation, findings with lines and fixes, and the strengths; explain SAFE, CAUTION, or DO_NOT_INSTALL; say what a static scan did not check. It is our local static scanner: no execution, no upload, no LLM, no live CVE lookup.
+
 ### systematic-debugging
 
 **Scope:** app · **Origin:** starter · **File:** `systematic-debugging.md` · **Size:** 2,095 chars
@@ -542,9 +564,9 @@ The JSON below is the same inventory. `origin` is `starter`, `builtin`, or `user
 ```json
 {
   "schema": 1,
-  "app": "CEditNeuro 0.99.30 (versionCode 146)",
+  "app": "CEditNeuro 0.99.31 (versionCode 147)",
   "generated": "2026-10-24",
-  "skill_count": 31,
+  "skill_count": 33,
   "limits": {
     "skill_chars": 12000,
     "active_skill_chars": 12000,
@@ -554,14 +576,14 @@ The JSON below is the same inventory. `origin` is `starter`, `builtin`, or `user
     "remote_adapted_chars": 2000
   },
   "tool_groups": {
-    "core": ["list_dir", "read_file", "write_file", "edit_file", "grep", "glob", "mkdir", "delete_path", "move_path", "git_status", "git_diff", "run_command", "zip_paths", "http_request", "set_timer", "load_tools", "reader_note", "reader_sketch", "list_skills", "read_skill", "use_skill", "save_skill", "append_skill", "delete_skill", "remember", "search_sessions", "chart", "layout", "list_models"],
+    "core": ["list_dir", "read_file", "write_file", "edit_file", "grep", "glob", "mkdir", "delete_path", "move_path", "git_status", "git_diff", "run_command", "zip_paths", "http_request", "set_timer", "load_tools", "reader_note", "reader_sketch", "list_skills", "read_skill", "use_skill", "save_skill", "append_skill", "delete_skill", "remember", "search_sessions", "chart", "layout", "network_card", "list_models"],
     "build": ["install_jdk", "install_android_sdk", "install_runtime", "install_program", "install_module"],
     "device": ["install_apk", "web_to_app", "uninstall_apk", "net_info", "shizuku_exec", "fetch_system_layout", "execute_system_action", "device_status", "list_apps", "open_settings", "clipboard", "open_file"],
     "remote": ["remote_connect", "remote_list", "remote_read", "remote_write", "remote_put", "remote_get", "space_sync", "ssh_exec", "browse_page", "second_monitor", "remote_mkdir", "remote_delete", "remote_rename"],
     "desk": ["notifications", "notification_reply", "notification_dismiss", "mail_list", "mail_read", "mail_send"],
     "study": ["research_log", "research_report", "research_figure", "research_plot", "research_run", "video_brief", "web_search", "calculate", "reference", "capture_dump", "read_dump", "net_audit"],
     "health": ["health_log", "health_panel", "health_trend", "health_index"],
-    "skills": ["find_skills", "review_skill"],
+    "skills": ["find_skills", "review_skill", "scan_skill"],
     "design": ["design_system"],
     "debug": ["debug_case"],
     "video": ["render_video", "edit_video", "download_video", "compress_media", "sound_effect", "make_music", "voiceover", "web_search"],
@@ -587,6 +609,7 @@ The JSON below is the same inventory. `origin` is `starter`, `builtin`, or `user
     {"name": "hyperframes", "scope": "app", "origin": "starter", "trigger": "a video, animation, title card, or HyperFrames composition", "groups": ["video"], "tools": ["render_video", "edit_video", "sound_effect", "make_music", "voiceover", "web_search", "http_request", "write_file", "edit_file"], "chars": 11930, "file": "hyperframes.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "learn", "scope": "app", "origin": "starter", "trigger": "learn a subject, be taught, or practice", "groups": ["learn"], "tools": ["learn", "http_request", "web_search"], "chars": 2501, "file": "learn.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "net-map", "scope": "app", "origin": "starter", "trigger": "a network must be drawn from packets", "groups": ["study"], "tools": ["net_audit", "capture_dump", "read_dump", "research_figure"], "chars": 5603, "file": "net-map.md", "source": "ResearchSkill.kt#StarterSkills"},
+    {"name": "network-study", "scope": "app", "origin": "starter", "trigger": "a network concept or topology must be taught with a drawing", "groups": ["study", "device"], "tools": ["net_audit", "capture_dump", "read_dump", "write_file", "network_card", "open_file", "load_tools"], "chars": 6531, "file": "network-study.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "photo-ocr", "scope": "app", "origin": "user", "trigger": "a photo arrived and the message has only paths", "groups": [], "tools": ["run_command", "read_file", "remote_delete"], "chars": 1491, "file": "photo-ocr.md", "source": "phone:CEditNeuro/skills/photo-ocr.md"},
     {"name": "research", "scope": "app", "origin": "builtin", "trigger": "a study question, a claim to check, a measured build", "groups": ["study"], "tools": ["research_log", "research_report", "research_figure", "research_plot", "research_run", "reference", "calculate", "chart", "open_file", "http_request", "grep"], "requires_skills": ["deep-read", "review", "debug", "security"], "chars": 4340, "file": "research.md", "source": "ResearchSkill.kt#TEXT"},
     {"name": "reverse-engineering", "scope": "app", "origin": "starter", "trigger": "a program must be understood to its real algorithm or a backdoor", "groups": ["build", "device", "study", "remote"], "tools": ["install_android_sdk", "install_jdk", "install_module", "install_program", "shizuku_exec", "install_apk", "open_file", "capture_dump", "read_dump", "net_audit", "remote_put", "ssh_exec", "run_command", "read_file", "write_file", "edit_file", "grep", "http_request"], "requires_skills": ["android-apk"], "chars": 10747, "file": "reverse-engineering.md", "source": "ResearchSkill.kt#StarterSkills"},
@@ -595,6 +618,7 @@ The JSON below is the same inventory. `origin` is `starter`, `builtin`, or `user
     {"name": "ru-translate", "scope": "app", "origin": "starter", "trigger": "translate into Russian or polish Russian", "groups": [], "tools": ["read_file", "write_file", "edit_file", "run_command", "reader_note", "reference"], "chars": 4809, "file": "ru-translate.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "second-monitor", "scope": "app", "origin": "starter", "trigger": "the phone becomes an extra monitor", "groups": ["remote"], "tools": ["second_monitor", "remote_connect", "remote_write", "remote_read", "ssh_exec"], "chars": 1556, "file": "second-monitor.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "security", "scope": "app", "origin": "starter", "trigger": "the task touches keys, logins, accounts, or another app", "groups": [], "tools": [], "chars": 415, "file": "security.md", "source": "ResearchSkill.kt#StarterSkills"},
+    {"name": "skill-security", "scope": "app", "origin": "starter", "trigger": "a skill must be checked for vulnerabilities before install", "groups": ["skills"], "tools": ["scan_skill", "review_skill", "find_skills", "save_skill", "load_tools"], "chars": 6001, "file": "skill-security.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "systematic-debugging", "scope": "app", "origin": "starter", "trigger": "a failure needs a cause before a fix", "groups": ["debug"], "tools": ["debug_case", "run_command", "read_file", "grep", "git_diff"], "requires_skills": ["review", "android-debug"], "chars": 2095, "file": "systematic-debugging.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "understand-anything", "scope": "app", "origin": "starter", "trigger": "a repository or docs tree must be understood as a whole", "groups": ["device"], "tools": ["list_dir", "glob", "read_file", "grep", "run_command", "git_status", "git_diff", "write_file", "open_file", "layout", "load_tools"], "chars": 11086, "file": "understand-anything.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "video-download", "scope": "app", "origin": "starter", "trigger": "a film, clip, stream, or video page must be saved", "groups": ["video"], "tools": ["download_video"], "chars": 1615, "file": "video-download.md", "source": "ResearchSkill.kt#StarterSkills"},

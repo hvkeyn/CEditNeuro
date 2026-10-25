@@ -1,6 +1,9 @@
 # Active context
 
+v0.99.31 (versionCode 147). Released. Adds the 32nd starter, `network-study`, which draws a network lesson in chat through the `network_card` tool (devices, labeled copper/Wi-Fi/fiber links, subnet, legend, packet path, question); `network.html` is an optional browser canvas. Adds the 33rd starter, `skill-security`, and the `scan_skill` skills-group tool: a local static 0–100 vulnerability report with severity, SAFE/CAUTION/DO_NOT_INSTALL, line-level findings and fixes, and strengths. The APK is universal: arm64-v8a, armeabi-v7a, x86, and x86_64; Android 8.0+ (API 26). 227 unit tests pass; 33 skill files.
+
 v0.99.30 (versionCode 146). Released. Adds the 31st starter, `understand-anything`, which builds a bounded `.ua/knowledge-graph.json` and a static `.ua/understand.html` from a repository or docs tree, plus a `layout` card. It was tested on a real Python project: 70 nodes, 66 edges, 7 layers and a 10-step tour; the page has no script; the project's secret files were skipped and only named, never read into the graph. 217 unit tests pass; the release APK is installed with 31 skill files.
+
 
 v0.99.29 (versionCode 145). Released. Adds two starter skills. `reverse-engineering` takes an APK/DEX, native library, firmware, or script to its real algorithm, hidden branch, key, protocol, packer, or backdoor: authorization and isolation first, evidence, Paranoia on a PC for PE/ELF/Mach-O, test vectors, and a backdoor proved by a trigger and an action path. `diff-tour` turns a branch or working-tree diff into a portable diff-tour v1 `tour.json` and a static `tour.html`, draws a `layout` card, and opens the page; the Go TUI stays on a PC. 216 unit tests pass; the release APK is installed with 30 skill files; `SKILLS.md` and `SKILLS.transfer.md` list 30.
 

@@ -34,6 +34,7 @@ object ToolGroups {
         "search_sessions",
         "chart",
         "layout",
+        "network_card",
         "list_models",
     )
 
@@ -105,6 +106,7 @@ object ToolGroups {
         "skills" to listOf(
             "find_skills",
             "review_skill",
+            "scan_skill",
         ),
         "design" to listOf(
             "design_system",

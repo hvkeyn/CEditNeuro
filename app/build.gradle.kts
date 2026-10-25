@@ -15,8 +15,11 @@ android {
         // API 29+ forbids executing a program this app just wrote. API 28 stays in the
         // compatibility domain that can run compilers installed into the app's private files.
         targetSdk = 28
-        versionCode = 146
-        versionName = "0.99.30"
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+        }
+        versionCode = 147
+        versionName = "0.99.31"
     }
 
     buildTypes {

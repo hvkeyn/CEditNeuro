@@ -25,6 +25,7 @@ class SkillWiringTest {
         "flow_step",
         "depends_on",
         "node_modules",
+        "authorized_keys",
     )
 
     @Test
@@ -123,6 +124,24 @@ class SkillWiringTest {
             .forEach { assertTrue("understand-anything lacks $it", text.contains(it, ignoreCase = true)) }
         assertTrue(text.length <= ACTIVE_SKILL_CHARS)
         assertTrue(buildSystemPrompt().contains("use_skill understand-anything"))
+    }
+
+    @Test
+    fun networkStudyDrawsTheLessonInChat() {
+        val text = StarterSkills.skills.getValue("network-study")
+        listOf("network_card", "network.html", "net-map", "SVG")
+            .forEach { assertTrue("network-study lacks $it", text.contains(it, ignoreCase = true)) }
+        assertTrue(text.length <= ACTIVE_SKILL_CHARS)
+        assertTrue(buildSystemPrompt().contains("use_skill network-study"))
+    }
+
+    @Test
+    fun skillSecurityExplainsSafeCautionAndBlocked() {
+        val text = StarterSkills.skills.getValue("skill-security")
+        listOf("scan_skill", "local static scanner", "DO_NOT_INSTALL", "SAFE", "CAUTION")
+            .forEach { assertTrue("skill-security lacks $it", text.contains(it, ignoreCase = true)) }
+        assertTrue(text.length <= ACTIVE_SKILL_CHARS)
+        assertTrue(buildSystemPrompt().contains("use_skill skill-security"))
     }
 
     @Test

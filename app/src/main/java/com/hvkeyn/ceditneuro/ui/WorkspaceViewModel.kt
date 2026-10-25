@@ -2760,6 +2760,7 @@ class WorkspaceViewModel(
             "list_models" -> "Listing models"
             "chart" -> "Drawing a chart"
             "layout" -> "Drawing a card"
+            "network_card" -> "Drawing a network"
             "set_timer" -> "Setting a timer"
             "load_tools" -> "Loading tools"
             "fetch_system_layout" -> "Reading the screen"
@@ -3408,6 +3409,7 @@ class WorkspaceViewModel(
             com.hvkeyn.ceditneuro.tools.HealthIndexTool(ws),
             com.hvkeyn.ceditneuro.tools.FindSkillsTool(agentNet) { settingsStore.current.networkEnabled },
             com.hvkeyn.ceditneuro.tools.ReviewSkillTool(skills, agentNet) { settingsStore.current.networkEnabled },
+            com.hvkeyn.ceditneuro.tools.ScanSkillTool(skills),
             ResearchReportTool(ws),
             ResearchFigureTool(ws),
             com.hvkeyn.ceditneuro.tools.ResearchPlotTool(ws),
@@ -3418,6 +3420,7 @@ class WorkspaceViewModel(
             com.hvkeyn.ceditneuro.tools.CalculateTool(),
             com.hvkeyn.ceditneuro.tools.ChartTool(),
             com.hvkeyn.ceditneuro.tools.LayoutTool(),
+            com.hvkeyn.ceditneuro.tools.NetworkCardTool(),
             com.hvkeyn.ceditneuro.tools.ListModelsTool(
                 current = { settingsStore.current },
                 replace = { settingsStore.replace(it) },
