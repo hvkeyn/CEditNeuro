@@ -203,7 +203,7 @@ fun ChatPanel(
     val userScroll = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (source == NestedScrollSource.UserInput && available.y > 1f) {
+                if (source == NestedScrollSource.UserInput && kotlin.math.abs(available.y) > 0.5f) {
                     followEnd.value = false
                 }
                 return Offset.Zero
@@ -211,11 +211,8 @@ fun ChatPanel(
         }
     }
 
-    LaunchedEffect(listState, state.projectRoot) {
-        snapshotFlow { listState.canScrollForward to listState.isScrollInProgress }
-            .collect { (canForward, moving) ->
-                if (!canForward && !moving) followEnd.value = true
-            }
+    LaunchedEffect(state.chat.lastOrNull { it.role == ChatRole.User }?.id) {
+        followEnd.value = true
     }
 
     LaunchedEffect(state.chat.size, lastEntry?.id, lastEntry?.text?.length, followEnd.value) {
