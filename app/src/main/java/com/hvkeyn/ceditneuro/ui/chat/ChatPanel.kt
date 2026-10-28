@@ -48,6 +48,7 @@ import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CheckBox
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -1058,7 +1059,7 @@ private fun ChatBubble(entry: ChatEntry, projectRoot: String?, onOpen: (String) 
 @Composable
 private fun ThinkingBlock(entry: ChatEntry) {
     var expanded by rememberSaveable(entry.id) { mutableStateOf(false) }
-    val open = expanded
+    val steps = remember(entry.text) { thinkingSteps(entry.text) }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1071,44 +1072,128 @@ private fun ThinkingBlock(entry: ChatEntry) {
                 .clickable { expanded = !expanded },
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (entry.streaming) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(13.dp),
+                    strokeWidth = 1.6.dp,
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.tertiary,
+                )
+            }
             Text(
                 text = if (entry.streaming) "Thinking" else "Thought",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.tertiary,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 7.dp),
             )
+            if (!entry.streaming && steps.isNotEmpty()) {
+                Text(
+                    text = "${steps.size} steps",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(end = 6.dp),
+                )
+            }
             Icon(
-                imageVector = if (open) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                contentDescription = if (open) "Hide thought" else "Show thought",
+                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = if (expanded) "Hide steps" else "Show steps",
                 modifier = Modifier.size(16.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        if (open) {
-            Copyable(entry.text) {
+        if (expanded) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 7.dp, start = 2.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
                 Text(
-                    text = entry.text,
-                    style = MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp),
+                    text = "Steps",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.tertiary,
                 )
+                if (steps.isEmpty()) {
+                    Text(
+                        text = "The request was handled in one pass.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    steps.forEachIndexed { index, step ->
+                        Row(verticalAlignment = Alignment.Top) {
+                            Box(
+                                modifier = Modifier
+                                    .padding(top = 1.dp)
+                                    .size(18.dp)
+                                    .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = "${index + 1}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                )
+                            }
+                            Text(
+                                text = step,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 8.dp),
+                            )
+                        }
+                    }
+                    if (steps.size == 10 && entry.text.length > 1_200) {
+                        Text(
+                            text = "The visible steps are condensed.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline,
+                        )
+                    }
+                }
             }
-        } else {
-            val preview = if (entry.streaming) {
-                entry.text.lineSequence().lastOrNull { it.isNotBlank() }.orEmpty()
-            } else {
-                entry.text.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty()
-            }
-            Text(
-                text = preview,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 2.dp),
-            )
         }
     }
+}
+
+/** A compact, readable step list from a hidden reasoning stream. */
+internal fun thinkingSteps(text: String): List<String> {
+    val cleaned = text
+        .replace(Regex("""```[\s\S]*?```"""), " ")
+        .replace(Regex("""`([^`]+)`"""), "$1")
+        .replace(Regex("""[*_]{1,2}([^*_]+)[*_]{1,2}"""), "$1")
+        .replace("✓", "")
+        .replace("✔", "")
+        .replace("✗", "")
+    val lines = cleaned.lineSequence()
+        .map { line ->
+            line.trim()
+                .replace(Regex("""^[-*•#]+\s*"""), "")
+                .replace(Regex("""^\d+[.)]\s*"""), "")
+                .trim()
+        }
+        .filter { line -> line.isNotEmpty() }
+    val out = LinkedHashSet<String>()
+    for (line in lines) {
+        if (line.startsWith("{") || line.startsWith("[") || line.startsWith("\"")) continue
+        for (piece in line.split(Regex("""(?<=[.!?])\s+"""))) {
+            val step = piece
+                .replace(Regex("""^(Hmm|So|Wait|Okay|OK)[\s—:-]+"""), "")
+                .replace(Regex("""\s+"""), " ")
+                .trim()
+            if (step.length in 24..240 && !step.startsWith("http")) out += step
+            if (out.size == 10) return out.toList()
+        }
+    }
+    return out.toList()
 }
 
 @Composable

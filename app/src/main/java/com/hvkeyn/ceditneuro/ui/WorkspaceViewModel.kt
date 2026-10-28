@@ -2106,6 +2106,12 @@ class WorkspaceViewModel(
         }
 
         appendChat(project, ChatRole.User, prompt)
+        if (wantsVisualSkill(prompt)) {
+            val switched = switchSkill(project, "visualize", "app", enable = true)
+            if (switched.startsWith("Switched on")) {
+                appendChat(project, ChatRole.Tool, switched, "skills")
+            }
+        }
         val skillsOn = (if (current === project) _state.value else project.ui).activeSkills
         if (skillsOn.isNotEmpty()) {
             appendChat(
@@ -3076,15 +3082,25 @@ class WorkspaceViewModel(
         val alreadyThinking = project.ui.agentActivity?.phase == "Thinking"
         if (alreadyThinking && now - project.lastThoughtUi < 400) return
         project.lastThoughtUi = now
-        val line = project.thoughtTail
-            .lineSequence()
-            .lastOrNull { it.isNotBlank() }
-            ?.trim()
-            .orEmpty()
-            .ifBlank { project.thoughtTail.trim() }
-            .take(140)
-        setActivity(project, phase = "Thinking", focus = line)
-        beacon.send(line)
+        val stage = thinkingStage(project.thoughtTail)
+        setActivity(project, phase = "Thinking", focus = stage)
+        beacon.send(stage)
+    }
+
+    /** A short, stable status for the toolbar; never a raw fragment of the hidden reasoning. */
+    private fun thinkingStage(text: String): String {
+        val lower = text.lowercase()
+        return when {
+            "svg" in lower || "diagram" in lower || "draw" in lower || "схем" in lower || "нарис" in lower ->
+                "Preparing the drawing"
+            "test" in lower || "check" in lower || "verify" in lower || "тест" in lower || "провер" in lower ->
+                "Checking the result"
+            "file" in lower || "read" in lower || "grep" in lower || "файл" in lower || "чит" in lower ->
+                "Reading the project"
+            "plan" in lower || "step" in lower || "план" in lower || "шаг" in lower ->
+                "Planning the next step"
+            else -> "Working through the request"
+        }
     }
 
     private fun toolFocus(name: String, arguments: String): String {

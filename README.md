@@ -26,7 +26,7 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ---
 
-## New in 0.99.34
+## New in 0.99.35
 
 - **Spec Kit** as a local skill: constitution → spec → plan → tasks → analysis → implementation → convergence. The plan is frozen, every task has a check, and unknown requirements stay marked instead of invented.
 - **Visualize** and `visual_card`: process flows, architectures, sequences, timelines, comparisons, exploded views, and technical sheets are drawn as static paper cards in the chat.
@@ -34,6 +34,8 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 - **A calmer chat**: long reasoning and tool output collapse to one line; scrolling up no longer snaps back while the agent writes; the End control goes to the real bottom of the conversation.
 - **Device teardown**: `visualize` draws a static exploded, orthographic, or section sheet for a phone, watch, drive, or other object, and can add a restrained CSS/SMIL animation when movement is the explanation.
 - **Looping visuals**: an animated SVG replays after a five-second pause; ASCII frames hold for five seconds after the last frame. Static cards are left alone.
+- **Visual intent**: a request to show a process, system, device, or drawing switches on the `visualize` skill before the model starts; the Skills chip confirms it.
+- **Thinking console**: a compact spinner and a stable stage replace flashing fragments; tapping the row opens a numbered, readable step list.
 - **Stable sheets**: SVG cards use their `viewBox` for height and no longer grow in pieces while you scroll; ASCII cards reserve their height before the drawing loads.
 - **Community files**: contributing, code of conduct, security, accessibility, MIT license, issue forms, and a pull request template are now in the repository.
 
