@@ -2,7 +2,7 @@
 
 A complete snapshot of every skill available in CEditNeuro **0.99.31 (versionCode 147)**, taken on **2026-10-22**, updated **2026-10-24**, from the phone's app-scope folder and the built-in source.
 
-**37 skills:** 35 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
+**39 skills:** 37 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
 
 This file is a catalog and a porting guide. The app does not load `SKILLS.md`; it loads the `.md` files in the two skill folders described below. The JSON at the end is the same inventory in a machine-readable form.
 
@@ -161,7 +161,7 @@ The tools below are this app's names. A port must provide an equivalent or rewri
 
 ### Core, on every request
 
-`list_dir`, `read_file`, `write_file`, `edit_file`, `grep`, `glob`, `mkdir`, `delete_path`, `move_path`, `git_status`, `git_diff`, `run_command`, `zip_paths`, `http_request`, `set_timer`, `load_tools`, `reader_note`, `reader_sketch`, `list_skills`, `read_skill`, `use_skill`, `save_skill`, `append_skill`, `delete_skill`, `remember`, `search_sessions`, `chart`, `layout`, `network_card`, `ascii_art`, `list_models`.
+`list_dir`, `read_file`, `write_file`, `edit_file`, `grep`, `glob`, `mkdir`, `delete_path`, `move_path`, `git_status`, `git_diff`, `run_command`, `zip_paths`, `http_request`, `set_timer`, `load_tools`, `reader_note`, `reader_sketch`, `list_skills`, `read_skill`, `use_skill`, `save_skill`, `append_skill`, `delete_skill`, `remember`, `search_sessions`, `chart`, `layout`, `network_card`, `ascii_art`, `visual_card`, `list_models`.
 
 ### Optional groups
 
@@ -195,7 +195,7 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 | 4 | [android-debug](#android-debug) | starter | an app crashes or a phone setting misbehaves | device, debug | 1,942 |
 | 5 | [android-ui](#android-ui) | starter | how an Android screen should look | — | 774 |
 | 6 | [book-notes](#book-notes) | starter | summarize, explain, or quiz from the open book | — | 462 |
-| 7 | [ascii-studio](#ascii-studio) | starter | a picture, banner, terminal animation, or video must be made in ASCII | video, device | 3,644 |
+| 7 | [ascii-studio](#ascii-studio) | starter | a picture, banner, terminal animation, or video must be made in ASCII | video, device | 3,681 |
 | 8 | [crew](#crew) | starter | other phones are on the link and work can be split | crew | 1,051 |
 | 9 | [debug](#debug) | starter | something fails on a short path | — | 479 |
 | 10 | [deep-read](#deep-read) | starter | study a book, note, or scheme in front of you | — | 494 |
@@ -219,13 +219,15 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 | 28 | [second-monitor](#second-monitor) | starter | the phone becomes an extra monitor | remote | 1,556 |
 | 29 | [security](#security) | starter | the task touches keys, logins, accounts, or another app | — | 415 |
 | 30 | [skill-security](#skill-security) | starter | a skill must be checked for vulnerabilities before install | skills | 6,001 |
-| 31 | [systematic-debugging](#systematic-debugging) | starter | a failure needs a cause before a fix | debug | 2,095 |
-| 32 | [ub-mode](#ub-mode) | starter | a feature must be written cleanly and tested | — | 6,683 |
-| 33 | [understand-anything](#understand-anything) | starter | a repository or docs tree must be understood as a whole | device | 11,086 |
-| 34 | [video-download](#video-download) | starter | a film, clip, stream, or video page must be saved | video | 1,615 |
-| 35 | [video-notes](#video-notes) | starter | the point of a YouTube/RuTube/Yandex/Dzen video | study | 1,679 |
-| 36 | [web-reach](#web-reach) | starter | read a link, page, article, repo, thread, or feed | study | 3,454 |
-| 37 | [web-to-app](#web-to-app) | starter | a website or HTML file must become an Android app | device | 793 |
+| 31 | [spec-kit](#spec-kit) | starter | a feature needs a spec and a plan before code | — | 10,108 |
+| 32 | [systematic-debugging](#systematic-debugging) | starter | a failure needs a cause before a fix | debug | 2,095 |
+| 33 | [ub-mode](#ub-mode) | starter | a feature must be written cleanly and tested | — | 6,683 |
+| 34 | [understand-anything](#understand-anything) | starter | a repository or docs tree must be understood as a whole | device | 11,086 |
+| 35 | [video-download](#video-download) | starter | a film, clip, stream, or video page must be saved | video | 1,615 |
+| 36 | [video-notes](#video-notes) | starter | the point of a YouTube/RuTube/Yandex/Dzen video | study | 1,679 |
+| 37 | [visualize](#visualize) | starter | a picture, process, architecture, or schema must be drawn in chat | — | 10,907 |
+| 38 | [web-reach](#web-reach) | starter | read a link, page, article, repo, thread, or feed | study | 3,454 |
+| 39 | [web-to-app](#web-to-app) | starter | a website or HTML file must become an Android app | device | 793 |
 
 ## Every skill
 
@@ -281,7 +283,7 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 
 ### ascii-studio
 
-**Scope:** app · **Origin:** starter · **File:** `ascii-studio.md` · **Size:** 3,644 chars
+**Scope:** app · **Origin:** starter · **File:** `ascii-studio.md` · **Size:** 3,681 chars
 
 **Use when:** a picture, banner, terminal animation, or video must be made in ASCII.
 
@@ -531,6 +533,16 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 
 **Shape:** load `skills`; `scan_skill` a saved skill, a pasted text, or a remote candidate after `review_skill`; read the 0–100 score, severity, recommendation, findings with lines and fixes, and the strengths; explain SAFE, CAUTION, or DO_NOT_INSTALL; say what a static scan did not check. It is our local static scanner: no execution, no upload, no LLM, no live CVE lookup.
 
+### spec-kit
+
+**Scope:** app · **Origin:** starter · **File:** `spec-kit.md` · **Size:** 10,108 chars
+
+**Use when:** a feature, subsystem, migration, or multi-step change needs an architecture and a plan before code.
+
+**Tools:** `write_file`, `read_file`, `edit_file`, `run_command`, `grep`, `glob`, `git_diff`, `review`.
+
+**Shape:** constitution → `spec.md` → `plan.md` → `tasks.md` → analysis gate → implement only planned tasks → converge with the full test command. Every task has an ID, path, check, and status. A plan change is explicit and approved. No `specify`/uv/Python install on this phone; it is a local adaptation of github/spec-kit (MIT), not the CLI.
+
 ### systematic-debugging
 
 **Scope:** app · **Origin:** starter · **File:** `systematic-debugging.md` · **Size:** 2,095 chars
@@ -581,6 +593,16 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 
 **Shape:** `video_brief` the page; do not download or open a stream/m3u8/mp4/googlevideo host; use only the printed title, description, and captions; if `captions is no`, say the picture was not seen; write Смысл / Важные мысли (3–7) / Вывод / Стоит ли смотреть; numbers via `calculate`; search/channel/playlist return titles only; no transcript service or API key; turn off.
 
+### visualize
+
+**Scope:** app · **Origin:** starter · **File:** `visualize.md` · **Size:** 10,907 chars
+
+**Use when:** a picture, process flow, architecture, sequence, timeline, comparison, technical object, teardown, exploded view, section, or quick ASCII picture must be shown in the chat.
+
+**Tools:** `ascii_art`, `visual_card`, `write_file`, `read_file`, `open_file`, `run_command`, `render_video`.
+
+**Shape:** choose ASCII or a schematic; read object and reference separately; keep an evidence and part inventory; choose the smallest view set; draw one SVG on a paper sheet; show it with `visual_card`; write `drawing.svg`; export PNG/PDF only when a renderer exists. It adapts the teardown skill (MIT) and does not invent hidden internals, dimensions, or a scale.
+
 ### web-reach
 
 **Scope:** app · **Origin:** starter · **File:** `web-reach.md` · **Size:** 3,454 chars
@@ -610,7 +632,7 @@ The JSON below is the same inventory. `origin` is `starter`, `builtin`, or `user
   "schema": 1,
   "app": "CEditNeuro 0.99.31 (versionCode 147)",
   "generated": "2026-10-24",
-  "skill_count": 37,
+  "skill_count": 39,
   "limits": {
     "skill_chars": 12000,
     "active_skill_chars": 12000,
@@ -620,7 +642,7 @@ The JSON below is the same inventory. `origin` is `starter`, `builtin`, or `user
     "remote_adapted_chars": 2000
   },
   "tool_groups": {
-    "core": ["list_dir", "read_file", "write_file", "edit_file", "grep", "glob", "mkdir", "delete_path", "move_path", "git_status", "git_diff", "run_command", "zip_paths", "http_request", "set_timer", "load_tools", "reader_note", "reader_sketch", "list_skills", "read_skill", "use_skill", "save_skill", "append_skill", "delete_skill", "remember", "search_sessions", "chart", "layout", "network_card", "ascii_art", "list_models"],
+    "core": ["list_dir", "read_file", "write_file", "edit_file", "grep", "glob", "mkdir", "delete_path", "move_path", "git_status", "git_diff", "run_command", "zip_paths", "http_request", "set_timer", "load_tools", "reader_note", "reader_sketch", "list_skills", "read_skill", "use_skill", "save_skill", "append_skill", "delete_skill", "remember", "search_sessions", "chart", "layout", "network_card", "ascii_art", "visual_card", "list_models"],
     "build": ["install_jdk", "install_android_sdk", "install_runtime", "install_program", "install_module"],
     "device": ["install_apk", "web_to_app", "uninstall_apk", "net_info", "shizuku_exec", "fetch_system_layout", "execute_system_action", "device_status", "list_apps", "open_settings", "clipboard", "open_file"],
     "remote": ["remote_connect", "remote_list", "remote_read", "remote_write", "remote_put", "remote_get", "space_sync", "ssh_exec", "browse_page", "second_monitor", "remote_mkdir", "remote_delete", "remote_rename"],
@@ -641,7 +663,7 @@ The JSON below is the same inventory. `origin` is `starter`, `builtin`, or `user
     {"name": "android-compose", "scope": "app", "origin": "starter", "trigger": "Jetpack Compose, a screen, Navigation 3, XML migration, edge-to-edge", "groups": [], "tools": ["http_request"], "chars": 1715, "file": "android-compose.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "android-debug", "scope": "app", "origin": "starter", "trigger": "an app crashes or a phone setting misbehaves", "groups": ["device", "debug"], "tools": ["device_status", "shizuku_exec", "fetch_system_layout", "execute_system_action", "install_apk", "uninstall_apk", "open_settings", "debug_case", "run_command"], "requires_skills": ["systematic-debugging"], "chars": 1942, "file": "android-debug.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "android-ui", "scope": "app", "origin": "starter", "trigger": "how an Android screen should look", "groups": [], "tools": ["http_request"], "requires_skills": ["frontend-design"], "chars": 774, "file": "android-ui.md", "source": "ResearchSkill.kt#StarterSkills"},
-    {"name": "ascii-studio", "scope": "app", "origin": "starter", "trigger": "a picture, banner, terminal animation, or video must be made in ASCII", "groups": ["video", "device"], "tools": ["ascii_art", "write_file", "read_file", "open_file", "render_video", "load_tools"], "chars": 3644, "file": "ascii-studio.md", "source": "ResearchSkill.kt#StarterSkills"},
+    {"name": "ascii-studio", "scope": "app", "origin": "starter", "trigger": "a picture, banner, terminal animation, or video must be made in ASCII", "groups": ["video", "device"], "tools": ["ascii_art", "write_file", "read_file", "open_file", "render_video", "load_tools"], "chars": 3681, "file": "ascii-studio.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "book-notes", "scope": "app", "origin": "starter", "trigger": "summarize, explain, or quiz from the open book", "groups": [], "tools": ["reader_note", "calculate"], "chars": 462, "file": "book-notes.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "crew", "scope": "app", "origin": "starter", "trigger": "other phones are on the link and work can be split", "groups": ["crew"], "tools": ["crew"], "chars": 1051, "file": "crew.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "debug", "scope": "app", "origin": "starter", "trigger": "something fails on a short path", "groups": [], "tools": [], "requires_skills": ["review", "systematic-debugging"], "chars": 479, "file": "debug.md", "source": "ResearchSkill.kt#StarterSkills"},
@@ -666,11 +688,13 @@ The JSON below is the same inventory. `origin` is `starter`, `builtin`, or `user
     {"name": "second-monitor", "scope": "app", "origin": "starter", "trigger": "the phone becomes an extra monitor", "groups": ["remote"], "tools": ["second_monitor", "remote_connect", "remote_write", "remote_read", "ssh_exec"], "chars": 1556, "file": "second-monitor.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "security", "scope": "app", "origin": "starter", "trigger": "the task touches keys, logins, accounts, or another app", "groups": [], "tools": [], "chars": 415, "file": "security.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "skill-security", "scope": "app", "origin": "starter", "trigger": "a skill must be checked for vulnerabilities before install", "groups": ["skills"], "tools": ["scan_skill", "review_skill", "find_skills", "save_skill", "load_tools"], "chars": 6001, "file": "skill-security.md", "source": "ResearchSkill.kt#StarterSkills"},
+    {"name": "spec-kit", "scope": "app", "origin": "starter", "trigger": "a feature needs a spec and a plan before code", "groups": [], "tools": ["write_file", "read_file", "edit_file", "run_command", "grep", "glob", "git_diff", "review"], "chars": 10108, "file": "spec-kit.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "systematic-debugging", "scope": "app", "origin": "starter", "trigger": "a failure needs a cause before a fix", "groups": ["debug"], "tools": ["debug_case", "run_command", "read_file", "grep", "git_diff"], "requires_skills": ["review", "android-debug"], "chars": 2095, "file": "systematic-debugging.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "ub-mode", "scope": "app", "origin": "starter", "trigger": "a feature must be written cleanly and tested", "groups": [], "tools": ["write_file", "edit_file", "read_file", "run_command", "grep", "git_status", "git_diff", "review", "systematic-debugging"], "chars": 6683, "file": "ub-mode.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "understand-anything", "scope": "app", "origin": "starter", "trigger": "a repository or docs tree must be understood as a whole", "groups": ["device"], "tools": ["list_dir", "glob", "read_file", "grep", "run_command", "git_status", "git_diff", "write_file", "open_file", "layout", "load_tools"], "chars": 11086, "file": "understand-anything.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "video-download", "scope": "app", "origin": "starter", "trigger": "a film, clip, stream, or video page must be saved", "groups": ["video"], "tools": ["download_video"], "chars": 1615, "file": "video-download.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "video-notes", "scope": "app", "origin": "starter", "trigger": "the point of a YouTube or RuTube or Yandex or Dzen video", "groups": ["study"], "tools": ["video_brief", "calculate"], "chars": 1679, "file": "video-notes.md", "source": "ResearchSkill.kt#StarterSkills"},
+    {"name": "visualize", "scope": "app", "origin": "starter", "trigger": "a picture, process, architecture, or schema must be drawn in chat", "groups": [], "tools": ["ascii_art", "visual_card", "write_file", "read_file", "open_file", "run_command", "render_video"], "chars": 10907, "file": "visualize.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "web-reach", "scope": "app", "origin": "starter", "trigger": "read a link, page, article, repo, thread, or feed", "groups": ["study"], "tools": ["http_request", "web_search", "video_brief"], "requires_skills": ["video-notes"], "chars": 3454, "file": "web-reach.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "web-to-app", "scope": "app", "origin": "starter", "trigger": "a website or HTML file must become an Android app", "groups": ["device"], "tools": ["web_to_app", "install_apk"], "chars": 793, "file": "web-to-app.md", "source": "ResearchSkill.kt#StarterSkills"}
   ]

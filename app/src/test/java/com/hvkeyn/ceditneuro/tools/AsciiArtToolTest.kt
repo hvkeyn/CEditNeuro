@@ -42,6 +42,21 @@ class AsciiArtToolTest {
     }
 
     @Test
+    fun animatedFramesUseACssLoop() = runBlocking {
+        val out = AsciiArtTool().execute(buildJsonObject {
+            put("subject", "ocean")
+            put("frames", 3)
+            put("animate", true)
+        })
+        assertTrue(!out.isError)
+        assertTrue(out.content.contains("@keyframes ascii-cycle"))
+        assertTrue(out.content.contains("animation:ascii-cycle"))
+        assertTrue(out.content.contains("3-frame loop"))
+        assertTrue(!out.content.contains("frame 1/3"))
+        assertTrue(out.content.length < 12_000)
+    }
+
+    @Test
     fun anUnknownSubjectIsRefused() = runBlocking {
         val out = AsciiArtTool().execute(buildJsonObject { put("subject", "dragon") })
         assertTrue(out.isError)

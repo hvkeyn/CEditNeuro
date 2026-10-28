@@ -167,6 +167,164 @@ object StarterSkills {
             4. A mockup is frames in one HTML file in the project. A frame that could belong to any app is a failed draft: follow the one-mood rule in frontend-design.
             5. When the HTML is written and the task was only the mockup, use_skill name=android-ui scope=app on=false.
         """.trimIndent() + "\n",
+        "visualize" to """
+            # Visualize: object to drawing
+
+            Use this when the user wants a picture, a process flow, an architecture, a sequence, a timeline, a comparison, a technical illustration, a teardown, an exploded view, a section, an orthographic sheet, or a layered concept explained visually in the chat. It replaces a photo-only answer with a static drawing made from the evidence.
+
+            This is a local adaptation of the teardown skill (MIT, jakubkrehel/skills) and the ASCII studio already in this app. It is not a CAD tool and not a manufacturing drawing: nothing here is toleranced, and invented dimensions stay invented.
+
+            ## Choose the medium first
+
+            | The user needs | Medium | First move |
+            | --- | --- | --- |
+            | A quick shape, logo, banner, or terminal-friendly picture | ASCII | `ascii_art` |
+            | A technical object, device, assembly, or cutaway | Schematic SVG | `visual_card` or `drawing.svg` |
+            | How parts fit together | Exploded axonometric | one inventory, one explosion vector |
+            | External shape or a specified size | Parallel or orthographic view | one view set, one scale policy |
+            | An internal passage or interface | Section | cut through the feature that answers the question |
+            | A concept with no physical form, such as pixels or UI layers | Exploded stack of plates | one part per layer |
+            | A process, flow, or decision path | Process flow | one start, ordered steps, labelled exits |
+            | Components, services, and boundaries | Architecture diagram | boxes, boundaries, directed data arrows |
+            | Actors exchanging messages over time | Sequence diagram | actors on top, lifelines, ordered messages |
+            | Events over a date range | Timeline | one axis, non-overlapping labels |
+            | Two or three options side by side | Comparison | one criterion per row, same scale |
+            | A numeric series or distribution | Chart | `chart`, not a hand-drawn fake axis |
+            | A moving ASCII scene or a reel | ASCII animation | `ascii-studio`, then `render_video` |
+
+            Do not use a photo generator. Do not present a decorative 3D render as a technical drawing. If the user needs a part they can manufacture, say that tolerances and a CAD drawing are outside this skill.
+
+            ## 1. Read object and reference separately
+
+            - Open the supplied image or document before drawing. Separate the subject from a styling reference.
+            - A photograph gives silhouette, proportions, fasteners, and visible interfaces; it does not prove hidden construction.
+            - Keep an `evidence.md` beside the drawing when the object is real:
+              - **Given** — supplied dimensions, CAD, or an authoritative drawing. Preserve and cite.
+              - **Visible** — features seen in the reference; mark estimated.
+              - **Hidden** — omit, request the missing reference, or label illustrative.
+              - **Concept** — a fictional object or an abstract idea; design a coherent assembly and label it concept.
+            - Ask only when the answer changes what is shown: which internals matter, the intended output size, or whether the sheet is a concept.
+            - Name the intended use and output size before drawing: chat preview, SVG, PNG, or PDF.
+
+            ## 2. Choose the smallest view set
+
+            - **Exploded axonometric** for assembly order. Set one explosion vector (usually diagonal) and keep every part on a credible path.
+            - **Assembled pictorial** when the outside silhouette is the answer.
+            - **Orthographic** only when shape and dimensions must align; use the same model for every view.
+            - **Section** through the passage or interface in question; hatch the cut material consistently.
+            - **Layered stack** for concepts such as display pixels, protocol layers, or interface surfaces; one plate per idea.
+
+            A second view must answer a question the first cannot. Do not draw a gallery of angles.
+
+            ## Process and architecture diagrams
+
+            - **Flow:** one start and one end; steps in order; a decision is a diamond with labelled exits; keep every shape to a short noun or verb. Route top-to-bottom on a phone and keep arrows one direction. Do not join every box to every other box.
+            - **Architecture:** boxes are components, not paragraphs; a boundary is a labelled rectangle; arrows show data or control direction, and the line legend says which. One accent marks the critical path. Do not draw a cloud icon for an unspecified service.
+            - **Sequence:** actors sit across the top, lifelines run down, and messages are ordered left-to-right and top-to-bottom. Label the message, not the lifeline. Time moves downward; do not let a label cross a lifeline.
+            - **Timeline:** one axis, a clear unit, events with a short label. Alternate above/below if the labels are dense, and drop a label rather than overlap it. A timeline is not a list of paragraphs.
+            - **Comparison:** two or three equal columns, the same criteria in the same order, one accent for the real difference. Do not compare unlike units.
+            - **Numeric chart:** use the `chart` tool for measured numbers. It draws the axes; do not hand-write a chart with invented ticks. If the data is conceptual rather than measured, label the axes absent.
+
+            A static process or architecture diagram is a drawing, not a video and not a decorative hero. If the answer needs motion, use `ascii-studio` only for an ASCII animation; otherwise this is the wrong medium.
+
+            ## 3. Build one inventory
+
+            Before drawing, list every part once:
+
+            ```text
+            id | name | count | parent | assembled position | explosion vector | evidence
+            A  | shell | 1 | — | outer | +Y | visible
+            B  | board | 1 | A | inside | +Y 70 | visible
+            C  | screw | 4 | B | corners | +Y 40 | visible
+            ```
+
+            - Derive every view from this list. A screw count, a rib, or a hole must not change between views.
+            - Give each separated part a credible place in the assembled object and a path that does not cross another part.
+            - Use the real repeated count when known; omit detail below the reproduction size rather than invent texture.
+            - If a part is hidden and no reference supports it, omit it or mark the sheet **illustrative**.
+
+            ## 4. Draw the sheet
+
+            Use a light technical sheet on the dark chat card: paper `#f7f4ec`, ink `#1c1b1f`, one blue accent `#0b6bcb` for the answer path. Keep the drawing legible at phone width.
+
+            - Line hierarchy: silhouette 2.2, part edge 1.4, hidden 0.8 dashed, construction 0.6.
+            - Fill a part with a flat tint only to separate it from its neighbour; no gradients, shadows, textures, or glow.
+            - Hatch a section with one direction per material; do not hatch a whole object.
+            - Callouts sit in a reserved lane at the side, with a leader that ends on the part edge. Labels do not cross leaders.
+            - Label the sheet `Illustrative · not to scale` unless every dimension came from the reference.
+            - Keep the title block to title, view name, and status. Do not invent a scale.
+
+            A compact SVG frame:
+
+            ```html
+            <svg viewBox="0 0 960 620" role="img" aria-labelledby="t d">
+              <title id="t">Object name — exploded view</title>
+              <desc id="d">Illustrative, not to scale; parts separated along one axis.</desc>
+              <rect width="960" height="620" fill="#f7f4ec"/>
+              <g stroke="#1c1b1f" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <g id="part-a" stroke-width="2.2"><path d="..."/></g>
+                <g id="part-b" stroke-width="1.4"><path d="..."/></g>
+              </g>
+              <g font-family="ui-monospace,monospace" font-size="12" fill="#1c1b1f">
+                <text x="24" y="28">OBJECT · EXPLODED</text>
+                <text x="24" y="600">Illustrative · not to scale</text>
+              </g>
+            </svg>
+            ```
+
+            - Keep an inline SVG under 10,000 characters for `visual_card`; a larger sheet goes to a file.
+            - Use `viewBox`, not fixed pixel width. No external `<image>`, `<foreignObject>`, `<script>`, or remote fonts.
+            - Text is part of the drawing: use short labels, a consistent type size, and no label over a line.
+
+
+            ## Motion, only when it explains
+
+            A still sheet is the default. Add motion only when the movement is the explanation: a packet crossing a link, a pump stroke, a signal propagating, or a sequence that needs time.
+
+            - Use CSS `@keyframes` or SVG `animate`/`animateTransform` inside the SVG. No JavaScript, no external GIF, no autoplay audio.
+            - Animate one path or one part, keep it under three seconds, and make the still frame readable before it moves.
+            - Respect reduced motion: wrap the animation in `@media (prefers-reduced-motion: no-preference)`.
+            - An animated SVG is not a GIF or MP4. Do not claim an export format that was not rendered.
+
+            ## 5. Show it in the chat
+
+            - **ASCII:** `ascii_art` with the subject, width, and frames; include the returned card unchanged.
+            - **Schematic:** call `visual_card` with `title`, `caption`, and the SVG. It returns the html block; include that block unchanged. Do not paste raw SVG in a code block as a substitute for the drawing.
+            - **Large or interactive:** `write_file drawing.svg`, then `open_file`; give a simplified `visual_card` preview plus a link to the full file.
+            - Do not claim the drawing is verified because the file was written. The user can see the card; if you cannot view the rendered result, say the visual check is by the user and name what to inspect.
+
+            ## 6. Export honestly
+
+            - SVG is the guaranteed deliverable: write `drawing.svg` beside `evidence.md`.
+            - PNG or PDF only if the project already has a renderer: `rsvg-convert`, Inkscape, ImageMagick, or Chrome/Chromium. Run it with `run_command` and check the file exists and is non-zero.
+            - The phone does not install a renderer, Python package, or font for this. If no renderer exists, deliver the SVG and say PNG/PDF were not produced.
+            - A PDF is a page export, not a manufacturing drawing. Do not claim tolerances, a scale, or a bill of materials that was not drawn.
+
+            ## 7. Verify before delivery
+
+            - Every part in the inventory appears once; repeated counts match across views.
+            - Exploded parts have a credible assembled place and do not float in unrelated space.
+            - No edge shows through a surface unless a section or hidden line explains it.
+            - Callouts sit outside the geometry, leaders touch the part, and no label crosses a line.
+            - The sheet is legible at its intended width; text does not collide with the frame or another label.
+            - The SVG parses; the preview is not a blank white card; the exported file opens and has bytes.
+            - State the assumptions, the view, the output size, and any unresolved visual defect.
+
+            ## Safety
+
+            - Do not invent hidden internals, dimensions, part numbers, or a material for a real product.
+            - Do not copy a copyrighted drawing; reconstruct from the user's reference or label the result as a concept.
+            - No external images, trackers, scripts, or fonts in the SVG.
+            - A photograph of a person, a private device, or a document is not a technical reference without consent; do not upload it.
+            - If the object is dangerous to open, say so and draw from public references instead.
+
+            ## Output order
+
+            1. Medium and view, with the evidence boundary.
+            2. The drawing card (ASCII or SVG), unchanged.
+            3. Files written: SVG, and PNG/PDF only if actually rendered.
+            4. What is illustrative, what is measured, and the one visual check left for the user.
+        """.trimIndent() + "\n",
         "ascii-studio" to """
             # ASCII studio
 
@@ -178,7 +336,7 @@ object StarterSkills {
 
             - `subject=shark`, `ocean`, `fish`, or `scene`;
             - `subject=text` with `text=HELLO` for a block-letter banner;
-            - `frames=2` to `8` for a short loop of shifted frames.
+            - `frames=2` to `8` for shifted frames; `animate=true` plays them as a CSS loop on the card.
 
             The tool returns a compact html card; include it unchanged. Keep one idea per card, max 100 columns, and no emoji-only picture. A banner is uppercase A–Z, 0–9, spaces, `- _ ! ?`; a longer line is split into two banners.
 
@@ -558,6 +716,260 @@ object StarterSkills {
             4. What was refactored, and the check that proved behavior unchanged.
             5. Duplication/complexity findings, or “not measured” with the reason.
             6. The log and what remains risky.
+        """.trimIndent() + "\n",
+        "spec-kit" to """
+            # Spec Kit: the plan is the contract
+
+            Use this when a feature, app, subsystem, migration, or multi-step change needs an architecture before code: unclear requirements, several files, a new interface, or a result that must match a written plan. For a one-line fix, use `ub-mode`; this skill is for work that deserves a specification.
+
+            Adapted from [github/spec-kit](https://github.com/github/spec-kit) (MIT). This is a local Markdown procedure, not the CLI: do not install `specify`, Python, uv, or an agent integration on this phone. The files and gates are the point.
+
+            ## The contract
+
+            1. **Constitution once per project.** Read `.specify/memory/constitution.md`; if it is missing, write it before the first feature.
+            2. **Spec before plan. Plan before tasks. Tasks before code.** No implementation file is edited before all three exist and the analysis gate passes.
+            3. **The plan is frozen.** After approval, a new requirement, file, dependency, or interface is a plan change: record it in `plan.md`, explain the reason, and get the user's approval. Do not silently widen the work.
+            4. **Every task is verifiable.** A task has an ID, a path, a test or check, and a status. One task changes one thing.
+            5. **Unknown is not a prompt to invent.** Mark it `[NEEDS CLARIFICATION: ...]`. Do not implement a requirement marked that way.
+            6. **Done means proved.** A task is `[x]` only after its check passes and the output is quoted. No "should work", no imagined command output.
+
+            ## Artifacts
+
+            ```
+            .specify/memory/constitution.md
+
+            specs/<feature>/
+              spec.md
+              plan.md
+              tasks.md
+              research.md          # optional; sources and decisions
+              data-model.md        # optional; entities and invariants
+              quickstart.md        # optional; how to run the result
+              contracts/           # optional; API, CLI, or event contracts
+              checklists/          # optional; requirement and release gates
+            ```
+
+            Create only the optional files the feature needs. `spec.md`, `plan.md`, and `tasks.md` are required for every feature.
+
+            ## Phase 0 — Constitution
+
+            Create `.specify/memory/constitution.md` once:
+
+            ```markdown
+            # Project Constitution
+
+            ## Principles
+            - Test behavior at the boundary. No claim without a check.
+            - One source of truth per decision. No duplicate state.
+            - Parse outside data at the edge; trust it inside.
+            - Keep the smallest design that satisfies the spec.
+            - No secret, token, personal record, or private path in a committed file.
+            - A dependency is a cost: name the need and the exit.
+
+            ## Quality gates
+            - Unit test for new behavior; regression test for a fixed failure.
+            - Lint or type check only if the project already has one.
+            - A change that touches data has a rollback note.
+
+            ## Workflow
+            - Spec -> plan -> tasks -> analyze -> implement -> converge.
+            - A plan change needs a reason and approval.
+
+            ## Last amended
+            - YYYY-MM-DD — why.
+            ```
+
+            Copy the project's real rules; do not invent a policy the user did not agree to.
+
+            ## Phase 1 — Specify
+
+            Write `specs/<feature>/spec.md` from the user's words, not from the code.
+
+            ```markdown
+            # Feature: <name>
+
+            ## Problem
+            Who hurts, in what situation, and why now.
+
+            ## User stories
+            - **P1** As a <role>, I want <outcome>, so that <reason>.
+              - Given <state>, when <action>, then <observable result>.
+            - **P2** ...
+
+            ## Requirements
+            - **FR-001** The system shall <testable behavior>.
+            - **FR-002** ...
+            - **NFR-001** <latency, privacy, accessibility, or platform constraint>.
+
+            ## Non-goals
+            - What this feature will not do.
+
+            ## Success criteria
+            - **SC-001** <a number, a state, or a user-visible result that can be checked>.
+
+            ## Open questions
+            - [NEEDS CLARIFICATION: <one question>] or "none".
+
+            ## Assumptions
+            - Only non-blocking defaults; label each one.
+            ```
+
+            Rules:
+
+            - No framework, database, library, or file choice in `spec.md`. That belongs in `plan.md`.
+            - A requirement is testable or it is not a requirement. Split "and" into two IDs.
+            - Use P1/P2/P3 so implementation has an order. P1 alone must be useful.
+            - Three blocking questions maximum. Ask once; if the user is unavailable, keep the unknown and continue only with safe, reversible work.
+
+            ## Phase 2 — Clarify
+
+            Ask only what changes the architecture or the acceptance result. Prefer one short message with numbered questions over an interview.
+
+            - Resolve a `[NEEDS CLARIFICATION]` before it becomes a task.
+            - If a default is safe, write it under **Assumptions**, not as a hidden fact.
+            - Never invent a policy, a customer, a legal rule, a schema, or a service limit.
+
+            ## Phase 3 — Plan
+
+            Write `specs/<feature>/plan.md`.
+
+            ```markdown
+            # Implementation Plan: <name>
+
+            ## Context
+            - Stack: <language, runtime, framework, versions>.
+            - Target: <phone, desktop, server, browser>.
+            - Constraints: <permissions, storage, network, privacy, time>.
+
+            ## Constitution check
+            - [ ] Every requirement has a test.
+            - [ ] No new dependency without a named need.
+            - [ ] No secret or personal data in a file.
+            - [ ] The design is the smallest that satisfies the spec.
+
+            ## Architecture
+            - Components and boundaries.
+            - Data flow: input -> validation -> domain -> storage/UI.
+            - Data model: entities, invariants, illegal states.
+            - Interfaces: API/CLI/event shapes, errors, limits.
+
+            ## Files
+            - New files and changed files, with one purpose each.
+            - Path rules and migration order.
+
+            ## Tests
+            - Unit, integration, and manual checks.
+            - The exact command for each check.
+            - Test data that is synthetic; never a real user record.
+
+            ## Risks
+            - What can fail, the symptom, and the first check.
+
+            ## Rollback
+            - How to return to the previous state.
+
+            ## Plan changes
+            - Date, reason, user approval. Empty until approved.
+            ```
+
+            A plan is not a wish list. If a file is not named, it is not in scope. If a dependency is not named with a reason, do not add it.
+
+            ## Phase 4 — Tasks
+
+            Write `specs/<feature>/tasks.md` in dependency order.
+
+            ```markdown
+            # Tasks: <name>
+
+            ## Phase 1 — Setup
+            - [ ] T001 <one verifiable change> — `path/to/file` — check: `<command>`
+
+            ## Phase 2 — Foundation
+            - [ ] T002 <behavior> — `path/to/file` — depends on T001
+            - [ ] T003 [P] <independent behavior> — `path/to/other` — check: `<command>`
+
+            ## Phase 3 — User story P1
+            - [ ] T004 Write the failing test for FR-001 — `test/path`
+            - [ ] T005 Make T004 pass — `src/path`
+            - [ ] T006 Manual check for SC-001 — `<exact steps>`
+
+            ## Phase 5 — Polish
+            - [ ] T007 Regression check — `<command>`
+            ```
+
+            Rules:
+
+            - Format is `- [ ] T### description — file — check`.
+            - `[P]` only when the task touches a different file and has no dependency.
+            - Test first, then implementation, then a manual or visual check if behavior is not fully unit-testable.
+            - No task without a requirement or acceptance criterion. Add the mapping in the task.
+            - No implementation task before the analysis gate.
+
+            ## Phase 5 — Analyze
+
+            Before code, compare the three files:
+
+            - Every FR/NFR has a task and a check.
+            - Every acceptance scenario has a test or a named manual check.
+            - Every task names an existing or planned file.
+            - No task introduces a file, dependency, endpoint, or behavior absent from the plan.
+            - The order is executable; no cycle; P1 can ship without P2.
+            - Contradictions and open questions are visible.
+
+            Write a short `checklists/analysis.md` with `PASS`, `GAPS`, or `BLOCKED`, the evidence, and the smallest fix. A gap is fixed in `spec.md`, `plan.md`, or `tasks.md`; do not hide it in code.
+
+            ## Phase 6 — Implement
+
+            For each task, in order:
+
+            1. Read the task, the relevant plan section, and the exact file.
+            2. Write or run the check first. Quote the failure.
+            3. Make the smallest edit that satisfies the task. Do not refactor unrelated code.
+            4. Run the same check. Quote the pass.
+            5. Mark `[x]` and append one evidence line: task, command, result, file/line.
+            6. Stop on a failed check, a missing tool, a conflict with the plan, or a new requirement. Report; do not guess.
+
+            Use `write_file`, `read_file`, `edit_file`, `run_command`, `grep`, and `glob`. Use `git_diff` for the scope and `review` for the diff. Do not install a package, framework, test runner, or CLI to avoid a missing check.
+
+            ## Phase 7 — Converge
+
+            Run the full check set, not only the last test.
+
+            - All tasks `[x]` and each acceptance criterion covered.
+            - Full test command passes; quote the summary.
+            - The diff contains only planned files; no debug output, secret, or dead code.
+            - Manual/visual checks done; outputs exist and are non-empty.
+            - Report `converged`, `partial`, or `failed`. A partial result lists the exact remaining task and why.
+
+            If the implementation and spec disagree, the spec wins; if the spec is wrong, change the spec and plan first.
+
+            ## Anti-hallucination rules
+
+            - A claim needs a file and line, a command and output, or a test result.
+            - Never invent an API, route, schema, config key, dependency, or file path.
+            - Never claim a test passed without running it; never invent its output.
+            - Never describe an image, screen, or external service you did not open.
+            - Unknown remains unknown; do not fill a gap with a plausible story.
+            - A tool that is missing is a blocker to report, not a reason to install or fake it.
+            - A plan change is explicit, dated, and approved; otherwise it is scope creep.
+            - No secrets, tokens, personal records, or real user data in specs, tests, or examples.
+
+            ## CEditoNeuro adaptation
+
+            - This app has no `specify` CLI. Create the files with `write_file`; inspect with `read_file`; run checks with `run_command`.
+            - A small one-file fix uses `ub-mode`; do not demand a full spec for a typo.
+            - A feature with several files, a new tool, a schema, or an unclear requirement uses this skill.
+            - The phone may lack a test framework. Use the project's existing check; if none exists, write a tiny standard-library test or a named manual check. Do not install one.
+            - A visual result is verified by opening the file or rendering it, not by imagining the screenshot.
+            - If the user changes the request mid-implementation, stop; update `spec.md`, `plan.md`, and `tasks.md`; then continue.
+
+            ## Output order
+
+            1. Gate: constitution, spec, plan, tasks, analysis.
+            2. The chosen P1 slice and why.
+            3. Files created/changed and the exact checks.
+            4. `converged`, `partial`, or `failed`, with evidence.
+            5. Remaining unknowns and one next action.
         """.trimIndent() + "\n",
         "review" to """
             # Review a change
@@ -1499,6 +1911,7 @@ object StarterSkills {
         extendSkillSecurity(appDir)
         extendAsciiStudio(appDir)
         extendGenealogy(appDir)
+        extendVisualize(appDir)
         extendSystematic(appDir)
         extendRrsi(appDir)
         extendSecondMonitor(appDir)
@@ -1560,7 +1973,7 @@ object StarterSkills {
         val file = File(appDir, "ascii-studio.md")
         if (!file.isFile) return
         val current = file.readText(Charsets.UTF_8)
-        if (current.contains("compact html card")) return
+        if (current.contains("animate=true")) return
         file.writeText(skills.getValue("ascii-studio"), Charsets.UTF_8)
     }
 
@@ -1571,6 +1984,15 @@ object StarterSkills {
         val current = file.readText(Charsets.UTF_8)
         if (current.contains("v1.8.0")) return
         file.writeText(skills.getValue("genealogy"), Charsets.UTF_8)
+    }
+
+    /** Phones that saved the first visualize skill learn process and architecture cards. */
+    private fun extendVisualize(appDir: File) {
+        val file = File(appDir, "visualize.md")
+        if (!file.isFile) return
+        val current = file.readText(Charsets.UTF_8)
+        if (current.contains("Motion, only when")) return
+        file.writeText(skills.getValue("visualize"), Charsets.UTF_8)
     }
 
     /** Phones that saved an older android-debug skill learn to check the installed screen. */

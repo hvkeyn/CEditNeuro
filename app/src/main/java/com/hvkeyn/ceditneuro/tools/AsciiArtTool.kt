@@ -2,6 +2,7 @@ package com.hvkeyn.ceditneuro.tools
 
 import com.hvkeyn.ceditneuro.chat.LayoutCard
 import kotlinx.serialization.json.JsonObject
+import java.util.Locale
 
 /** Small deterministic ASCII studio: shark/ocean scenes and block-letter banners. Shark and ocean templates are adapted from ascii-sharks (MIT). */
 class AsciiArtTool : Tool {
@@ -10,7 +11,7 @@ class AsciiArtTool : Tool {
     override val description =
         "Draw ASCII art in the chat. subject is shark, ocean, fish, scene, or text. " +
             "For text, pass the words; uppercase letters, digits, and spaces are supported. " +
-            "frames 1 to 8 makes a short loop of shifted frames for an animation. " +
+            "frames 1 to 8 makes shifted frames; animate true plays them as a CSS loop on the card. " +
             "The result is a compact monospace card. For an ASCII video, use the ascii-studio skill and render_video."
 
     override val parameters = objectSchema(
@@ -18,6 +19,7 @@ class AsciiArtTool : Tool {
             "subject" to stringProp("shark, ocean, fish, scene, or text. Default scene."),
             "text" to stringProp("Words for subject=text, at most 24 characters."),
             "frames" to intProp("1 to 8 frames. Default 1."),
+            "animate" to boolProp("Play the frames as a CSS loop. Default false."),
         ),
         required = listOf("subject"),
     )
@@ -28,6 +30,7 @@ class AsciiArtTool : Tool {
             return ToolResult.error("subject is shark, ocean, fish, scene, or text.")
         }
         val frames = (args.intArg("frames") ?: 1).coerceIn(1, 8)
+        val animate = args.boolArg("animate") ?: false
         if (subject == "text") {
             val text = args.stringArg("text")?.trim()?.uppercase().orEmpty()
             if (text.isEmpty()) return ToolResult.error("text is required for subject=text.")
@@ -41,6 +44,9 @@ class AsciiArtTool : Tool {
             "fish" -> FISH
             else -> SCENE
         }
+        if (frames > 1 && animate) {
+            return animatedCard((0 until frames).map { shift(base, it * 3) })
+        }
         val out = buildString {
             for (i in 0 until frames) {
                 if (frames > 1) append("frame ").append(i + 1).append('/').append(frames).append('\n')
@@ -51,13 +57,41 @@ class AsciiArtTool : Tool {
         return card(out)
     }
 
+    private fun animatedCard(frames: List<String>): ToolResult {
+        val n = frames.size.coerceAtLeast(2)
+        val step = 0.6
+        val duration = n * step
+        val visible = 100.0 / n
+        val body = buildString {
+            append("<style>html,body{background:#080c09;margin:0}</style>")
+            append("<style>")
+            append(java.lang.String.format(Locale.US, "@keyframes ascii-cycle{0%%,%.1f%%{opacity:1}%.1f%%,100%%{opacity:0}}", visible - 0.1, visible))
+            append(".ascii-stage{display:grid;background:#080c09;color:#d8ffd0;padding:12px;overflow:auto}")
+            append(java.lang.String.format(Locale.US, ".ascii-frame{grid-area:1/1;margin:0;font:10px/1.15 ui-monospace,monospace;white-space:pre;opacity:0;animation:ascii-cycle %.2fs linear infinite}", duration))
+            frames.indices.forEach { i ->
+                append(java.lang.String.format(Locale.US, ".ascii-frame:nth-child(%d){animation-delay:%.2fs}", i + 1, i * step))
+            }
+            append("</style>")
+            append("<div style=\"background:#080c09;color:#d8ffd0;border-radius:10px;padding:12px;overflow:auto\">")
+            append("<div class=\"ascii-stage\">")
+            frames.forEach { append("<pre class=\"ascii-frame\">").append(esc(it)).append("</pre>") }
+            append("</div>")
+            append("<div style=\"font:12px -apple-system,system-ui,sans-serif;color:#8fae8b;margin-top:8px\">ASCII · ").append(n).append("-frame loop · monospace</div>")
+            append("</div>")
+        }
+        val page = LayoutCard.page(body) ?: return ToolResult.error("The ASCII animation is empty or too large.")
+        return ToolResult.ok(LayoutCard.fence(page))
+    }
+
     private fun card(ascii: String): ToolResult {
         val body = buildString {
+            append("<style>html,body{background:#080c09;margin:0}</style>")
             append("<div style=\"background:#080c09;color:#d8ffd0;border-radius:10px;padding:12px;overflow:auto\">")
             append("<pre style=\"margin:0;font:10px/1.15 ui-monospace,monospace;white-space:pre\">")
             append(esc(ascii))
-            append("</pre></div>")
-            append("<div style=\"font:12px -apple-system,system-ui,sans-serif;color:#5f6368;margin-top:6px\">ASCII · monospace · original characters</div>")
+            append("</pre>")
+            append("<div style=\"font:12px -apple-system,system-ui,sans-serif;color:#8fae8b;margin-top:8px\">ASCII · monospace · original characters</div>")
+            append("</div>")
         }
         val page = LayoutCard.page(body) ?: return ToolResult.error("The ASCII card is empty or too large.")
         return ToolResult.ok(LayoutCard.fence(page))

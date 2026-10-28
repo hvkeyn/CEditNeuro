@@ -201,7 +201,7 @@ private fun HtmlDrawing(markup: String) {
     var heightPx by remember(markup) { mutableIntStateOf(0) }
     var grows by remember(markup) { mutableIntStateOf(0) }
     val height = with(density) {
-        if (heightPx <= 0) 240.dp else heightPx.toDp().coerceIn(120.dp, 4800.dp)
+        if (heightPx <= 0) 96.dp else heightPx.toDp().coerceIn(80.dp, 4800.dp)
     }
     Box(
         modifier = Modifier
@@ -214,10 +214,10 @@ private fun HtmlDrawing(markup: String) {
             text = markup,
             baseDir = null,
             onContentHeight = { contentPx, viewPx ->
-                if (grows >= 4 || contentPx <= 0) return@ExpandableMarkup
+                if (grows >= 6 || contentPx <= 0) return@ExpandableMarkup
                 val next = (contentPx + 16).coerceAtMost(with(density) { 4800.dp.roundToPx() })
                 val clipped = contentPx > viewPx + 8
-                if (!clipped && heightPx > 0) return@ExpandableMarkup
+                if (!clipped && next >= heightPx) return@ExpandableMarkup
                 if (kotlin.math.abs(next - heightPx) <= 8) return@ExpandableMarkup
                 heightPx = next
                 grows++

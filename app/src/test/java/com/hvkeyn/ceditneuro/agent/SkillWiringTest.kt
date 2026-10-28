@@ -178,6 +178,24 @@ class SkillWiringTest {
     }
 
     @Test
+    fun visualizeDrawsAsciiOrSchematic() {
+        val text = StarterSkills.skills.getValue("visualize")
+        listOf("visual_card", "drawing.svg", "not to scale", "teardown", "exploded")
+            .forEach { assertTrue("visualize lacks $it", text.contains(it, ignoreCase = true)) }
+        assertTrue(text.length <= ACTIVE_SKILL_CHARS)
+        assertTrue(buildSystemPrompt().contains("use_skill visualize"))
+    }
+
+    @Test
+    fun specKitRequiresGatesBeforeCode() {
+        val text = StarterSkills.skills.getValue("spec-kit")
+        listOf("spec.md", "plan.md", "tasks.md", "[NEEDS CLARIFICATION]", "converged", "plan change")
+            .forEach { assertTrue("spec-kit lacks $it", text.contains(it, ignoreCase = true)) }
+        assertTrue(text.length <= ACTIVE_SKILL_CHARS)
+        assertTrue(buildSystemPrompt().contains("use_skill spec-kit"))
+    }
+
+    @Test
     fun ubModeEnforcesRedGreenRefactor() {
         val text = StarterSkills.skills.getValue("ub-mode")
         listOf("failing test", "root cause", "refactor", "vibe")

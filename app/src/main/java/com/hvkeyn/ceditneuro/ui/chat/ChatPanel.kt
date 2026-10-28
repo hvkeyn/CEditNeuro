@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -217,9 +219,9 @@ fun ChatPanel(
     }
 
     LaunchedEffect(state.chat.size, lastEntry?.id, lastEntry?.text?.length, followEnd.value) {
-        if (!followEnd.value) return@LaunchedEffect
+        if (!followEnd.value || listState.isScrollInProgress) return@LaunchedEffect
         val last = state.chat.lastIndex
-        if (last >= 0) listState.scrollToItem(last)
+        if (last >= 0) listState.scrollToItem(last, scrollOffset = Int.MAX_VALUE)
     }
 
     val compact = LocalConfiguration.current.let { it.screenHeightDp < 520 && it.screenWidthDp > it.screenHeightDp }
@@ -267,6 +269,11 @@ fun ChatPanel(
                         items(state.chat, key = { it.id }) { entry ->
                             ChatBubble(entry, state.projectRoot, onOpenLink)
                         }
+                        if (state.chat.isNotEmpty()) {
+                            item(key = "chat-end-sentinel") {
+                                Spacer(Modifier.height(1.dp))
+                            }
+                        }
                     }
                     if (state.chat.size > 1) {
                         ChatScrubber(
@@ -275,7 +282,11 @@ fun ChatPanel(
                             firstVisible = listState.firstVisibleItemIndex,
                             onJump = { index ->
                                 followEnd.value = index >= state.chat.lastIndex
-                                scope.launch { listState.scrollToItem(index) }
+                                if (index >= state.chat.lastIndex) {
+                                    scope.launch { listState.scrollToItem(state.chat.lastIndex, scrollOffset = Int.MAX_VALUE) }
+                                } else {
+                                    scope.launch { listState.scrollToItem(index) }
+                                }
                             },
                         )
                     }
@@ -287,7 +298,7 @@ fun ChatPanel(
                             .padding(bottom = 8.dp)
                             .clickable {
                                 followEnd.value = true
-                                scope.launch { listState.scrollToItem(state.chat.lastIndex) }
+                                scope.launch { listState.scrollToItem(state.chat.lastIndex, scrollOffset = Int.MAX_VALUE) }
                             },
                         shape = RoundedCornerShape(16.dp),
                         color = MaterialTheme.colorScheme.primary,
@@ -1050,7 +1061,7 @@ private fun ChatBubble(entry: ChatEntry, projectRoot: String?, onOpen: (String) 
 @Composable
 private fun ThinkingBlock(entry: ChatEntry) {
     var expanded by rememberSaveable(entry.id) { mutableStateOf(false) }
-    val open = entry.streaming || expanded
+    val open = expanded
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1060,7 +1071,7 @@ private fun ThinkingBlock(entry: ChatEntry) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(enabled = !entry.streaming) { expanded = !expanded },
+                .clickable { expanded = !expanded },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -1069,32 +1080,30 @@ private fun ThinkingBlock(entry: ChatEntry) {
                 color = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.weight(1f),
             )
-            if (!entry.streaming) {
-                Icon(
-                    imageVector = if (open) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = if (open) "Hide thought" else "Show thought",
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            Icon(
+                imageVector = if (open) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = if (open) "Hide thought" else "Show thought",
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         if (open) {
             Copyable(entry.text) {
-                val compact = LocalConfiguration.current.let {
-                    it.screenHeightDp < 520 && it.screenWidthDp > it.screenHeightDp
-                }
                 Text(
                     text = entry.text,
                     style = MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = if (compact && entry.streaming) 3 else Int.MAX_VALUE,
-                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
         } else {
+            val preview = if (entry.streaming) {
+                entry.text.lineSequence().lastOrNull { it.isNotBlank() }.orEmpty()
+            } else {
+                entry.text.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty()
+            }
             Text(
-                text = entry.text.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty(),
+                text = preview,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -1175,26 +1184,48 @@ private fun CopyLabel(text: String) {
 
 @Composable
 private fun ToolBlock(label: String, text: String, error: Boolean) {
+    val head = text.trimStart()
+    val visual = head.startsWith("```chart") || head.startsWith("```html") || head.startsWith("```svg") ||
+        head.startsWith("<svg") || head.startsWith("<!doctype html") || head.startsWith("<html")
+    val long = !visual && (label == "use_skill" || text.length > 600)
+    var expanded by rememberSaveable(label, text.hashCode()) { mutableStateOf(false) }
+
     Column(modifier = Modifier.fillMaxWidth().padding(start = 8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (long) Modifier.clickable { expanded = !expanded } else Modifier),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
                 color = if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline,
                 modifier = Modifier.weight(1f),
             )
+            if (long) {
+                Text(
+                    text = if (expanded) "hide" else "${text.length} chars · show",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(end = 8.dp),
+                )
+                Icon(
+                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (expanded) "Hide tool output" else "Show tool output",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             CopyLabel(text)
         }
-        if (text.contains("```chart") || text.contains("```html") || text.contains("```svg") ||
-            text.trimStart().startsWith("<svg") || text.trimStart().startsWith("<!doctype html") ||
-            text.trimStart().startsWith("<html")
-        ) {
+        if (visual) {
             MarkdownText(
                 text = text,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(top = 2.dp),
             )
-        } else {
+        } else if (!long || expanded) {
             SelectionContainer {
                 Text(
                     text = text,
@@ -1203,6 +1234,15 @@ private fun ToolBlock(label: String, text: String, error: Boolean) {
                     modifier = Modifier.padding(top = 2.dp),
                 )
             }
+        } else {
+            Text(
+                text = text.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty(),
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 2.dp),
+            )
         }
     }
 }

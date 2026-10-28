@@ -2762,6 +2762,7 @@ class WorkspaceViewModel(
             "layout" -> "Drawing a card"
             "network_card" -> "Drawing a network"
             "ascii_art" -> "Drawing ASCII"
+            "visual_card" -> "Drawing a schematic"
             "set_timer" -> "Setting a timer"
             "load_tools" -> "Loading tools"
             "fetch_system_layout" -> "Reading the screen"
@@ -3423,6 +3424,7 @@ class WorkspaceViewModel(
             com.hvkeyn.ceditneuro.tools.LayoutTool(),
             com.hvkeyn.ceditneuro.tools.NetworkCardTool(),
             com.hvkeyn.ceditneuro.tools.AsciiArtTool(),
+            com.hvkeyn.ceditneuro.tools.VisualCardTool(),
             com.hvkeyn.ceditneuro.tools.ListModelsTool(
                 current = { settingsStore.current },
                 replace = { settingsStore.replace(it) },

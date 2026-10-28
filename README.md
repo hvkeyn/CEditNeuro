@@ -26,6 +26,15 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ---
 
+## New in 0.99.32
+
+- **Spec Kit** as a local skill: constitution → spec → plan → tasks → analysis → implementation → convergence. The plan is frozen, every task has a check, and unknown requirements stay marked instead of invented.
+- **Visualize** and `visual_card`: process flows, architectures, sequences, timelines, comparisons, exploded views, and technical sheets are drawn as static paper cards in the chat.
+- **Animated ASCII**: `ascii_art` can play 2–8 shifted frames as a CSS loop in the card. No GIF encoder is installed; MP4 still goes through `render_video`.
+- **A calmer chat**: long reasoning and tool output collapse to one line, and the End control goes to the real bottom of the conversation.
+
+---
+
 ## Why it feels different
 
 Most mobile coding tools are a chat window next to a file list. CEditNeuro is built the other way around: the project is the centre, and the agent is a tool inside it. It reads the files you see, runs the same shell, writes the same report, and then gets out of the way. Close the panel and the editor is still there, with the change already on disk.
@@ -65,7 +74,7 @@ This is not a roadmap. A model is a host, a URL, a key, and a model name; a skil
 | | |
 | --- | --- |
 | **Models** | DeepSeek API or DeepSeek Web, Qwen Web, or any OpenAI-compatible host, remote or local. Paste the base URL, add a key if the host needs one, then fetch its model list or type a model name. A local server such as Ollama or LM Studio can run without a key. Switch the active provider or model without reinstalling and without losing projects. |
-| **Skills** | Any Markdown procedure that fits the contract: app scope `CEditNeuro/skills`, project scope `.ceditneuro/skills`, a public catalog, or a file you import. The current source ships 37 starters, but that is a starting set, not a fixed list. A skill adds instructions; it does not add a tool, a permission, or executable code. |
+| **Skills** | Any Markdown procedure that fits the contract: app scope `CEditNeuro/skills`, project scope `.ceditneuro/skills`, a public catalog, or a file you import. The current source ships 39 starters, but that is a starting set, not a fixed list. A skill adds instructions; it does not add a tool, a permission, or executable code. |
 | **Data** | No account is required for a local model. A key is stored on the phone in encrypted preferences and sent only to the host you choose. The app has no analytics or telemetry. Chats and projects stay on the device; only the request you send goes to that model host, and a tool goes to a service only when you call it. |
 
 <p align="center">
@@ -150,9 +159,15 @@ Ask the agent for a film or a clip, paste a video page, or send the page from th
 
 ## Skills
 
-The agent loads Markdown procedures from `CEditNeuro/skills` on this phone and from `.ceditneuro/skills` in the project. It can also search a public catalog, check a downloaded file, and save only the adapted procedure. **[SKILLS.md](SKILLS.md)** is the complete catalog: all 37 skills, their triggers and tools, the file contract, the activation path, and how to move one to another agent.
+The agent loads Markdown procedures from `CEditNeuro/skills` on this phone and from `.ceditneuro/skills` in the project. It can also search a public catalog, check a downloaded file, and save only the adapted procedure. **[SKILLS.md](SKILLS.md)** is the complete catalog: all 39 skills, their triggers and tools, the file contract, the activation path, and how to move one to another agent.
 
-The 37 starters are a starting set, not a closed list. Any other Markdown procedure that follows the same contract can be copied into either scope, imported from the catalog, or pasted in as a file.
+One of the 39 is **`spec-kit`**: it writes a constitution, a specification, a plan, and a task list, freezes the plan, and refuses code before the analysis gate. Every task has an ID, a file path, a check, and a status; a plan change is explicit and approved. It is a local Markdown adaptation of GitHub's Spec Kit, not its CLI.
+
+Another is **`visualize`**: quick ASCII, or a static SVG for process flows, architecture, sequences, timelines, comparisons, exploded views, sections, orthographic sheets, and layered concepts.
+
+ASCII frames can loop in the chat (CSS); the same skill also allows a restrained CSS/SMIL motion in an SVG when movement is the explanation. Actual GIF or MP4 files still need an existing renderer; the app does not install one. `visual_card` draws it on a paper card in the chat; the SVG is the source, and PNG/PDF are produced only when a renderer already exists.
+
+The 39 starters are a starting set, not a closed list. Any other Markdown procedure that follows the same contract can be copied into either scope, imported from the catalog, or pasted in as a file.
 
 - A skill is read only when it is selected; installing it does not run it and does not grant a tool or a permission.
 - If a skill names a tool this build does not have, the skill does not create it. The agent says what is missing instead of pretending.
