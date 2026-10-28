@@ -17,7 +17,7 @@ class VisualCardToolTest {
             put("caption", "Illustrative, not to scale.")
         })
         assertTrue(!out.isError)
-        assertTrue(out.content.startsWith("```html"))
+        assertTrue(out.content.startsWith("```svg"))
         assertTrue(out.content.contains("<svg"))
         assertTrue(out.content.contains("PUMP"))
         assertTrue(out.content.contains("Illustrative"))

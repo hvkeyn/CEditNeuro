@@ -26,13 +26,16 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ---
 
-## New in 0.99.33
+## New in 0.99.34
 
 - **Spec Kit** as a local skill: constitution → spec → plan → tasks → analysis → implementation → convergence. The plan is frozen, every task has a check, and unknown requirements stay marked instead of invented.
 - **Visualize** and `visual_card`: process flows, architectures, sequences, timelines, comparisons, exploded views, and technical sheets are drawn as static paper cards in the chat.
 - **Animated ASCII**: `ascii_art` can play 2–8 shifted frames as a CSS loop in the card. No GIF encoder is installed; MP4 still goes through `render_video`.
 - **A calmer chat**: long reasoning and tool output collapse to one line; scrolling up no longer snaps back while the agent writes; the End control goes to the real bottom of the conversation.
 - **Device teardown**: `visualize` draws a static exploded, orthographic, or section sheet for a phone, watch, drive, or other object, and can add a restrained CSS/SMIL animation when movement is the explanation.
+- **Looping visuals**: an animated SVG replays after a five-second pause; ASCII frames hold for five seconds after the last frame. Static cards are left alone.
+- **Stable sheets**: SVG cards use their `viewBox` for height and no longer grow in pieces while you scroll; ASCII cards reserve their height before the drawing loads.
+- **Community files**: contributing, code of conduct, security, accessibility, MIT license, issue forms, and a pull request template are now in the repository.
 
 ---
 
@@ -182,6 +185,14 @@ Long-press a file and choose **Read**, or tap the book icon.
 - Pictures inside FB2, EPUB, and HTML get their own page. **Pen**, **Notes**, **Contents**, and **Book** stay with that file.
 - PNG, JPG, WebP, GIF, BMP, SVG, and HTML also open as a preview, with a switch back to the text.
 - On a phone, the page is the unit: no horizontal scrolling to find the next paragraph.
+
+## Contributing
+
+- [Contributing guide](CONTRIBUTING.md) — build, tests, and the pull request checklist.
+- [Code of conduct](CODE_OF_CONDUCT.md) — the standard for every project space.
+- [Security policy](SECURITY.md) — report privately; do not post a key or a working exploit.
+- [Accessibility](ACCESSIBILITY.md) — what is supported, known limits, and how to report a barrier.
+- [MIT license](LICENSE) — the project is open source.
 
 ## Layout
 

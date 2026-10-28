@@ -23,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +52,7 @@ import com.hvkeyn.ceditneuro.reader.BookText
 import com.hvkeyn.ceditneuro.ui.editor.ExpandableMarkup
 import com.hvkeyn.ceditneuro.ui.editor.svgAspect
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 /**
@@ -74,13 +76,7 @@ fun MarkdownText(
         for (block in blocks) {
             val drawing = block is MdBlock.Scheme ||
                 (block is MdBlock.Code && (isSvgMarkup(block.lang, block.text) || isChartBlock(block.lang)))
-            if (drawing) {
-                DrawBlock(block, color, linkColor, codeColor, codeBackground, projectRoot, onOpen)
-            } else {
-                SelectionContainer {
-                    DrawBlock(block, color, linkColor, codeColor, codeBackground, projectRoot, onOpen)
-                }
-            }
+            DrawBlock(block, color, linkColor, codeColor, codeBackground, projectRoot, onOpen)
         }
     }
 }
@@ -198,7 +194,12 @@ private fun ListRow(
 @Composable
 private fun HtmlDrawing(markup: String) {
     val density = LocalDensity.current
-    var heightPx by remember(markup) { mutableIntStateOf(0) }
+    val fixedDp = remember(markup) {
+        Regex("""data-card-height-dp\s*=\s*["'](\d+)["']""")
+            .find(markup)?.groupValues?.get(1)?.toIntOrNull()?.coerceIn(96, 600)
+    }
+    val fixedPx = fixedDp?.let { with(density) { it.dp.roundToPx() } }
+    var heightPx by remember(markup) { mutableIntStateOf(fixedPx ?: 0) }
     var grows by remember(markup) { mutableIntStateOf(0) }
     val height = with(density) {
         if (heightPx <= 0) 96.dp else heightPx.toDp().coerceIn(80.dp, 4800.dp)
@@ -214,6 +215,7 @@ private fun HtmlDrawing(markup: String) {
             text = markup,
             baseDir = null,
             onContentHeight = { contentPx, viewPx ->
+                if (fixedDp != null) return@ExpandableMarkup
                 if (grows >= 6 || contentPx <= 0) return@ExpandableMarkup
                 val next = (contentPx + 16).coerceAtMost(with(density) { 4800.dp.roundToPx() })
                 val clipped = contentPx > viewPx + 8
@@ -230,20 +232,47 @@ private fun HtmlDrawing(markup: String) {
 @Composable
 private fun SvgDrawing(markup: String) {
     val aspect = remember(markup) { svgAspect(markup) }
+    val replayMs = remember(markup) { svgReplayMs(markup) }
+    var generation by remember(markup) { mutableIntStateOf(0) }
+    LaunchedEffect(markup, replayMs) {
+        val wait = replayMs ?: return@LaunchedEffect
+        while (true) {
+            delay(wait)
+            generation++
+        }
+    }
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp)),
     ) {
-        ExpandableMarkup(
-            kind = "svg",
-            text = markup,
-            baseDir = null,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height((maxWidth * aspect).coerceIn(160.dp, 720.dp)),
-        )
+        key(generation) {
+            ExpandableMarkup(
+                kind = "svg",
+                text = markup,
+                baseDir = null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height((maxWidth * aspect).coerceIn(160.dp, 720.dp)),
+            )
+        }
     }
+}
+
+/** A finite SVG animation is re-created after it ends, so it gets a five-second pause and starts over. */
+internal fun svgReplayMs(markup: String): Long? {
+    val animated = Regex("""@keyframes|animation\s*:|<animate\b|<animateTransform\b""", RegexOption.IGNORE_CASE)
+        .containsMatchIn(markup)
+    if (!animated) return null
+    val durations = Regex("""([0-9]+(?:\.[0-9]+)?)\s*(ms|s)\b""", RegexOption.IGNORE_CASE)
+        .findAll(markup)
+        .mapNotNull { match ->
+            val value = match.groupValues[1].toDoubleOrNull() ?: return@mapNotNull null
+            if (match.groupValues[2].equals("ms", ignoreCase = true)) value.toLong() else (value * 1000).toLong()
+        }
+        .toList()
+    val duration = durations.maxOrNull() ?: 2000L
+    return (duration + 5_000L).coerceAtLeast(5_000L)
 }
 
 @Composable

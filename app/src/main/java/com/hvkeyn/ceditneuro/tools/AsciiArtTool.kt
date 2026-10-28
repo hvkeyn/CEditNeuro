@@ -60,8 +60,10 @@ class AsciiArtTool : Tool {
     private fun animatedCard(frames: List<String>): ToolResult {
         val n = frames.size.coerceAtLeast(2)
         val step = 0.6
-        val duration = n * step
-        val visible = 100.0 / n
+        val play = n * step
+        val pause = 5.0
+        val duration = play + pause
+        val visible = 100.0 * play / duration
         val body = buildString {
             append("<style>html,body{background:#080c09;margin:0}</style>")
             append("<style>")
@@ -72,11 +74,12 @@ class AsciiArtTool : Tool {
                 append(java.lang.String.format(Locale.US, ".ascii-frame:nth-child(%d){animation-delay:%.2fs}", i + 1, i * step))
             }
             append("</style>")
-            append("<div style=\"background:#080c09;color:#d8ffd0;border-radius:10px;padding:12px;overflow:auto\">")
+            append("<div data-card-height-dp=\"").append(heightDp(frames.maxOf { it.lines().size }))
+                .append("\" style=\"background:#080c09;color:#d8ffd0;border-radius:10px;padding:12px;overflow:auto\">")
             append("<div class=\"ascii-stage\">")
             frames.forEach { append("<pre class=\"ascii-frame\">").append(esc(it)).append("</pre>") }
             append("</div>")
-            append("<div style=\"font:12px -apple-system,system-ui,sans-serif;color:#8fae8b;margin-top:8px\">ASCII · ").append(n).append("-frame loop · monospace</div>")
+            append("<div style=\"font:12px -apple-system,system-ui,sans-serif;color:#8fae8b;margin-top:8px\">ASCII · ").append(n).append("-frame loop · 5 s pause · monospace</div>")
             append("</div>")
         }
         val page = LayoutCard.page(body) ?: return ToolResult.error("The ASCII animation is empty or too large.")
@@ -86,7 +89,8 @@ class AsciiArtTool : Tool {
     private fun card(ascii: String): ToolResult {
         val body = buildString {
             append("<style>html,body{background:#080c09;margin:0}</style>")
-            append("<div style=\"background:#080c09;color:#d8ffd0;border-radius:10px;padding:12px;overflow:auto\">")
+            append("<div data-card-height-dp=\"").append(heightDp(ascii.lines().size))
+                .append("\" style=\"background:#080c09;color:#d8ffd0;border-radius:10px;padding:12px;overflow:auto\">")
             append("<pre style=\"margin:0;font:10px/1.15 ui-monospace,monospace;white-space:pre\">")
             append(esc(ascii))
             append("</pre>")
@@ -96,6 +100,8 @@ class AsciiArtTool : Tool {
         val page = LayoutCard.page(body) ?: return ToolResult.error("The ASCII card is empty or too large.")
         return ToolResult.ok(LayoutCard.fence(page))
     }
+
+    private fun heightDp(lines: Int): Int = (lines * 7 + 60).coerceIn(120, 480)
 
     private fun esc(value: String): String = value
         .replace("&", "&amp;")

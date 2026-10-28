@@ -53,6 +53,11 @@ fun previewKind(path: String): String? = when (path.substringAfterLast('.', "").
 
 /** Height divided by width, so a scheme can use the full pane width without cropping. */
 internal fun svgAspect(markup: String): Float {
+    val viewBox = Regex("""viewBox\s*=\s*["']([^"']+)["']""").find(markup)?.groupValues?.get(1)
+    val box = viewBox?.split(',', ' ', '\t')?.mapNotNull { it.toFloatOrNull() }
+    if (box != null && box.size == 4 && box[2] > 0f && box[3] > 0f) {
+        return (box[3] / box[2]).coerceIn(0.28f, 1.7f)
+    }
     val width = Regex("""\bwidth\s*=\s*"([\d.]+)""").find(markup)?.groupValues?.get(1)?.toFloatOrNull()
     val height = Regex("""\bheight\s*=\s*"([\d.]+)""").find(markup)?.groupValues?.get(1)?.toFloatOrNull()
     if (width == null || height == null || width < 1f) return 0.62f
@@ -207,7 +212,10 @@ fun MarkupPreview(
                 settings.displayZoomControls = false
                 settings.useWideViewPort = true
                 settings.loadWithOverviewMode = false
-                setBackgroundColor(android.graphics.Color.WHITE)
+                isNestedScrollingEnabled = false
+        isVerticalScrollBarEnabled = false
+        overScrollMode = android.view.View.OVER_SCROLL_NEVER
+        setBackgroundColor(android.graphics.Color.WHITE)
             }
         },
         update = { view ->

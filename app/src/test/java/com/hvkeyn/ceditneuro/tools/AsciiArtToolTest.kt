@@ -52,6 +52,8 @@ class AsciiArtToolTest {
         assertTrue(out.content.contains("@keyframes ascii-cycle"))
         assertTrue(out.content.contains("animation:ascii-cycle"))
         assertTrue(out.content.contains("3-frame loop"))
+        assertTrue(out.content.contains("5 s pause"))
+        assertTrue(out.content.contains("data-card-height-dp"))
         assertTrue(!out.content.contains("frame 1/3"))
         assertTrue(out.content.length < 12_000)
     }
