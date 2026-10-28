@@ -26,6 +26,12 @@ class SkillWiringTest {
         "depends_on",
         "node_modules",
         "authorized_keys",
+        "analyze_function",
+        "compare_functions",
+        "evidence_id",
+        "inspect_analysis_view",
+        "normalized_result",
+        "raw_result",
     )
 
     @Test
@@ -142,6 +148,50 @@ class SkillWiringTest {
             .forEach { assertTrue("skill-security lacks $it", text.contains(it, ignoreCase = true)) }
         assertTrue(text.length <= ACTIVE_SKILL_CHARS)
         assertTrue(buildSystemPrompt().contains("use_skill skill-security"))
+    }
+
+    @Test
+    fun asciiStudioDrawsAndMakesAsciiVideo() {
+        val text = StarterSkills.skills.getValue("ascii-studio")
+        listOf("ascii_art", "render_video", "ascii.html", "ASCII")
+            .forEach { assertTrue("ascii-studio lacks $it", text.contains(it, ignoreCase = true)) }
+        assertTrue(text.length <= ACTIVE_SKILL_CHARS)
+        assertTrue(buildSystemPrompt().contains("use_skill ascii-studio"))
+    }
+
+    @Test
+    fun reaIsThePcWorkflowAndThePhoneFallsBack() {
+        val text = StarterSkills.skills.getValue("rea")
+        listOf("REA 6.8.0", "remote_put", "reverse-engineering", "evidence")
+            .forEach { assertTrue("rea lacks $it", text.contains(it, ignoreCase = true)) }
+        assertTrue(text.length <= ACTIVE_SKILL_CHARS)
+        assertTrue(buildSystemPrompt().contains("use_skill rea"))
+    }
+
+    @Test
+    fun genealogyKeepsEvidenceAndPrivacy() {
+        val text = StarterSkills.skills.getValue("genealogy")
+        listOf("PERSON_ID", "single-source", "CAPTCHA", "http_request")
+            .forEach { assertTrue("genealogy lacks $it", text.contains(it, ignoreCase = true)) }
+        assertTrue(text.length <= ACTIVE_SKILL_CHARS)
+        assertTrue(buildSystemPrompt().contains("use_skill genealogy"))
+    }
+
+    @Test
+    fun ubModeEnforcesRedGreenRefactor() {
+        val text = StarterSkills.skills.getValue("ub-mode")
+        listOf("failing test", "root cause", "refactor", "vibe")
+            .forEach { assertTrue("ub-mode lacks $it", text.contains(it, ignoreCase = true)) }
+        assertTrue(text.length <= ACTIVE_SKILL_CHARS)
+        assertTrue(buildSystemPrompt().contains("use_skill ub-mode"))
+    }
+
+    @Test
+    fun genealogySearchModuleCoversV18() {
+        val text = StarterSkills.skills.getValue("genealogy")
+        listOf("v1.8.0", "INDEX_STATE", "COVERAGE", "Geneteka", "Zhnivo", "SODD NAF", "GWAR", "not-indexed")
+            .forEach { assertTrue("genealogy v1.8 lacks $it", text.contains(it, ignoreCase = true)) }
+        assertTrue(text.length <= ACTIVE_SKILL_CHARS)
     }
 
     @Test

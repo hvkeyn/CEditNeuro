@@ -167,6 +167,60 @@ object StarterSkills {
             4. A mockup is frames in one HTML file in the project. A frame that could belong to any app is a failed draft: follow the one-mood rule in frontend-design.
             5. When the HTML is written and the task was only the mockup, use_skill name=android-ui scope=app on=false.
         """.trimIndent() + "\n",
+        "ascii-studio" to """
+            # ASCII studio
+
+            Use this when the user asks for ASCII art, a text banner, a shark or ocean scene, a terminal animation, a retro screen, or an ASCII video. The reference is ascii-sharks (MIT): fish and sharks drawn as monospace cells on a dark canvas. The bundled shark and ocean templates are adapted from it and remain MIT; do not copy other code or assets.
+
+            ## Static picture
+
+            Call `ascii_art`:
+
+            - `subject=shark`, `ocean`, `fish`, or `scene`;
+            - `subject=text` with `text=HELLO` for a block-letter banner;
+            - `frames=2` to `8` for a short loop of shifted frames.
+
+            The tool returns a compact html card; include it unchanged. Keep one idea per card, max 100 columns, and no emoji-only picture. A banner is uppercase A–Z, 0–9, spaces, `- _ ! ?`; a longer line is split into two banners.
+
+            The card already wraps the art in a dark monospace panel; do not put it inside another `layout` block. Do not invent a second scene to fill space.
+
+            ## ASCII video
+
+            When the user asks for a video, a clip, a reel, an animation, or “ролик”, make an **ASCII animation**, not normal footage.
+
+            1. Write `ascii.html` with inline CSS and JavaScript. Use a `<pre>` stage, monospace font, dark background, and one accent (white, amber, or green).
+            2. Build 6–12 seconds at 12–24 frames per second. A frame is a full text grid; the player swaps frames on a timer. Keep the grid 80×30 or 100×36; scale with CSS, not with a huge character count.
+            3. Animate one thing: a shark crossing, a school turning, a radar sweep, a typing banner, or a packet moving through an ASCII network. Do not animate every cell.
+            4. Add a title frame, the loop, and an end card with the caption. No audio unless the user asks for sound.
+            5. `load_tools group=video`, then `render_video` the HTML to `ascii.mp4` (720p or 1080p, 16:9). Save the frame list as `ascii-frames.txt` so the result is reproducible.
+            6. Open the HTML with `open_file` (group `device`) if the user wants to preview it in a browser. A chooser is normal; choose a browser.
+            7. Check the result: `read_file` the HTML, run `render_video`, then report the path, duration, dimensions, and that the picture is ASCII. Do not say “rendered” before the tool returns success.
+
+            If the user only mentions a video in passing, ask one short question: “ASCII animation or normal video?” If they want ASCII, proceed. If they want normal footage, use the `hyperframes` skill instead.
+
+            ## Style
+
+            - Paper-black terminal, `#0b0f0c` background, `#d8ffd0` or `#ffd27a` ink; one accent.
+            - Monospace only; no proportional font, no ligatures, no emoji as the main shape.
+            - Use characters with similar width: ` .:-=+*#%@` for shading, `/\|_-` for lines, `oO0` for eyes or bubbles.
+            - Leave a margin; do not let a shark touch the frame edge unless it is exiting.
+            - A shark is a silhouette with a dorsal fin, tail, and one eye; a fish is a small dash or `><>`; water is a repeated wave line, not random noise.
+            - Keep the caption outside the art: one sentence, plain language.
+
+            ## Quality
+
+            - The art must be readable at phone width. If a line wraps, cut the scene or split it into two frames.
+            - A video must have a duration, a resolution, a frame count, and a path. “A nice animation” is not a result.
+            - No copyrighted character, logo, or copied ascii-sharks frame.
+            - No external image, font, package, or CDN. The HTML is self-contained.
+            - If `render_video` fails, report the exact error and keep the HTML; do not silently switch to a still image.
+
+            ## Output order
+
+            1. `ascii_art` block, or the `ascii.html` preview.
+            2. For a video: `render_video` result with path and duration.
+            3. One caption and one next step (loop longer, change ink, or add a title).
+        """.trimIndent() + "\n",
         "android-apk" to """
             # Android APK check
 
@@ -300,6 +354,210 @@ object StarterSkills {
             - Keep the original and every patched copy hashed. Patch only a copy, never the evidence.
             - If the target is Android malware and no disposable device is available, stop at static analysis and say the dynamic behavior was not observed.
             - When the question is only "is this APK safe to install", use android-apk; when it is "what does this program really do", stay here and go to the logic.
+        """.trimIndent() + "\n",
+        "rea" to """
+            # REA: reverse engineering software systems
+
+            Use this when a desktop app, native binary, JavaScript or Electron app, .NET assembly, APK, firmware image, packaged Python app, Unity/Godot game, or recorded runtime must be understood as a system: a feature, a protocol, a data format, a build difference, or a behavior. REA 6.8.0 (MIT, morluto/rea) is the reference toolkit. It is not installed on this phone; the local `reverse-engineering` skill is the phone fallback.
+
+            ## Where REA runs
+
+            REA is a local MCP server and CLI. It needs Node.js `^22.23.4 || ^24.22.1 || >=26.12.1` and npm. The supported agents are Claude Code, Codex, Cursor, Gemini CLI, Grok Build, and other MCP clients.
+
+            - First setup on the user's own computer: `npx rea-agents@latest setup`. Review the changes, approve the MCP registration, restart the agent.
+            - Global CLI: `npm install -g rea-agents`, then `rea --help`.
+            - Update: `rea update`, or refresh setup with `npx rea-agents@latest setup`.
+            - Node 23 and 25 are not supported. Do not upgrade Node silently; tell the user.
+            - Deep native analysis uses an existing Hopper, Ghidra, or IDA installation. Static JavaScript and .NET inspection do not require a native engine. Do not install a commercial tool or a cracked copy.
+            - The phone cannot run this MCP stack. If a user-owned PC is connected, `remote_put` the sample or path and run the CLI with `ssh_exec` on that PC. Do not send the sample to a third-party server.
+
+            ## Choose the target workflow
+
+            | Target | What to inspect | Requirement |
+            | --- | --- | --- |
+            | Desktop install | Runtime candidates, support files, component markers, next probes | built-in bounded directory inspection |
+            | Native binary | Pseudocode, assembly, strings, symbols, calls, references | Hopper, Ghidra, or IDA |
+            | JavaScript / Electron | Modules, imports, source maps, routes, IPC, native add-ons | Node and npm |
+            | .NET assembly | Metadata, CIL, native dependencies, build comparison | static only |
+            | APK | Manifest, classes, decompiled methods, references, signatures, resources | headless JADX and a full JDK; optional Apktool |
+            | Android device | Packages, processes, logs, dumps, screen, APK/file transfer | caller-supplied adb |
+            | Go / Rust / Swift | Embedded build identity, modules, dependencies, symbols | built-in static inspection |
+            | Unity IL2CPP / Godot PCK / PyInstaller / Node SEA | Metadata, archive inventory, entry scripts, bytecode | built-in static decoding |
+            | GPU / model / WASM / SQLite / firmware | Code objects, model metadata, imports, tables, regions | built-in or caller-supplied tool |
+            | Website / capture | Page structure, scripts, requests, responses, source locations | Chrome-family browser or HAR/SAZ |
+            | Process behavior | Terminal output, interactions, exit, filesystem, comparisons | Linux/macOS PTY |
+
+            Pick the narrowest workflow that can answer the question. Do not start a native provider for a JavaScript route, and do not use a runtime capture when static files already answer it.
+
+            ## Evidence protocol
+
+            REA returns canonical Evidence, not just prose. Read `normalized_result` for the operation and `evidence_id` for its identity. `raw_result` is a provider-specific representation and may be null. Keep limitations and coverage; they are part of the answer.
+
+            - `analyze_function` returns a retained summary by default in 6.8.0. Ask for `detail: "complete"` only when you need the full dossier; use `inspect_analysis_view` to page a summary or a large collection.
+            - Compare only compatible Evidence. `compare_functions` accepts a complete dossier; a summary is rejected. Use the retained `evidence_id` for a dossier, not the summary.
+            - A coverage status of `unknown` or `partial` is not equality. Do not turn a missing observation into a negative fact.
+            - MCP input schemas are compact by default. Set `REA_MCP_INPUT_SCHEMA_PROFILE=full` when a field is ambiguous; do not guess a parameter shape.
+            - Save large Evidence to a file and project a summary/page; do not paste hundreds of megabytes into the chat.
+
+            ## Investigation
+
+            1. State the feature or behavior, the target build, and the authorization. A lawful sample the user owns or may inspect; no DRM bypass, no stolen license, no third-party system.
+            2. Fingerprint first: file type, architecture, version, signature, hashes, install layout, runtime. Record what is packed or stripped.
+            3. Static first: strings, symbols, imports, manifest, routes, source maps, metadata, archive inventory. Do not run an unknown sample on the daily phone.
+            4. Trace the feature: entry point -> callers/callees -> data -> external boundary. Keep a call path and file/offset references.
+            5. Use dynamic capture only in an isolated environment and only when static evidence is insufficient. Do not contact a live command server or replay credentials.
+            6. Reconstruct: pseudocode, data structures, protocol messages, constants, state machine, test vector. Reimplement in a small harness and test it.
+            7. Report evidence, unknowns, limitations, and the smallest next probe. A decompiler output is not source code.
+
+            ## 6.8.0 specifics
+
+            - Agent environments can be built from network captures, browser scenarios, or a prompt; derived reads and evidence-gated writes can be served and compared with fresh captures.
+            - More static formats: GPU code objects, BEAM, Python bytecode, Unity IL2CPP metadata, Godot PCK, PyInstaller, Node.js SEA, devicetree, and more PE/ELF tables.
+            - Retained summaries and selected fact queries keep a large investigation bounded; complete Evidence remains available.
+            - Breaking changes to know: `analyze_function` default summary; JSONL metadata record; `environment-serve` serves derived state unless `--replay-only`; MCP schemas compact by default; Node 23/25 unsupported.
+            - Use the release tag `rea-agents-6.8.0` when pinning; do not mix output from an older version without saying so.
+
+            ## Quality and safety
+
+            - Every claim gets an Evidence location, a function/offset, or a test vector. Unknown stays unknown.
+            - A suspicious string is not a backdoor; a trigger and an action path are.
+            - No live C2, no credential replay, no exploitation, no bypass of a license or paywall.
+            - Keep the sample outside the project and delete it when the investigation is done. Hash the original and every patched copy.
+            - On this phone, use `reverse-engineering` and local tools; do not install Node, npm, Hopper, Ghidra, or IDA here.
+            - If a PC is not available, stop at static phone analysis and say so.
+
+            ## Output
+
+            1. Target and authorization.
+            2. Workflow and tool version (REA 6.8.0, provider).
+            3. Evidence chain: feature -> function/offset -> observation.
+            4. Reconstruction and test vector.
+            5. Unknowns, limitations, and one next probe.
+        """.trimIndent() + "\n",
+        "ub-mode" to """
+            # UB mode: clean code under pressure
+
+            Use this when the user asks to build, change, fix, or “vibe code” a feature and the result must be clean enough to keep. The request may be casual; the engineering is not. A working demo is not done if it is duplicated, untested, or only hides the cause.
+
+            Three phases, in order: **First make it work**, **Then make it right**, **Practice**.
+
+            ## First make it work
+
+            1. Restate the outcome in one sentence and name the smallest behavior that can be checked. If the user's request has two outcomes, split it.
+            2. Find the existing test command and the smallest test file. Do not install a test framework.
+            3. Write the failing test first, using `write_file` or `edit_file`. Run it with `run_command` and quote the failure. If it passes before the change, the test does not test the change.
+            4. Make the smallest edit that turns that failure into a pass. Do not rewrite the module, add an abstraction, or fix unrelated code in the same step.
+            5. Run the same test again. A different test is not the check.
+
+            If an honest test is impractical, say why in one line and name the manual check. Do not write a test that would pass if the function returned nothing.
+
+            ### Laziness protocol
+
+            - One decision lives in one place.
+            - The smallest edit that solves the stated problem wins.
+            - Do not add a dependency, a package, a build step, or a new file when the existing code can do the job.
+            - Delete a line before adding a branch.
+
+            ### Foundational thinking
+
+            - Get the data shape right before the logic. Fix the model before the template.
+            - Do first whatever makes every later step easier: a test seam, a pure function, a clear type.
+            - If a concurrent writer would matter, do not share the mutable state; if it must be shared, allow one writer and enforce it in the structure.
+
+            ### TDD
+
+            - Red: see the new test fail for the expected reason.
+            - Green: smallest change that passes.
+            - Refactor: only with the test green.
+            - If the test is flaky, fix the test or the design; do not retry until it looks green.
+
+            ### Redesign from first principles
+
+            Do not bolt a new requirement onto a design that cannot hold it. Ask what you would have built if the requirement had been there from the start. Deliver that design in small, verified pieces.
+
+            ### Attack the premise
+
+            If two fixes that share one premise fail the same gate, write the premise in one sentence and count which actors hold the imbalance. Remove the assumption. Do not start a third fix until you have done that.
+
+            ### Subtract before you add
+
+            Take complexity out before adding anything: an unused parameter, a dead branch, a duplicated helper, a wrapper that only forwards.
+
+            ### Build the lever
+
+            If the work is not obvious at a glance, build the smallest tool that does one unit, do one unit by hand, then make the tool match that unit. Do not build a framework.
+
+            ### Architecture
+
+            - **Model the domain.** Make illegal states impossible to write. Keep a short glossary of terms. If the code is already clear and local, leave it.
+            - **Boundary discipline.** Check data where it enters; inside, trust it. Keep business logic in a pure function.
+            - **Type discipline.** Parse outside data once, at the boundary. Do not silence the compiler.
+            - **Idempotence.** Running the operation twice, or after a crash halfway, ends in the same state.
+            - **Separate before serializing shared state.** If two parts do not need the same mutable object, give each its own.
+
+            ## Then make it right
+
+            ### Fix the root cause
+
+            - Reproduce the failure with the same check the user saw.
+            - Find the line where the bad value starts, not only where it crashes.
+            - Fix that cause.
+            - A guard that hides the crash is not a fix.
+
+            Use `systematic-debugging` when the cause is not obvious. Do not patch symptoms to make a test green.
+
+            ### Sequence verifiable units
+
+            Finish one small unit, check it, then start the next. A half-finished refactor and a new feature are two changes, not one.
+
+            ### Test behavior, not implementation
+
+            The test calls the code the way its user does and checks the result the user sees. If the test would still pass when every function returned nothing, throw it out.
+
+            ### Quality gates
+
+            Use the project's existing test and lint commands. If the repository already has `crapper`, `dryer`, or `mutator`, use them; do not install them on this phone and do not run `npx` or `npm install`.
+
+            - **Complexity.** Split a function that has too many branches or more than one reason to change. A function with no test and many branches is a finding, not a style preference.
+            - **Duplication.** Search the changed area with `grep` for copied blocks and near-identical helpers. Remove the duplicate or extract one behavior. Do not create a generic abstraction for two accidental look-alikes.
+            - **Coverage.** Every new branch has a test or a named manual check. Delete dead code instead of testing it.
+            - **Mutation thinking.** For each promise, ask what change would make the test fail. If no small change fails it, the test is weak.
+
+            ### Refactoring
+
+            1. Pin the current behavior with a passing test.
+            2. Change one structural thing: rename, extract, inline, move, split.
+            3. Prove the same behavior with the same test.
+            4. Stop before the refactor becomes a rewrite.
+
+            ## Practice
+
+            - **Keep a log.** Every action and its reason: test, failure, edit, pass, refactor. Report it at the end.
+            - **Guard the context.** Keep the main thread small; put bulk output in a file and keep the summary.
+            - **Clean the worktree.** Remove generated files, failed experiments, and unused imports. Uncommitted work waits for a decision; do not delete the user's changes.
+            - **Commit small.** One change per commit, in order. The message says why, what changed, and how it was proved. Push only when the user asks.
+            - **Review before done.** Use `review` on the diff. If a test failed, the run is not done; the same check must pass.
+
+            ## Vibe-coder red flags
+
+            - A feature with no failing test and no manual check.
+            - Copy-paste code with a new name.
+            - A “fix” that catches an exception, retries, or hides a warning.
+            - A broad rewrite for a one-line behavior.
+            - Unused code, a dead branch, a TODO, or a commented-out block left behind.
+            - A claim that it works without the command and its output.
+            - A package installed to avoid learning the existing tool.
+            - Two sources of truth for one decision.
+            - “It compiles” used as proof of behavior.
+
+            ## Output
+
+            1. The changed files and the one behavior.
+            2. The test command, the red output, and the green output.
+            3. The root cause and the smallest fix.
+            4. What was refactored, and the check that proved behavior unchanged.
+            5. Duplication/complexity findings, or “not measured” with the reason.
+            6. The log and what remains risky.
         """.trimIndent() + "\n",
         "review" to """
             # Review a change
@@ -574,6 +832,162 @@ object StarterSkills {
             4. A clean result may be saved with save_skill scope=app, using only the adapted text review_skill printed. Do not paste the remote file.
             5. The adapted skill uses tools this app already has. Do not run npx, apt, sudo, or a downloaded program.
             6. When the search is finished, call use_skill name=find-skills scope=app on=false.
+        """.trimIndent() + "\n",
+        "genealogy" to """
+            # Генеалогия: доказательный поиск (v1.8.0)
+
+            Use this when the user asks about family history, ancestors, родственники, метрические книги, архивные записи, репрессии, депортации, военные документы, однофамильцы or a family tree in the former USSR, the Russian Empire, or the former Soviet republics. Reply in the user's language; quote records in their original spelling. Adapted from ex-ussr-kinship-research v1.8.0 (MIT, Denis Shiryaev).
+
+            Это семейная история, а не слежка: без текущих адресов, телефонов и аккаунтов живых людей; без обхода входа, paywall, geo-block, лимитов и CAPTCHA.
+
+            ## Рамки и первый ответ
+
+            1. Сформулируйте один вопрос: кто с кем связан, какая связь проверяется, за какой период.
+            2. Запишите известные имена, даты, места, конфессию, занятия, миграции — с пометкой, что это рассказ, а не документ.
+            3. Спросите один раз о том, что уже есть у семьи: кто исследовал человека, какие деревья и страницы (FamilySearch, Geni, MyHeritage, ВГД, «Бессмертный полк», «Бессмертный барак», «Последний адрес», Yad Vashem), у кого документы, письма, альбомы и фотографии. Ответ сохраните в `PRIOR_FAMILY_RESEARCH`.
+            4. Отметьте, кто может быть жив: минимум данных, без текущих контактов и публикации.
+            5. Спросите о запретах: страны, сервисы, платные источники, публикация имён, загрузка файлов, контакт с архивом.
+            6. Сохраните оригиналы без изменений; работайте с копиями и записывайте SHA-256 каждого файла.
+
+            ## Автономный цикл
+
+            По умолчанию вести исследование самостоятельно, а не заканчивать каждый шаг вопросом «продолжать?».
+
+            1. Уточнения задавать один раз; не блокировать работу ожиданием ответа. Неизвестное — неизвестно, предположение — гипотеза.
+            2. Повторять: следующая проверка → источник → артефакт и происхождение → утверждения и журнал → следующий шаг. Не повторять проверенное без нового основания.
+            3. Если источник требует входа, оплаты или CAPTCHA, сохранить URL и запрос, оставить шаг в очереди и продолжить другие источники. Обычную CAPTCHA — одна попытка штатными средствами, если пользователь может её пройти; решатели, обход и чужие cookies запрещены.
+            4. Остановиться, когда вопрос доказан, маршруты закрыты или нужно решение пользователя. Отсутствие результата — не доказательство отсутствия человека.
+
+            В начале исследования один раз проверьте канонический репозиторий; если версия новее 1.8.0, сообщите, но не останавливайте поиск.
+
+            ## Дело и реестры
+
+            Создайте папку `research/genealogy/<case>/`:
+
+            - `CASE.md` — вопрос, рамки, известные факты, ограничения, `PRIOR_FAMILY_RESEARCH`;
+            - `PERSONS.csv` — `PERSON_ID, NAME_AS_WRITTEN, VARIANTS, BIRTH, PLACE, NOTES`;
+            - `ARTIFACTS.csv` — `ARTIFACT_ID, TYPE, SOURCE, URL_OR_PATH, DATE, READABILITY, INDEPENDENCE_GROUP, HASH`;
+            - `CLAIMS.csv` — `CLAIM_ID, ARTIFACT_ID, CLAIM, STATUS, NOTES`;
+            - `RELATIONS.csv` — `RELATION_ID, PERSON_A, PERSON_B, TYPE, STATUS, EVIDENCE`;
+            - `SEARCH_LOG.csv` — `DATE, QUERY, SOURCE, SCOPE, FILTERS, ROWS_SEEN, INDEX_STATE, COVERAGE, STATUS, RESULT, BLOCKER, NEXT`;
+            - `REPORT.md` — итог.
+
+            Одна строка — один факт или один поиск. Не смешивайте несколько утверждений в одной строке. `write_file` создаёт файл; `read_file` проверяет его. Публичную страницу читайте через `http_request`; `browse_page` — после `load_tools group=remote`.
+
+            ## География и имена
+
+            Для каждого события определите юрисдикцию **на дату события**, а не современную страну: государство → губерния/область → уезд/район → волость/сельсовет → приход/ЗАГС → населённый пункт. Запишите старые и новые названия, язык дел и календарь; старый/новый стиль — отдельно. Покрывайте все 15 бывших советских республик.
+
+            Составьте матрицу имён: исходное написание, дореформенная форма, местный язык, кириллица/латиница, патроним, женские окончания, девичья фамилия, русификация, е/ё, -ев/-ов. Запросы — на языке источника, а не общения.
+
+            До появления различающего признака ведите разных людей как разные `PERSON_ID`. Признаки: точная дата рождения, родители, восприемники, дом, воинская часть, профессия, адрес, состав семьи. Не сливайте людей только по ФИО, возрасту и селу.
+
+            ## Источники: порядок и маршруты
+
+            1. Оригинал или официальный архивный каталог.
+            2. Официальный индекс/опись, опубликованное издание документов.
+            3. Крупные генеалогические базы и книги памяти — как наводка, с проверкой оригинала.
+            4. Семейные деревья, форумы, краеведческие сайты — только как гипотеза.
+
+            Проверяйте актуальный адрес и условия; не выдавайте индекс за оригинал. Полезные маршруты:
+
+            - **FamilySearch Catalog / Images.** Ищите место, приход и DGS; проверяйте, что описано — индекс, изображение или плёнка. Для индексированной записи сохраните ARK и наблюдаемый текст; для скана — DGS, кадр, архивный шифр и прочитанное. Индекс и скан одной записи — не независимые подтверждения.
+            - **Geneteka.** Проверяйте территорию, приход, родителей, пару, год и фильтры; фиксируйте покрытие типов записей. Один индекс не является полным списком прихода.
+            - **Zhnivo, SODD NAF и hryc.by.** Точечные белорусские маршруты: сохраняйте происхождение, ограничения доступа и проверяйте находку по оригиналу. Каталожная ссылка — не доказательство родства.
+            - **GWAR (WWI).** Ищите человека и locality раздельно; различайте волость и населённый пункт; сохраняйте locator изображения. Не переносите сведения на однофамильца.
+            - **OBD «Мемориал», «Память народа», «Подвиг народа».** Потери, награды, места службы; отсутствие в базе потерь не значит, что человек не воевал.
+            - **«Мемориал», «Бессмертный барак», «Последний адрес», Yad Vashem.** Репрессии, депортации, эвакуация, Холокост; проверяйте, кто назван и в каком действии.
+            - **Кладбищенские каталоги и надгробия.** Каталог может подсказать историческое надгробие и военную семью; это отдельная находка, а не автоматическая связь.
+            - **ВГД, Raduraksti, областные архивы, библиотеки, краеведческие каталоги.** Ищите по месту, конфессии, году и вариантам имени; используйте внутренний поиск.
+            - **Семейные страницы и деревья.** Проверяйте поиск сайта. Фотография оригинала — `image-of-original`; текст страницы — пересказ.
+
+            ## Полнота поиска
+
+            До отчёта закройте каждый пункт в `SEARCH_LOG.csv` статусом `found`, `not-found`, `blocked` или `skipped`:
+
+            1. метрические книги / церковные записи;
+            2. ревизские сказки и переписи;
+            3. гражданская регистрация после 1918 года;
+            4. репрессии и депортации;
+            5. эвакуация;
+            6. плен, остарбайтеры;
+            7. эмиграция;
+            8. еврейские общины;
+            9. военная служба и награды.
+
+            Богатая первая база не завершает поиск. Если пункт не проверен, это `skipped` с причиной, а не «нет данных». Для каждой гипотезы заранее запишите, что её подтвердит и что опровергнет.
+
+            ## Поиск и журнал
+
+            Ищите на языке источника, по вариантам имени, места и лет. Начинайте с самого позднего надёжного события и двигайтесь назад по одной связи. Для каждого запроса сохраняйте:
+
+            - `SCOPE` — кого и что искали: роль (жених, невеста, ребёнок, родитель, свидетель), территория, период;
+            - `FILTERS` — фактические фильтры и лимит;
+            - `ROWS_SEEN` — сколько результатов реально просмотрено;
+            - `INDEX_STATE` — `indexed`, `not-indexed`, `unresolved` или `blocked`;
+            - `COVERAGE` — `complete` или `partial`;
+            - `STATUS` — `found`, `not-found`, `blocked` или `skipped`.
+
+            Положительная находка в узкой выборке не закрывает поиск по другому человеку. Для отрицательного вывода нужен подходящий охват, а не перебор всех комбинаций. Не повторяйте неудачный запрос без нового признака.
+
+            ## Проверка выдачи и архивных ссылок
+
+            - **Применимость прежнего запроса.** Перед отрицательным выводом сверьте исходные фильтры, роли людей, годы, территорию, лимит и фактически просмотренные результаты. Выборка браков по имени жениха не является списком всех браков прихода.
+            - **Смысл поля.** Название поля не заменяет формуляр. Возраст рядом с годом учёта — не точная дата рождения; не объявляйте весь индекс ошибочным по одному примеру.
+            - **Единица совпадения.** Уточните, ищет ли сервис по записи, странице или документу. Два слова на одной странице описи могут относиться к разным делам; проверяйте их внутри нужной записи.
+            - **Каталожное описание.** Шапка, том, цифровая группа и раздел могут расходиться по месту, датам или типу актов. Сохраните оба описания и основание выбора.
+            - **Опечатка в шифре.** Храните исходную ссылку, противоречия и замену отдельно. Проверяйте место, даты, вид документа и объём; похожий номер — кандидат, а не подтверждение.
+            - **Перемещение дела.** Сохраняйте цепочку: старый номер, опись, промежуточное дело, фонд назначения; конечный номер — только после подтверждения.
+
+            Пустой ответ `{}`, пустая панель, незавершённая загрузка или успешный вход **не доказывают** отсутствие записи. `not-indexed` допустим только при явном сообщении источника; иначе `unresolved` или `blocked`. Неполный фрагмент всегда `COVERAGE=partial` и не закрывает поиск по книге.
+
+            ## Доказательства
+
+            Любой новый материал — **артефакт**, а не факт. Оцените происхождение, оригинал/копию/индекс, современность событию, информанта, прямоту, читаемость, полноту и независимость. Копии и зеркала одной записи получают общий `INDEPENDENCE_GROUP`; индекс и скан одной записи тоже не независимы. Общий архив не делает две записи независимыми — оценивайте зависимость каждого утверждения.
+
+            Статусы утверждений — только объяснимые, без процентов:
+
+            - `hypothesis` — рабочая гипотеза;
+            - `single-source` — одна доказательная цепочка;
+            - `corroborated` — минимум две независимые цепочки без существенного конфликта;
+            - `strongly-corroborated` — несколько независимых цепочек, включая прямую запись с установленным происхождением;
+            - `contradicted` — сильное противоречие;
+            - `unresolved` — данных мало или конфликт не разрешён.
+
+            Не повышайте семейную память до документа. Не скрывайте противоречие. Не вычисляйте точную дату из возраста и не считайте отсутствие записи смертью. Если событие не попадает в приход, проверьте соседние и объясните выбор территории.
+
+            ## Фотографии, деревья и надгробия
+
+            Ищите семейные фотографии и альбомы: подписи, обороты, одежда, погоны, награды, фотоателье. Надпись на обороте — свидетельство, а не автоматическая идентификация. Для надгробия сохраните фотографию, кладбище, дату съёмки и текст; надгробие может дать военную часть или семью, но вывод об родстве делайте отдельно.
+
+            Дерево GEDCOM/JSON — это **наводка**, а не доказательство. Сохраните исходный файл и внешние ID, заведите отдельных кандидатов и не сливайте людей автоматически. Для живых людей минимизируйте данные; не публикуйте дерево с их данными без согласия.
+
+            ## Архивные запросы и координация
+
+            Проект письма в архив: адресат, фонд/опись/дело, вопрос, факты, согласие. Отправляет пользователь или уполномоченный канал; не автоматически. Фиксируйте `draft`, `prepared`, `sent`, `replied`; при неоднозначной ошибке проверьте, не ушло ли письмо. Ответ архива — отдельный артефакт.
+
+            При параллельной работе: один ответственный за реестр, уникальные ID, передача только затронутых записей и фактического охвата. Не вкладывайте весь архив в каждый пакет; перед импортом сверяйте версию.
+
+            ## Отчёт
+
+            Пишите `REPORT.md` по связям, а не по красивой истории: каждое ребро `A — B`, тип связи, статус, артефакты, цитата, перевод, что не проверено. Отдельно: противоречия, неудачные и заблокированные поиски, покрытие, вопросы живым родственникам, проекты архивных запросов, следующие 3 проверки. Частичный отчёт полезен; не выдавайте его за полный.
+
+            ## Что не делать
+
+            - Не искать текущие адреса, телефоны и аккаунты живых людей.
+            - Не публиковать данные несовершеннолетних и чувствительные находки без необходимости.
+            - Не загружать документы, фотографии или ДНК в сторонний сервис без явного согласия.
+            - Не обходить CAPTCHA, paywall, geo-block, rate limit или авторизацию.
+            - Не выдавать индекс, пересказ, дерево или надгробие за оригинал.
+            - Не сливать однофамильцев и не объявлять родство без независимого подтверждения.
+
+            ## Порядок ответа
+
+            1. Один вопрос и рамки; что уже есть у семьи.
+            2. Дело и реестры (файлы).
+            3. Что уже доказано, что нет, и с каким покрытием.
+            4. Следующие 3 проверки с точными запросами.
+            5. Вопросы родственникам или проект архивного запроса.
         """.trimIndent() + "\n",
         "health" to """
             # Read a health file
@@ -1083,6 +1497,8 @@ object StarterSkills {
         extendAndroidApk(appDir)
         extendNetworkStudy(appDir)
         extendSkillSecurity(appDir)
+        extendAsciiStudio(appDir)
+        extendGenealogy(appDir)
         extendSystematic(appDir)
         extendRrsi(appDir)
         extendSecondMonitor(appDir)
@@ -1137,6 +1553,24 @@ object StarterSkills {
         val current = file.readText(Charsets.UTF_8)
         if (current.contains("local static scanner")) return
         file.writeText(skills.getValue("skill-security"), Charsets.UTF_8)
+    }
+
+    /** Phones that saved the first ascii-studio skill learn the card wording. */
+    private fun extendAsciiStudio(appDir: File) {
+        val file = File(appDir, "ascii-studio.md")
+        if (!file.isFile) return
+        val current = file.readText(Charsets.UTF_8)
+        if (current.contains("compact html card")) return
+        file.writeText(skills.getValue("ascii-studio"), Charsets.UTF_8)
+    }
+
+    /** Phones that saved the first genealogy skill learn the v1.8.0 search rules. */
+    private fun extendGenealogy(appDir: File) {
+        val file = File(appDir, "genealogy.md")
+        if (!file.isFile) return
+        val current = file.readText(Charsets.UTF_8)
+        if (current.contains("v1.8.0")) return
+        file.writeText(skills.getValue("genealogy"), Charsets.UTF_8)
     }
 
     /** Phones that saved an older android-debug skill learn to check the installed screen. */

@@ -35,6 +35,7 @@ object ToolGroups {
         "chart",
         "layout",
         "network_card",
+        "ascii_art",
         "list_models",
     )
 
