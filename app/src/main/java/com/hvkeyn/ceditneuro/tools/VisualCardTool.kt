@@ -10,7 +10,7 @@ class VisualCardTool : Tool {
     override val description =
         "Draw a static diagram in the chat: a process flow, architecture, sequence, timeline, comparison, block diagram, exploded view, section, or technical sheet. " +
             "Pass a complete responsive SVG with a viewBox; it is wrapped in a light paper sheet with a title and caption. " +
-            "Keep the SVG under 9000 characters and use no script, external image, foreignObject, or event handler. " +
+            "Keep the SVG under 18000 characters and use no script, external image, foreignObject, or event handler. " +
             "The reply must include the returned svg block unchanged. For ASCII art use ascii_art; for a large drawing write drawing.svg and open_file."
 
     override val parameters = objectSchema(
@@ -32,7 +32,7 @@ class VisualCardTool : Tool {
         if (!Regex("""viewBox\s*=\s*["'][^"']+["']""", RegexOption.IGNORE_CASE).containsMatchIn(svg)) {
             return ToolResult.error("svg needs a viewBox so it scales on a phone.")
         }
-        if (svg.length > 9_000) return ToolResult.error("svg is longer than 9000 characters.")
+        if (svg.length > 18_000) return ToolResult.error("svg is longer than 18000 characters.")
         val blocked = listOf("<script", "<iframe", "<object", "<embed", "<foreignObject", "<image", "javascript:")
         if (blocked.any { svg.contains(it, ignoreCase = true) } ||
             Regex("""\son[a-z]+\s*=""", RegexOption.IGNORE_CASE).containsMatchIn(svg)
@@ -88,7 +88,7 @@ class VisualCardTool : Tool {
             }
             append("</svg>")
         }
-        if (out.length > 12_000) return ToolResult.error("The sheet is longer than 12000 characters.")
+        if (out.length > 24_000) return ToolResult.error("The sheet is longer than 24000 characters.")
         return ToolResult.ok("```svg\n$out\n```")
     }
 

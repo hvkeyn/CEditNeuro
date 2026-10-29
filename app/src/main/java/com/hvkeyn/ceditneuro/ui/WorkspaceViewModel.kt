@@ -3082,24 +3082,28 @@ class WorkspaceViewModel(
         val alreadyThinking = project.ui.agentActivity?.phase == "Thinking"
         if (alreadyThinking && now - project.lastThoughtUi < 400) return
         project.lastThoughtUi = now
-        val stage = thinkingStage(project.thoughtTail)
+        val stage = thinkingStage(project.thoughtTail, isRussian(project))
         setActivity(project, phase = "Thinking", focus = stage)
         beacon.send(stage)
     }
 
     /** A short, stable status for the toolbar; never a raw fragment of the hidden reasoning. */
-    private fun thinkingStage(text: String): String {
+    private fun isRussian(project: LiveProject): Boolean =
+        project.ui.chat.lastOrNull { it.role == ChatRole.User }?.text
+            ?.any { it in '\u0400'..'\u04FF' } == true
+
+    private fun thinkingStage(text: String, russian: Boolean): String {
         val lower = text.lowercase()
         return when {
             "svg" in lower || "diagram" in lower || "draw" in lower || "схем" in lower || "нарис" in lower ->
-                "Preparing the drawing"
+                if (russian) "Готовлю схему" else "Preparing the drawing"
             "test" in lower || "check" in lower || "verify" in lower || "тест" in lower || "провер" in lower ->
-                "Checking the result"
+                if (russian) "Проверяю результат" else "Checking the result"
             "file" in lower || "read" in lower || "grep" in lower || "файл" in lower || "чит" in lower ->
-                "Reading the project"
+                if (russian) "Читаю проект" else "Reading the project"
             "plan" in lower || "step" in lower || "план" in lower || "шаг" in lower ->
-                "Planning the next step"
-            else -> "Working through the request"
+                if (russian) "Планирую следующий шаг" else "Planning the next step"
+            else -> if (russian) "Работаю над запросом" else "Working through the request"
         }
     }
 

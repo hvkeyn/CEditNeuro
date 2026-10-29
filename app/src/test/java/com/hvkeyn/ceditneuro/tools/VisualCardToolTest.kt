@@ -24,6 +24,18 @@ class VisualCardToolTest {
     }
 
     @Test
+    fun acceptsADetailedSvgBelowTheNewLimit() = runBlocking {
+        val path = "M0 0" + " l1 1".repeat(2_000)
+        val detailed = """<svg viewBox="0 0 960 620"><path d="$path" fill="none" stroke="#000"/></svg>"""
+        val out = VisualCardTool().execute(buildJsonObject {
+            put("title", "Detailed sheet")
+            put("svg", detailed)
+        })
+        assertTrue(!out.isError)
+        assertTrue(out.content.startsWith("```svg"))
+    }
+
+    @Test
     fun refusesScriptAndEventHandlers() = runBlocking {
         val out = VisualCardTool().execute(buildJsonObject {
             put("svg", """<svg viewBox="0 0 10 10" onload="alert(1)"><script>alert(1)</script></svg>""")

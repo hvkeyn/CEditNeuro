@@ -201,6 +201,8 @@ fun ChatPanel(
     val followEnd = remember(state.projectRoot) { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
     val steps = chatSteps(state.chat)
+    val russian = state.chat.lastOrNull { it.role == ChatRole.User }?.text
+        ?.any { it in '\u0400'..'\u04FF' } == true
     val userScroll = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
@@ -265,7 +267,7 @@ fun ChatPanel(
                             item { ChatHint() }
                         }
                         items(state.chat, key = { it.id }) { entry ->
-                            ChatBubble(entry, state.projectRoot, onOpenLink)
+                            ChatBubble(entry, state.projectRoot, onOpenLink, russian)
                         }
                         if (state.chat.isNotEmpty()) {
                             item(key = "chat-end-sentinel") {
@@ -1021,9 +1023,9 @@ private fun ChatHint() {
 }
 
 @Composable
-private fun ChatBubble(entry: ChatEntry, projectRoot: String?, onOpen: (String) -> Unit) {
+private fun ChatBubble(entry: ChatEntry, projectRoot: String?, onOpen: (String) -> Unit, russian: Boolean = false) {
     when (entry.role) {
-        ChatRole.Reasoning -> ThinkingBlock(entry)
+        ChatRole.Reasoning -> ThinkingBlock(entry, russian)
         ChatRole.User -> MessageBlock(
             label = "You",
             text = entry.text,
@@ -1057,7 +1059,7 @@ private fun ChatBubble(entry: ChatEntry, projectRoot: String?, onOpen: (String) 
 }
 
 @Composable
-private fun ThinkingBlock(entry: ChatEntry) {
+private fun ThinkingBlock(entry: ChatEntry, russian: Boolean = false) {
     var expanded by rememberSaveable(entry.id) { mutableStateOf(false) }
     val steps = remember(entry.text) { thinkingSteps(entry.text) }
     Column(
@@ -1087,7 +1089,12 @@ private fun ThinkingBlock(entry: ChatEntry) {
                 )
             }
             Text(
-                text = if (entry.streaming) "Thinking" else "Thought",
+                text = when {
+                    entry.streaming && russian -> "Думаю…"
+                    entry.streaming -> "Thinking"
+                    russian -> "Ход мысли"
+                    else -> "Thought"
+                },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier
@@ -1096,7 +1103,7 @@ private fun ThinkingBlock(entry: ChatEntry) {
             )
             if (!entry.streaming && steps.isNotEmpty()) {
                 Text(
-                    text = "${steps.size} steps",
+                    text = if (russian) "${steps.size} шагов" else "${steps.size} steps",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline,
                     modifier = Modifier.padding(end = 6.dp),
@@ -1117,13 +1124,13 @@ private fun ThinkingBlock(entry: ChatEntry) {
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    text = "Steps",
+                    text = if (russian) "Шаги" else "Steps",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.tertiary,
                 )
                 if (steps.isEmpty()) {
                     Text(
-                        text = "The request was handled in one pass.",
+                        text = if (russian) "Запрос обработан за один проход." else "The request was handled in one pass.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1153,7 +1160,7 @@ private fun ThinkingBlock(entry: ChatEntry) {
                     }
                     if (steps.size == 10 && entry.text.length > 1_200) {
                         Text(
-                            text = "The visible steps are condensed.",
+                            text = if (russian) "Шаги сокращены." else "The visible steps are condensed.",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.outline,
                         )

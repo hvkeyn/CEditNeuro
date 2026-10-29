@@ -26,7 +26,7 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ---
 
-## New in 0.99.35
+## New in 0.99.36
 
 - **Spec Kit** as a local skill: constitution → spec → plan → tasks → analysis → implementation → convergence. The plan is frozen, every task has a check, and unknown requirements stay marked instead of invented.
 - **Visualize** and `visual_card`: process flows, architectures, sequences, timelines, comparisons, exploded views, and technical sheets are drawn as static paper cards in the chat.
@@ -35,6 +35,9 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 - **Device teardown**: `visualize` draws a static exploded, orthographic, or section sheet for a phone, watch, drive, or other object, and can add a restrained CSS/SMIL animation when movement is the explanation.
 - **Looping visuals**: an animated SVG replays after a five-second pause; ASCII frames hold for five seconds after the last frame. Static cards are left alone.
 - **Visual intent**: a request to show a process, system, device, or drawing switches on the `visualize` skill before the model starts; the Skills chip confirms it.
+- **Your language**: thinking headers and stages follow the language of the request; the visible status no longer appears as an English fragment.
+- **Larger sheets**: `visual_card` accepts detailed SVGs up to 18,000 characters, so a system or device drawing is not rejected for being too rich.
+- **Evidence-based learning**: a lesson needs a failed action, a command or file, and a fix; one chat is not training. Harness edits still go through rrsi and the Doctor report.
 - **Thinking console**: a compact spinner and a stable stage replace flashing fragments; tapping the row opens a numbered, readable step list.
 - **Stable sheets**: SVG cards use their `viewBox` for height and no longer grow in pieces while you scroll; ASCII cards reserve their height before the drawing loads.
 - **Community files**: contributing, code of conduct, security, accessibility, MIT license, issue forms, and a pull request template are now in the repository.
