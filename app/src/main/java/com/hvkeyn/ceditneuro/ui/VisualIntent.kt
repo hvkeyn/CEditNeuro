@@ -12,6 +12,7 @@ internal fun wantsVisualSkill(prompt: String): Boolean {
         "визуал", "нарису", "схем", "диаграм", "чертёж", "чертеж",
         "разбери", "разбор", "устройств", "внутренност", "из чего состоит",
         "visual", "draw", "diagram", "schema", "teardown", "exploded",
+        "picture", "image", "figure", "картин", "изображ",
         "blueprint", "illustrat", "flow chart", "flowchart",
     )
     if (direct.any { it in text }) return true

@@ -17,6 +17,8 @@ class VisualIntentTest {
         assertTrue(wantsVisualSkill("Show a process diagram"))
         assertTrue(wantsVisualSkill("Teardown a phone in a static sheet"))
         assertTrue(wantsVisualSkill("Draw the system components"))
+        assertTrue(wantsVisualSkill("Покажи картинку процесса"))
+        assertTrue(wantsVisualSkill("Show a picture of the device"))
     }
 
     @Test

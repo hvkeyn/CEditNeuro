@@ -79,6 +79,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -203,6 +204,8 @@ fun ChatPanel(
     val steps = chatSteps(state.chat)
     val russian = state.chat.lastOrNull { it.role == ChatRole.User }?.text
         ?.any { it in '\u0400'..'\u04FF' } == true
+    val lastVisual = state.chat.lastOrNull { it.role == ChatRole.Tool && isVisualPayload(it.text) }
+    var heldVisual by remember(state.projectRoot) { mutableStateOf(lastVisual?.id) }
     val userScroll = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
@@ -215,13 +218,25 @@ fun ChatPanel(
     }
 
     LaunchedEffect(state.chat.lastOrNull { it.role == ChatRole.User }?.id) {
+        heldVisual = null
         followEnd.value = true
     }
 
     LaunchedEffect(state.chat.size, lastEntry?.id, lastEntry?.text?.length, followEnd.value) {
-        if (!followEnd.value || listState.isScrollInProgress) return@LaunchedEffect
+        if (heldVisual != null || !followEnd.value || listState.isScrollInProgress) return@LaunchedEffect
         val last = state.chat.lastIndex
         if (last >= 0) listState.scrollToItem(last, scrollOffset = Int.MAX_VALUE)
+    }
+
+    // A finished drawing should be seen, not pushed above the explanation by follow mode.
+    LaunchedEffect(lastVisual?.id) {
+        val id = lastVisual?.id ?: return@LaunchedEffect
+        if (id == heldVisual) return@LaunchedEffect
+        heldVisual = id
+        if (!followEnd.value) return@LaunchedEffect
+        followEnd.value = false
+        val index = state.chat.indexOfFirst { it.id == id }
+        if (index >= 0) listState.scrollToItem(index)
     }
 
     val compact = LocalConfiguration.current.let { it.screenHeightDp < 520 && it.screenWidthDp > it.screenHeightDp }
@@ -283,6 +298,7 @@ fun ChatPanel(
                             onJump = { index ->
                                 followEnd.value = index >= state.chat.lastIndex
                                 if (index >= state.chat.lastIndex) {
+                                    heldVisual = null
                                     scope.launch { listState.scrollToItem(state.chat.lastIndex, scrollOffset = Int.MAX_VALUE) }
                                 } else {
                                     scope.launch { listState.scrollToItem(index) }
@@ -297,6 +313,7 @@ fun ChatPanel(
                             .align(Alignment.BottomCenter)
                             .padding(bottom = 8.dp)
                             .clickable {
+                                heldVisual = null
                                 followEnd.value = true
                                 scope.launch { listState.scrollToItem(state.chat.lastIndex, scrollOffset = Int.MAX_VALUE) }
                             },
@@ -941,6 +958,13 @@ private fun AgentActivityBar(activity: AgentActivity, compact: Boolean) {
             )
         }
     }
+}
+
+
+private fun isVisualPayload(text: String): Boolean {
+    val head = text.trimStart()
+    return head.startsWith("```svg") || head.startsWith("```html") || head.startsWith("```chart") ||
+        head.startsWith("<svg") || head.startsWith("<!doctype html") || head.startsWith("<html")
 }
 
 private data class ChatStep(val index: Int, val role: ChatRole)
