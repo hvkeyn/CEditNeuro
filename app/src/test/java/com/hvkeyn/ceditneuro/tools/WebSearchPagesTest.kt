@@ -33,6 +33,21 @@ class WebSearchPagesTest {
     }
 
     @Test
+    fun parsesBingRss() {
+        val xml = """
+            <rss><channel><item>
+              <title>Android Developers</title>
+              <link>https://developer.android.com/develop/ui/views/launch/icon_design_adaptive</link>
+              <description>Adaptive icons documentation.</description>
+            </item></channel></rss>
+        """.trimIndent()
+        val (hits, _) = WebSearchPages.parseBingRss(xml, 5)
+        assertEquals(1, hits.size)
+        assertEquals("https://developer.android.com/develop/ui/views/launch/icon_design_adaptive", hits[0].url)
+        assertEquals("Android Developers", hits[0].title)
+    }
+
+    @Test
     fun parsesMojeekResult() {
         val html = """<a class="title" href="https://example.net/c">Example C</a>"""
         val (hits, _) = WebSearchPages.parseMojeek(html, 5)

@@ -34,6 +34,10 @@ object WebSearchPages {
         """<p[^>]*>([\s\S]*?)</p>""",
         setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
     )
+    private val rssItem = Regex("""<item>([\s\S]*?)</item>""", RegexOption.IGNORE_CASE)
+    private val rssTitle = Regex("""<title>(.*?)</title>""", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+    private val rssLink = Regex("""<link>(.*?)</link>""", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+    private val rssDescription = Regex("""<description>(.*?)</description>""", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
     private val mojeekLink = Regex(
         """<a\b[^>]*\bclass="[^"]*title[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)</a>""",
         setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
@@ -78,6 +82,21 @@ object WebSearchPages {
         return hits to skipped
     }
 
+    fun parseBingRss(xml: String, limit: Int): Pair<List<Hit>, Int> {
+        val hits = ArrayList<Hit>()
+        val seen = HashSet<String>()
+        var skipped = 0
+        rssItem.findAll(xml).forEach { item ->
+            if (hits.size >= limit) return@forEach
+            val block = item.groupValues[1]
+            val link = rssLink.find(block)?.groupValues?.get(1) ?: return@forEach
+            val title = rssTitle.find(block)?.groupValues?.get(1).orEmpty()
+            val blurb = rssDescription.find(block)?.groupValues?.get(1).orEmpty()
+            addHit(title, link, blurb, hits, seen) { skipped++ }
+        }
+        return hits to skipped
+    }
+
     fun parseMojeek(html: String, limit: Int): Pair<List<Hit>, Int> {
         val hits = ArrayList<Hit>()
         val seen = HashSet<String>()
@@ -104,7 +123,7 @@ object WebSearchPages {
     }
 
     private fun cleanUrl(raw: String): String? {
-        val decoded = text(raw).trim()
+        val decoded = text(raw).trim().replace("&amp;", "&")
         val url = when {
             decoded.startsWith("https://") || decoded.startsWith("http://") -> decoded
             decoded.startsWith("//") -> "https:$decoded"
@@ -179,7 +198,7 @@ class WebSearchTool(
             checkPage: Boolean,
         ): ToolResult? {
             val exchange = runCatching {
-                net.exchange(url, method, headers, body, AgentNet.MAX_DOWNLOAD_BYTES)
+                net.exchange(url, method, headers, body, AgentNet.MAX_DOWNLOAD_BYTES, 15)
             }.getOrElse {
                 lastError = "$name: ${it.message ?: "request failed"}"
                 return null
@@ -217,6 +236,15 @@ class WebSearchTool(
             "q=$encoded",
             WebSearchPages::parseDuck,
             checkPage = true,
+        )?.let { return@withContext it }
+
+        tryEngine(
+            "Bing RSS",
+            "https://www.bing.com/search?q=$encoded&format=rss",
+            "GET",
+            null,
+            WebSearchPages::parseBingRss,
+            checkPage = false,
         )?.let { return@withContext it }
 
         tryEngine(

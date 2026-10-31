@@ -129,10 +129,11 @@ class AgentNet(
         headers: Map<String, String>,
         body: String?,
         maxBytes: Long,
+        timeoutSeconds: Long = 60,
     ): HttpExchange {
         refuseHost(url)
         try {
-            return exchangeBody(url, method, headers, body, maxBytes)
+            return exchangeBody(url, method, headers, body, maxBytes, timeoutSeconds)
         } catch (error: IOException) {
             rememberHost(url, error)
             throw error
@@ -145,6 +146,7 @@ class AgentNet(
         headers: Map<String, String>,
         body: String?,
         maxBytes: Long,
+        timeoutSeconds: Long,
     ): HttpExchange {
         val httpUrl = parseUrl(url)
         val verb = method.trim().uppercase().ifBlank { "GET" }
@@ -162,7 +164,12 @@ class AgentNet(
         headers.forEach { (name, value) ->
             if (!name.equals("Content-Type", ignoreCase = true)) builder.header(name, value)
         }
-        client().newCall(builder.build()).execute().use { response ->
+        val caller = client().newBuilder()
+            .connectTimeout(minOf(15L, timeoutSeconds), TimeUnit.SECONDS)
+            .readTimeout(timeoutSeconds, TimeUnit.SECONDS)
+            .callTimeout(timeoutSeconds, TimeUnit.SECONDS)
+            .build()
+        caller.newCall(builder.build()).execute().use { response ->
             if (response.code == 522) {
                 throw IOException("HTTP 522 for $url. That proxy failed. Do not call it again.")
             }
