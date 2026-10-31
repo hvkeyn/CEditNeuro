@@ -179,7 +179,10 @@ class AgentNet(
     }
 
     companion object {
-        const val USER_AGENT = "CEditNeuro"
+        const val BROWSER_AGENT =
+            "Mozilla/5.0 (Linux; Android 15; Mobile) AppleWebKit/537.36 " +
+                "(KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36"
+        const val USER_AGENT = BROWSER_AGENT
         const val MAX_DOWNLOAD_BYTES = 32L * 1024L * 1024L
         /** A GET that is written straight to disk, including `fetch URL DEST`. */
         const val MAX_FILE_BYTES = 96L * 1024L * 1024L

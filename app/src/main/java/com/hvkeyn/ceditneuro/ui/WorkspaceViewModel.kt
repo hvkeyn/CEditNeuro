@@ -266,6 +266,8 @@ data class WorkspaceUiState(
     val agentBrowsing: Boolean = false,
     val webUrl: String = "",
     val webGeneration: Int = 0,
+    /** Browser identity mask: a Chrome UA plus the visible automation shim. */
+    val webMask: Boolean = true,
     val appUpdate: AppUpdate? = null,
     val fileClipboard: FileClipboard? = null,
     val otherRuns: List<ProjectRunStatus> = emptyList(),
@@ -1526,7 +1528,7 @@ class WorkspaceViewModel(
         }
     }
 
-    suspend fun browsePage(url: String, timeoutSec: Int = 25): String {
+    suspend fun browsePage(url: String, timeoutSec: Int = 25, mask: Boolean = true): String {
         val trimmed = url.trim()
         if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
             return "Only http and https pages can be opened in the browser."
@@ -1541,6 +1543,7 @@ class WorkspaceViewModel(
                 agentBrowsing = true,
                 webUrl = trimmed,
                 webGeneration = it.webGeneration + 1,
+                webMask = mask,
                 shellVisible = false,
             )
         }
@@ -2107,6 +2110,7 @@ class WorkspaceViewModel(
 
         appendChat(project, ChatRole.User, prompt)
         val autoSkill = when {
+            wantsExplainerSkill(prompt) -> "visual-explainer"
             wantsReanimateSkill(prompt) -> "reanimate"
             wantsVisualSkill(prompt) -> "visualize"
             else -> null

@@ -167,6 +167,143 @@ object StarterSkills {
             4. A mockup is frames in one HTML file in the project. A frame that could belong to any app is a failed draft: follow the one-mood rule in frontend-design.
             5. When the HTML is written and the task was only the mockup, use_skill name=android-ui scope=app on=false.
         """.trimIndent() + "\n",
+        "visual-explainer" to """
+            # Visual Explainer: make the idea visible
+
+            Use this when the user needs an explanation of a system, architecture, change, plan, comparison, data set, or technical concept — not a single drawing and not a talking answer. The deliverable is a short self-contained HTML page plus a readable card in the chat. Figures carry the explanation; prose is the caption.
+
+            Adapted from [nicobailon/visual-explainer](https://github.com/nicobailon/visual-explainer) (MIT). This is a local HTML/CSS adaptation, not its Node/MCP renderer. Do not install a browser, Node, a kit, or an external CDN.
+
+            ## What to make
+
+            | Request | Page shape |
+            | --- | --- |
+            | Explain a system or architecture | Question → one overview figure → mechanism → boundaries → what to remember |
+            | Review a diff or a change | Verdict → evidence figures → risks → tests → next step |
+            | Review a plan | Goal → current state → proposed path → difference → risks |
+            | Compare options | The difference drawn side by side → trade-offs → recommendation |
+            | Explain data or a process | One chart or state machine → the reading → edge cases |
+            | Recap a project | One map of what exists → what changed → what is next |
+            | One concept | One large figure, a headline, one caption |
+
+            Do not turn a 3-row list into a page. Do not write a wall of prose and add one decorative picture.
+
+            ## The first screen is the answer
+
+            - Put the main idea in the first viewport as a figure plus one sentence.
+            - Each `<figure>` makes **one claim**. The `<figcaption>` states that claim in a plain sentence.
+            - Draw the mechanism, not a box labelled with its name. An arrow says `writes`, `polls 30s`, `retries`, or `falls back`.
+            - Show the difference: what each option or change adds or removes.
+            - Encode state in shape, position, and pattern as well as colour. Never colour alone.
+            - Every number has a visual place: a dimension line, a small bar, a sparkline, or a labelled span. Do not leave a number floating in prose.
+            - When there are cases, draw small multiples of the same mini-diagram rather than a table of sentences.
+
+            ## Build one page
+
+            Write `explain-<name>.html` in the project. Keep it self-contained: inline CSS, inline SVG, no external font, image, script, or stylesheet.
+
+            ```html
+            <!doctype html>
+            <html lang="en" data-theme="paper">
+            <head>
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <style>
+                :root { --paper: #f5f1e8; --ink: #1c1b18; --muted: #68625a; --line: #c9c1b4; --accent: #a24b32; }
+                * { box-sizing: border-box; }
+                body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.45 Georgia, "Times New Roman", serif; }
+                main { max-width: 880px; margin: 0 auto; padding: 28px 20px 40px; }
+                h1 { font-size: clamp(30px, 8vw, 54px); line-height: .96; letter-spacing: -.03em; margin: 0 0 10px; }
+                h2 { font-size: 21px; margin: 34px 0 8px; }
+                p { max-width: 62ch; }
+                .lede { font-size: 19px; color: var(--muted); }
+                figure { margin: 22px 0 28px; }
+                svg { display: block; width: 100%; height: auto; }
+                figcaption { font: 13px/1.35 ui-monospace, monospace; color: var(--muted); margin-top: 8px; }
+                .rule { height: 1px; background: var(--line); margin: 26px 0; }
+                @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+              </style>
+            </head>
+            <body>
+            <main>
+              <p class="lede">The one sentence the reader should keep.</p>
+              <h1>A specific claim, not a topic</h1>
+              <figure>
+                <svg viewBox="0 0 800 380" role="img" aria-labelledby="fig1-title fig1-desc">...</svg>
+                <figcaption id="fig1-title">The path writes a draft, checks it, then commits the delta.</figcaption>
+              </figure>
+              <h2>Why this shape</h2>
+              <p>Two or three short sentences. Name the trade-off and the boundary.</p>
+            </main>
+            </body>
+            </html>
+            ```
+
+            - **No comments** in the page source.
+            - No `Inter`, `Roboto`, `Arial`, or `system-ui` as the only font. Use a serif for reading and a monospace for labels.
+            - No violet/fuchsia accents, neon, glass, gradient text or blobs, emoji markers, or a rounded card with an accent bar.
+            - One accent used for the answer path, not everywhere.
+            - Section navigation only for four or more sections.
+
+            ## Chat card
+
+            The same page does not belong in a `layout` call if it is large.
+
+            - **Small explanation (≤12,000 chars)**: pass a compact HTML body to `layout`: a title, one inline SVG or CSS figure, a caption, and two short takeaway lines. `layout` removes scripts, so this card must be static; CSS animation is allowed.
+            - **Single diagram**: use `visual_card` with a complete SVG. It gives a stable `viewBox` and a paper sheet.
+            - **Large or interactive page**: `write_file` the self-contained HTML, then `open_file`. A JS stepper belongs here, not in `layout`.
+            - Do not claim a browser screenshot or a pixel check. The user sees the card; say what to inspect.
+
+            ## Explaining a change or a plan
+
+            1. **Verdict first.** One sentence: safe to ship, needs work, or blocked.
+            2. **Evidence.** A small figure of the actual flow, file, or state; cite `file:line` or a command. Do not paste the whole diff.
+            3. **Risks and tests.** One row per real risk: symptom, trigger, check.
+            4. **Next step.** One action, or "none" with the reason.
+
+            For a plan, draw the **difference** between the current path and the proposed path. Do not draw the same boxes twice with different labels.
+
+            ## Motion and interaction
+
+            - CSS motion is allowed for a process, state change, or cause and effect; no motion for decoration.
+            - Animate **one** thing: a flow dot, a step, a queue draining, a before/after swap.
+            - Include a readable still state and `prefers-reduced-motion`.
+            - JavaScript interaction is allowed only in the full HTML file, never in a `layout` card.
+            - A video is a separate hyperframes request; this skill produces a page, not an MP4.
+
+            ## Words
+
+            - Answer first. A heading states the takeaway ("Cache hits skip Postgres"), not the topic ("Caching").
+            - One idea per sentence; mostly under 20 words; active voice; present tense.
+            - Name a term once and use the same term. Spell out an abbreviation once.
+            - No filler, idioms, metaphors, or "it is important to note".
+            - A paragraph is one to three sentences. A table is for a real matrix, not for prose.
+
+            ## Look
+
+            - Choose a register: **paper** (warm paper, ink, serif), **blueprint** (cool paper, ruled lines, mono), or **night** (dark, one warm accent). State it in `data-theme`.
+            - One topic motif: a hairline grid, a measurement scale, a route line. Repeat it; do not add a second motif.
+            - Hand-drawn SVG is the default. A plain box-and-arrow flow is fine when it is the clearest figure.
+            - Mermaid only when the user asks for it or supplies its source.
+            - Images and 3D only when the project already has them; never fetch a CDN.
+            - A table uses a header row, hairlines, and status chips; it does not use a colour-only status.
+
+            ## Before delivery
+
+            - The first screen answers the question.
+            - Every figure has a caption that states one claim.
+            - Every arrow has a verb; every number has a place.
+            - Long paths wrap; code scrolls; no text is clipped by the card.
+            - A `layout` card is under 12,000 characters and contains no script.
+            - The full HTML page has no external dependency and opens with `open_file`.
+            - State what is illustrative or estimated; do not present a guess as a measurement.
+
+            ## Output order
+
+            1. The claim and the page shape.
+            2. The chat card, unchanged.
+            3. The full page path, if written.
+            4. One sentence on what to inspect and what remains uncertain.
+        """.trimIndent() + "\n",
         "visualize" to """
             # Visualize: object to drawing
 

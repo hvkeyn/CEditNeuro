@@ -187,6 +187,15 @@ class SkillWiringTest {
     }
 
     @Test
+    fun visualExplainerLeadsWithFigures() {
+        val text = StarterSkills.skills.getValue("visual-explainer")
+        listOf("first screen is the answer", "one claim", "layout", "open_file", "not its Node/MCP")
+            .forEach { assertTrue("visual-explainer lacks $it", text.contains(it, ignoreCase = true)) }
+        assertTrue(text.length <= ACTIVE_SKILL_CHARS)
+        assertTrue(buildSystemPrompt().contains("use_skill visual-explainer"))
+    }
+
+    @Test
     fun reanimateRequiresEvidenceAndAPreview() {
         val text = StarterSkills.skills.getValue("reanimate")
         listOf("motion-faithful", "spec.md", "open_file", "layout", "Bun", "prefers-reduced-motion")

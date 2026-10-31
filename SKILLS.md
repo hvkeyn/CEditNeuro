@@ -2,7 +2,7 @@
 
 A complete snapshot of every skill available in CEditNeuro **0.99.31 (versionCode 147)**, taken on **2026-10-22**, updated **2026-10-24**, from the phone's app-scope folder and the built-in source.
 
-**40 skills:** 38 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
+**41 skills:** 39 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
 
 This file is a catalog and a porting guide. The app does not load `SKILLS.md`; it loads the `.md` files in the two skill folders described below. The JSON at the end is the same inventory in a machine-readable form.
 
@@ -227,8 +227,9 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 | 36 | [video-download](#video-download) | starter | a film, clip, stream, or video page must be saved | video | 1,615 |
 | 37 | [video-notes](#video-notes) | starter | the point of a YouTube/RuTube/Yandex/Dzen video | study | 1,679 |
 | 38 | [visualize](#visualize) | starter | a picture, process, architecture, or schema must be drawn in chat | — | 10,907 |
-| 39 | [web-reach](#web-reach) | starter | read a link, page, article, repo, thread, or feed | study | 3,454 |
-| 40 | [web-to-app](#web-to-app) | starter | a website or HTML file must become an Android app | device | 793 |
+| 39 | [visual-explainer](#visual-explainer) | starter | a system, diff, plan, or concept needs a designed explanation | design | 7,448 |
+| 40 | [web-reach](#web-reach) | starter | read a link, page, article, repo, thread, or feed | study | 3,454 |
+| 41 | [web-to-app](#web-to-app) | starter | a website or HTML file must become an Android app | device | 793 |
 
 ## Every skill
 
@@ -604,6 +605,16 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 
 **Shape:** `video_brief` the page; do not download or open a stream/m3u8/mp4/googlevideo host; use only the printed title, description, and captions; if `captions is no`, say the picture was not seen; write Смысл / Важные мысли (3–7) / Вывод / Стоит ли смотреть; numbers via `calculate`; search/channel/playlist return titles only; no transcript service or API key; turn off.
 
+### visual-explainer
+
+**Scope:** app · **Origin:** starter · **File:** `visual-explainer.md` · **Size:** 7,448 chars
+
+**Use when:** a system, architecture, diff, plan, comparison, data set, project recap, or technical concept needs a designed HTML explanation, not one box diagram.
+
+**Tools:** `write_file`, `read_file`, `edit_file`, `open_file`, `layout`, `visual_card`.
+
+**Shape:** first viewport is the answer; one claim per figure; figures lead and words label; a compact `layout` card or `visual_card` in chat; a large self-contained page through `open_file`. No kit, Node, CDN, or script in a layout card. Adapted from nicobailon/visual-explainer (MIT).
+
 ### visualize
 
 **Scope:** app · **Origin:** starter · **File:** `visualize.md` · **Size:** 10,907 chars
@@ -643,7 +654,7 @@ The JSON below is the same inventory. `origin` is `starter`, `builtin`, or `user
   "schema": 1,
   "app": "CEditNeuro 0.99.31 (versionCode 147)",
   "generated": "2026-10-24",
-  "skill_count": 40,
+  "skill_count": 41,
   "limits": {
     "skill_chars": 12000,
     "active_skill_chars": 12000,
@@ -706,6 +717,7 @@ The JSON below is the same inventory. `origin` is `starter`, `builtin`, or `user
     {"name": "understand-anything", "scope": "app", "origin": "starter", "trigger": "a repository or docs tree must be understood as a whole", "groups": ["device"], "tools": ["list_dir", "glob", "read_file", "grep", "run_command", "git_status", "git_diff", "write_file", "open_file", "layout", "load_tools"], "chars": 11086, "file": "understand-anything.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "video-download", "scope": "app", "origin": "starter", "trigger": "a film, clip, stream, or video page must be saved", "groups": ["video"], "tools": ["download_video"], "chars": 1615, "file": "video-download.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "video-notes", "scope": "app", "origin": "starter", "trigger": "the point of a YouTube or RuTube or Yandex or Dzen video", "groups": ["study"], "tools": ["video_brief", "calculate"], "chars": 1679, "file": "video-notes.md", "source": "ResearchSkill.kt#StarterSkills"},
+    {"name": "visual-explainer", "scope": "app", "origin": "starter", "trigger": "a system, diff, plan, or concept needs a designed explanation", "groups": [], "tools": ["write_file", "read_file", "edit_file", "open_file", "layout", "visual_card"], "chars": 7448, "file": "visual-explainer.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "visualize", "scope": "app", "origin": "starter", "trigger": "a picture, process, architecture, or schema must be drawn in chat", "groups": [], "tools": ["ascii_art", "visual_card", "write_file", "read_file", "open_file", "run_command", "render_video"], "chars": 10907, "file": "visualize.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "web-reach", "scope": "app", "origin": "starter", "trigger": "read a link, page, article, repo, thread, or feed", "groups": ["study"], "tools": ["http_request", "web_search", "video_brief"], "requires_skills": ["video-notes"], "chars": 3454, "file": "web-reach.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "web-to-app", "scope": "app", "origin": "starter", "trigger": "a website or HTML file must become an Android app", "groups": ["device"], "tools": ["web_to_app", "install_apk"], "chars": 793, "file": "web-to-app.md", "source": "ResearchSkill.kt#StarterSkills"}

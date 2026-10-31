@@ -1,6 +1,7 @@
 package com.hvkeyn.ceditneuro.ui
 
 import android.annotation.SuppressLint
+import android.webkit.CookieManager
 import android.content.Context
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -33,6 +34,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 fun WebPreview(
     url: String,
     generation: Int,
+    mask: Boolean = true,
     onClose: () -> Unit,
     onLoaded: (title: String, text: String) -> Unit,
     modifier: Modifier = Modifier,
@@ -66,9 +68,10 @@ fun WebPreview(
                     factory = { context -> PageWebView(context) },
                     update = { view ->
                         view.onLoaded = onLoaded
-                        if (view.generation != generation) {
+                        if (view.generation != generation || view.masked != mask) {
                             view.generation = generation
-                            view.loadUrl(url)
+                            view.masked = mask
+                            view.open(url)
                         }
                     },
                 )
@@ -81,13 +84,28 @@ fun WebPreview(
 private class PageWebView(context: Context) : WebView(context) {
     var onLoaded: (title: String, text: String) -> Unit = { _, _ -> }
     var generation: Int = -1
+    var masked: Boolean = true
+
+    fun open(url: String) {
+        val cookies = CookieManager.getInstance()
+        cookies.setAcceptCookie(true)
+        cookies.setAcceptThirdPartyCookies(this, true)
+        settings.userAgentString = if (masked) MASK_AGENT else PLAIN_AGENT
+        loadUrl(url)
+    }
 
     init {
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
+        settings.javaScriptCanOpenWindowsAutomatically = true
         webViewClient = object : WebViewClient() {
+            override fun onPageStarted(view: WebView, startedUrl: String, favicon: android.graphics.Bitmap?) {
+                if (masked) evaluateJavascript(MASK_SCRIPT, null)
+            }
+
             override fun onPageFinished(view: WebView, finishedUrl: String) {
                 if (finishedUrl == "about:blank") return
+                if (masked) evaluateJavascript(MASK_SCRIPT, null)
                 evaluateJavascript(PAGE_SCRIPT) { raw ->
                     val (title, text) = parsePage(raw)
                     onLoaded(title, text)
@@ -120,3 +138,14 @@ private val pageJson = Json { ignoreUnknownKeys = true }
 private const val PAGE_SCRIPT =
     "(function(){var t=document.title||'';var b=document.body?document.body.innerText:'';" +
         "return JSON.stringify({title:t,text:b.slice(0,6000)});})()"
+
+private const val PLAIN_AGENT = "CEditNeuro"
+private const val MASK_AGENT =
+    "Mozilla/5.0 (Linux; Android 15; Mobile) AppleWebKit/537.36 " +
+        "(KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36"
+
+/** Removes the obvious automation flag; this is identity masking, not a login or DRM bypass. */
+private const val MASK_SCRIPT =
+    "(function(){try{Object.defineProperty(navigator,'webdriver',{get:function(){return undefined}})}catch(e){}" +
+        "try{Object.defineProperty(navigator,'languages',{get:function(){return ['ru-RU','ru','en-US','en']}})}catch(e){}" +
+        "try{window.chrome=window.chrome||{runtime:{}}}catch(e){}})()"

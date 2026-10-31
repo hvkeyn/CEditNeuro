@@ -784,6 +784,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                 WebPreview(
                     url = state.webUrl,
                     generation = state.webGeneration,
+                    mask = state.webMask,
                     onClose = viewModel::toggleWeb,
                     onLoaded = viewModel::onBrowseLoaded,
                     modifier = Modifier

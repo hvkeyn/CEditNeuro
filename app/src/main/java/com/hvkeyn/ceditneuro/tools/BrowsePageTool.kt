@@ -6,17 +6,20 @@ import kotlinx.serialization.json.JsonObject
 /** Opens the in-app browser and returns the text a person would see. */
 class BrowsePageTool(
     private val networkAllowed: () -> Boolean,
-    private val browse: suspend (String, Int) -> String,
+    private val browse: suspend (String, Int, Boolean) -> String,
 ) : Tool {
     override val name = "browse_page"
     override val description =
         "Open a page in the in-app browser and read its visible text. JavaScript runs. " +
             "Use this to check a site after uploading or editing it. Pass an absolute http(s) URL. " +
-            "timeout_sec is how long to wait for a heavy page, from 5 to 90, default 25."
+            "timeout_sec is how long to wait for a heavy page, from 5 to 90, default 25. " +
+            "mask=true (default) uses a current Chrome user agent and hides the obvious automation flag. " +
+            "mask=false uses the app's plain user agent."
     override val parameters = objectSchema(
         properties = mapOf(
             "url" to stringProp("Absolute http or https URL to open."),
             "timeout_sec" to intProp("Seconds to wait for the page. Default 25, maximum 90."),
+            "mask" to boolProp("Use the browser mask. Default true."),
         ),
         required = listOf("url"),
     )
@@ -26,8 +29,9 @@ class BrowsePageTool(
         if (url.isEmpty()) return ToolResult.error("Missing 'url'.")
         if (!networkAllowed()) return ToolResult.error("Agent network is off. Turn on Agent network in Settings.")
         val timeoutSec = args.intArg("timeout_sec") ?: 25
+        val mask = args.boolArg("mask") ?: true
         return try {
-            ToolResult.ok(browse(url, timeoutSec))
+            ToolResult.ok(browse(url, timeoutSec, mask))
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
