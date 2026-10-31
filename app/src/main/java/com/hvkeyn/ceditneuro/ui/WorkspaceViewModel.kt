@@ -2106,8 +2106,16 @@ class WorkspaceViewModel(
         }
 
         appendChat(project, ChatRole.User, prompt)
-        if (wantsVisualSkill(prompt)) {
-            val switched = switchSkill(project, "visualize", "app", enable = true)
+        val autoSkill = when {
+            wantsReanimateSkill(prompt) -> "reanimate"
+            wantsVisualSkill(prompt) -> "visualize"
+            else -> null
+        }
+        if (autoSkill != null) {
+            if (autoSkill == "reanimate") {
+                switchSkill(project, "hyperframes", "app", enable = false)
+            }
+            val switched = switchSkill(project, autoSkill, "app", enable = true)
             if (switched.startsWith("Switched on")) {
                 appendChat(project, ChatRole.Tool, switched, "skills")
             }

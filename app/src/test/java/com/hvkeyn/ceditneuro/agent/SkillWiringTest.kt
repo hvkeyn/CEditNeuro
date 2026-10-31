@@ -187,6 +187,15 @@ class SkillWiringTest {
     }
 
     @Test
+    fun reanimateRequiresEvidenceAndAPreview() {
+        val text = StarterSkills.skills.getValue("reanimate")
+        listOf("motion-faithful", "spec.md", "open_file", "layout", "Bun", "prefers-reduced-motion")
+            .forEach { assertTrue("reanimate lacks $it", text.contains(it, ignoreCase = true)) }
+        assertTrue(text.length <= ACTIVE_SKILL_CHARS)
+        assertTrue(buildSystemPrompt().contains("use_skill reanimate"))
+    }
+
+    @Test
     fun specKitRequiresGatesBeforeCode() {
         val text = StarterSkills.skills.getValue("spec-kit")
         listOf("spec.md", "plan.md", "tasks.md", "[NEEDS CLARIFICATION]", "converged", "plan change")

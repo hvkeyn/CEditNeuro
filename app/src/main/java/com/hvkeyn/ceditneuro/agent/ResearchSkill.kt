@@ -592,6 +592,156 @@ object StarterSkills {
             4. Reconstruction and test vector.
             5. Unknowns, limitations, and one next probe.
         """.trimIndent() + "\n",
+        "reanimate" to """
+            # Reanimate: motion from a reference
+
+            Use this when the user points at a GIF, video, live site, Lottie file, screenshot, or prototype and asks to reproduce its animation, interaction, loader, hover, page transition, marquee, or 3D scene. The result is code in the project plus an honest comparison, never "it looks close".
+
+            This is a local adaptation of [NiazMorshed2007/reanimate](https://github.com/NiazMorshed2007/reanimate) (MIT). It keeps the scope → evidence → spec → build → compare → report method. It does **not** install Bun, Playwright, ffmpeg, or the original scripts: they are desktop tools and are not available on this phone.
+
+            ## Choose the fidelity before building
+
+            | Level | The user says | Must match | May differ |
+            | --- | --- | --- | --- |
+            | **Motion-faithful** | "clone this animation", "make it move like this" | trigger, order, stagger, timing within 80 ms, easing family, direction and distance | copy, colours, fonts, brand assets |
+            | **Pixel-faithful** | "match it exactly", "pixel-perfect", "1:1" | all of the above plus sizes, spacing, type, colour, radii and assets | only what the user asked to change |
+            | **Mixed** | "clone it and add our pricing" | cloned motion at one of the levels above | the additions, kept separate |
+
+            State the level in the first reply. If the user does not say, use motion-faithful. Pixel-faithful is only possible when the reference supplies the fonts, assets and a stable viewport; say when it does not.
+
+            ## 1. Scope
+
+            Write `.reanimate/<name>/spec.md` before code:
+
+            - **Target**: URL and selector, or the file and time range, or "the toggle in this GIF".
+            - **Destination**: the exact project file or stack. Read the nearby code and use the libraries already there.
+            - **Fidelity**: the chosen level and the additions for mixed work.
+            - **Viewport**: width, height, device scale, crop, and whether the reference is a full page or a widget.
+
+            Ask only when two readings lead to different work. If the reference is behind a login, YouTube, Loom, or another page that cannot be read here, ask for a screen recording or 3–5 key frames and continue with what is available.
+
+            ## 2. Evidence
+
+            Collect what this phone can actually inspect:
+
+            - **A URL**: `http_request` the page and its CSS. Use the supplied screenshots or the browser page for the rendered result. A page that needs a live browser cannot be recorded here; do not claim a capture you did not make.
+            - **A GIF or video**: open it with `open_file`. The original frame extractor is not installed; ask for 3–5 frames around the start, the middle, and the end, or a screen recording with a fixed crop. Inspect only frames the user supplied or that a tool returned.
+            - **A Lottie or Rive JSON**: `read_file` it. The file is the specification; do not reverse it from pixels.
+            - **A screenshot**: inspect the visible start and end states. A still cannot prove easing or duration; ask for the missing motion.
+            - **A site the user owns**: `http_request` the HTML/CSS and use the user's screen recording as the timing evidence.
+
+            Record a short evidence table in `spec.md`:
+
+            ```text
+            source | what it proves | confidence | missing
+            GIF     | two states, 12 fps | estimated | exact easing, trigger
+            URL CSS | keyframes and duration | exact | rendered layout
+            ```
+
+            Mark every unknown with `?`. Do not fill it with a guess.
+
+            ## 3. Motion spec
+
+            Write one row per element and per property:
+
+            ```text
+            element | property | trigger | start | duration | from → to | easing | stagger | evidence
+            orb     | translateY | load | 0 ms | 900 ms | 0 → -14 px | ease-out | — | frames 1-9
+            ring    | opacity | load | 300 ms | 600 ms | 0 → 1 | linear | 120 ms × 4 | CSS
+            ```
+
+            Use seconds or milliseconds consistently. Record:
+
+            - the **trigger**: load, scroll, hover, focus, click, pointer path, drag, or none;
+            - **order and stagger**, not just each duration;
+            - **direction and distance relative to the element**, not an absolute guess;
+            - **easing family** and whether the track overshoots or settles like a spring;
+            - **layout facts** the movement depends on: origin, z-order, clipping, perspective, track size;
+            - **reduced-motion** behavior.
+
+            A `?` row is not ready to implement. If a source lacks the timing, implement the smallest test that answers it (two frames, a hover, a scroll) instead of inventing.
+
+            ## 4. Build
+
+            Keep the destination stack. Do not add Framer Motion, GSAP, Three.js, or a CDN just to imitate a reference: this phone cannot install them. Recreate the behavior with what is available:
+
+            - **CSS** for transitions, keyframes, stagger, scroll-driven `animation-timeline` where supported, 3D transforms with `perspective` and `transform-style: preserve-3d`.
+            - **Canvas 2D** for particles and trails where DOM is too slow.
+            - **WebGL** only when the reference is genuinely 3D; write one self-contained HTML/JS file and keep a CSS fallback.
+            - **Existing project library** if the project already uses Framer Motion, GSAP, or Three.js; match that API instead of introducing another.
+            - **No external font, image, model, or script** in a chat preview. A copied asset belongs to its owner; clone motion, not brand material.
+
+            A small CSS preview for the chat card:
+
+            ```html
+            <div class="stage">
+              <div class="orb"></div>
+            </div>
+            <style>
+              .stage { position: relative; height: 180px; display: grid; place-items: center; background: #0b1118; }
+              .orb { width: 34px; height: 34px; border-radius: 50%; background: #b9a7ff;
+                     animation: pulse 1.8s ease-in-out infinite; }
+              @keyframes pulse { 0%, 100% { transform: translateY(0) scale(1); opacity: .7 }
+                                 50% { transform: translateY(-14px) scale(1.12); opacity: 1 } }
+              @media (prefers-reduced-motion: reduce) { .orb { animation: none } }
+            </style>
+            ```
+
+            For a full animation with JavaScript, write `animation.html` and open it with `open_file`. `layout` removes scripts, so a JS animation there is a still card, not proof of motion. Do not call `render_video` from this skill: the phone's video renderer expects the hyperframes composition contract, not a CSS clone.
+
+
+            ## Rendering on this phone
+
+            The default deliverable is an **HTML file plus a CSS card**, not an MP4.
+
+            - A CSS-only card through `layout` proves the motion while stripping scripts. A full HTML file through `open_file` proves the real thing.
+            - There is no MP4 step in this skill. If the user asks for a video, finish the HTML/CSS clone first and treat the video as a separate hyperframes request.
+            - **Do not turn on hyperframes for reanimate work.** It is a different skill with a different contract.
+            - Never add GSAP, Framer Motion, Three.js, or a CDN to make a render succeed. If the reference needs 3D, write self-contained Canvas/WebGL; if the phone cannot render it, report that with the still preview.
+
+            ## 5. Show and verify
+
+            Use two different views:
+
+            - **Chat preview**: a CSS-only card through `layout`, or a `visual_card` storyboard with 3–6 labelled key frames. It must be honest: a still is not the animation.
+            - **Full motion**: `open_file animation.html` for the browser. A video file is a separate hyperframes request; this skill does not produce one.
+            - **Comparison**: put the reference frame and the clone frame at the same time in one side-by-side image or storyboard. Check trigger, order, stagger, start/end, easing, direction, origin, and clipping. Read every frame you have, not only the first and last.
+            - **Timing**: compare the spec row with the observed frame times. An 80 ms difference is visible on a fast UI; a 300 ms difference changes the feel.
+            - **Pixel-faithful**: only when fonts and assets match; report the limits instead of claiming a 2% match that was never measured.
+
+            Fix the largest difference, then re-check. Expect 2–5 rounds. Stop after 5 and report the residual with its number and reason; never lower the threshold to call it done.
+
+            ## 6. Report
+
+            The final message must stand alone:
+
+            - fidelity level, target, destination, and what was added;
+            - files and how to trigger the motion;
+            - a compact timing table: element, property, reference, clone, error, result;
+            - a storyboard or side-by-side preview;
+            - residuals, with a number and a reason;
+            - a reminder that only the motion was copied, not the original assets or code.
+
+            ## Hard rules
+
+            - Do not claim a frame, a duration, or a capture you did not inspect.
+            - Do not install Bun, Playwright, Chromium, ffmpeg, Node, or a package to imitate the original. Use the phone, the project's stack, and CSS/Canvas/WebGL.
+            - Do not use hyperframes, GSAP, Framer Motion, or Three.js for this skill. A renderer failure is not permission to change stacks.
+            - Do not copy a proprietary font, logo, image, model, shader, or brand asset. Use the user's own content or a neutral placeholder.
+            - Do not call a one-pass visual answer "pixel-perfect". A still frame is not a timing check.
+            - Respect `prefers-reduced-motion` and keep a readable still state.
+            - A video or GIF of someone else's screen may contain a cursor, browser chrome, or private data. Crop it out; do not upload it.
+            - Do not call `render_video` here and do not install hyperframes to make an MP4. Use the HTML/CSS preview; the video path belongs to the separate hyperframes skill.
+            - If the reference cannot be inspected, say exactly what is missing and ask for frames; do not invent the animation.
+
+            ## Output order
+
+            1. Scope, fidelity, and evidence boundary.
+            2. Motion spec table with unknowns marked.
+            3. Files built and how to preview.
+            4. Chat card or storyboard, unchanged.
+            5. Verification table and residuals.
+        """.trimIndent() + "\n",
         "ub-mode" to """
             # UB mode: clean code under pressure
 

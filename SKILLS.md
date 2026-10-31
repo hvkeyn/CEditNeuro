@@ -2,7 +2,7 @@
 
 A complete snapshot of every skill available in CEditNeuro **0.99.31 (versionCode 147)**, taken on **2026-10-22**, updated **2026-10-24**, from the phone's app-scope folder and the built-in source.
 
-**39 skills:** 37 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
+**40 skills:** 38 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
 
 This file is a catalog and a porting guide. The app does not load `SKILLS.md`; it loads the `.md` files in the two skill folders described below. The JSON at the end is the same inventory in a machine-readable form.
 
@@ -212,22 +212,23 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 | 21 | [photo-ocr](#photo-ocr) | user | a photo arrived and the message has only paths | — | 1,491 |
 | 22 | [research](#research) | builtin | a study question, a claim to check, a measured build | study | 4,340 |
 | 23 | [rea](#rea) | starter | a software system must be understood with REA 6.8.0 on a PC | remote | 6,675 |
-| 24 | [reverse-engineering](#reverse-engineering) | starter | a program must be understood to its real algorithm or a backdoor | build, device, study, remote | 10,747 |
-| 25 | [review](#review) | starter | before saying a code change works | — | 364 |
-| 26 | [rrsi](#rrsi) | starter | improve the agent's own harness | harness | 1,749 |
-| 27 | [ru-translate](#ru-translate) | starter | translate into Russian or polish Russian | — | 4,809 |
-| 28 | [second-monitor](#second-monitor) | starter | the phone becomes an extra monitor | remote | 1,556 |
-| 29 | [security](#security) | starter | the task touches keys, logins, accounts, or another app | — | 415 |
-| 30 | [skill-security](#skill-security) | starter | a skill must be checked for vulnerabilities before install | skills | 6,001 |
-| 31 | [spec-kit](#spec-kit) | starter | a feature needs a spec and a plan before code | — | 10,108 |
-| 32 | [systematic-debugging](#systematic-debugging) | starter | a failure needs a cause before a fix | debug | 2,095 |
-| 33 | [ub-mode](#ub-mode) | starter | a feature must be written cleanly and tested | — | 6,683 |
-| 34 | [understand-anything](#understand-anything) | starter | a repository or docs tree must be understood as a whole | device | 11,086 |
-| 35 | [video-download](#video-download) | starter | a film, clip, stream, or video page must be saved | video | 1,615 |
-| 36 | [video-notes](#video-notes) | starter | the point of a YouTube/RuTube/Yandex/Dzen video | study | 1,679 |
-| 37 | [visualize](#visualize) | starter | a picture, process, architecture, or schema must be drawn in chat | — | 10,907 |
-| 38 | [web-reach](#web-reach) | starter | read a link, page, article, repo, thread, or feed | study | 3,454 |
-| 39 | [web-to-app](#web-to-app) | starter | a website or HTML file must become an Android app | device | 793 |
+| 24 | [reanimate](#reanimate) | starter | an animation from a GIF, video, or site must be rebuilt | — | 9,462 |
+| 25 | [reverse-engineering](#reverse-engineering) | starter | a program must be understood to its real algorithm or a backdoor | build, device, study, remote | 10,747 |
+| 26 | [review](#review) | starter | before saying a code change works | — | 364 |
+| 27 | [rrsi](#rrsi) | starter | improve the agent's own harness | harness | 1,749 |
+| 28 | [ru-translate](#ru-translate) | starter | translate into Russian or polish Russian | — | 4,809 |
+| 29 | [second-monitor](#second-monitor) | starter | the phone becomes an extra monitor | remote | 1,556 |
+| 30 | [security](#security) | starter | the task touches keys, logins, accounts, or another app | — | 415 |
+| 31 | [skill-security](#skill-security) | starter | a skill must be checked for vulnerabilities before install | skills | 6,001 |
+| 32 | [spec-kit](#spec-kit) | starter | a feature needs a spec and a plan before code | — | 10,108 |
+| 33 | [systematic-debugging](#systematic-debugging) | starter | a failure needs a cause before a fix | debug | 2,095 |
+| 34 | [ub-mode](#ub-mode) | starter | a feature must be written cleanly and tested | — | 6,683 |
+| 35 | [understand-anything](#understand-anything) | starter | a repository or docs tree must be understood as a whole | device | 11,086 |
+| 36 | [video-download](#video-download) | starter | a film, clip, stream, or video page must be saved | video | 1,615 |
+| 37 | [video-notes](#video-notes) | starter | the point of a YouTube/RuTube/Yandex/Dzen video | study | 1,679 |
+| 38 | [visualize](#visualize) | starter | a picture, process, architecture, or schema must be drawn in chat | — | 10,907 |
+| 39 | [web-reach](#web-reach) | starter | read a link, page, article, repo, thread, or feed | study | 3,454 |
+| 40 | [web-to-app](#web-to-app) | starter | a website or HTML file must become an Android app | device | 793 |
 
 ## Every skill
 
@@ -453,6 +454,16 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 
 **Shape:** adapted from the named external project; it is a local procedure, not a bundled program. It keeps the evidence, stops, and privacy rules in the file.
 
+### reanimate
+
+**Scope:** app · **Origin:** starter · **File:** `reanimate.md` · **Size:** 9,462 chars
+
+**Use when:** a GIF, video, live site, Lottie, screenshot, or prototype shows an animation, hover, loader, transition, or 3D scene that should be rebuilt in the project.
+
+**Tools:** `http_request`, `read_file`, `write_file`, `edit_file`, `open_file`, `layout`, `visual_card`.
+
+**Shape:** scope and fidelity → evidence table → `spec.md` motion rows → build with CSS/Canvas/WebGL → preview and compare → report residuals. Adapted from NiazMorshed2007/reanimate (MIT); no Bun, Playwright, ffmpeg, or copied brand assets on the phone.
+
 ### research
 
 **Scope:** app · **Origin:** builtin (`ResearchSkill.TEXT`) · **File:** `research.md` · **Size:** 4,340 chars
@@ -632,7 +643,7 @@ The JSON below is the same inventory. `origin` is `starter`, `builtin`, or `user
   "schema": 1,
   "app": "CEditNeuro 0.99.31 (versionCode 147)",
   "generated": "2026-10-24",
-  "skill_count": 39,
+  "skill_count": 40,
   "limits": {
     "skill_chars": 12000,
     "active_skill_chars": 12000,
@@ -674,12 +685,13 @@ The JSON below is the same inventory. `origin` is `starter`, `builtin`, or `user
     {"name": "frontend-design", "scope": "app", "origin": "starter", "trigger": "a landing page, cabinet, form, or product screen", "groups": ["design"], "tools": ["http_request", "write_file", "design_system"], "requires_skills": ["hyperframes", "web-to-app"], "chars": 4804, "file": "frontend-design.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "genealogy", "scope": "app", "origin": "starter", "trigger": "family history, ancestors, or archive records in the former USSR", "groups": ["remote"], "tools": ["write_file", "read_file", "run_command", "http_request", "browse_page", "load_tools"], "chars": 11976, "file": "genealogy.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "health", "scope": "app", "origin": "starter", "trigger": "a lab sheet, scan report, or family health record", "groups": ["health"], "tools": ["health_log", "health_panel", "health_trend", "health_index"], "chars": 1361, "file": "health.md", "source": "ResearchSkill.kt#StarterSkills"},
-    {"name": "hyperframes", "scope": "app", "origin": "starter", "trigger": "a video, animation, title card, or HyperFrames composition", "groups": ["video"], "tools": ["render_video", "edit_video", "sound_effect", "make_music", "voiceover", "web_search", "http_request", "write_file", "edit_file"], "chars": 11930, "file": "hyperframes.md", "source": "ResearchSkill.kt#StarterSkills"},
+    {"name": "hyperframes", "scope": "app", "origin": "starter", "trigger": "a video, animation, title card, or HyperFrames composition", "groups": [], "tools": ["render_video", "edit_video", "sound_effect", "make_music", "voiceover", "web_search", "http_request", "write_file", "edit_file"], "chars": 11930, "file": "hyperframes.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "learn", "scope": "app", "origin": "starter", "trigger": "learn a subject, be taught, or practice", "groups": ["learn"], "tools": ["learn", "http_request", "web_search"], "chars": 2501, "file": "learn.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "net-map", "scope": "app", "origin": "starter", "trigger": "a network must be drawn from packets", "groups": ["study"], "tools": ["net_audit", "capture_dump", "read_dump", "research_figure"], "chars": 5603, "file": "net-map.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "network-study", "scope": "app", "origin": "starter", "trigger": "a network concept or topology must be taught with a drawing", "groups": ["study", "device"], "tools": ["net_audit", "capture_dump", "read_dump", "write_file", "network_card", "open_file", "load_tools"], "chars": 6531, "file": "network-study.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "photo-ocr", "scope": "app", "origin": "user", "trigger": "a photo arrived and the message has only paths", "groups": [], "tools": ["run_command", "read_file", "remote_delete"], "chars": 1491, "file": "photo-ocr.md", "source": "phone:CEditNeuro/skills/photo-ocr.md"},
     {"name": "rea", "scope": "app", "origin": "starter", "trigger": "a software system must be understood with REA 6.8.0 on a PC", "groups": ["remote"], "tools": ["remote_put", "ssh_exec", "run_command", "read_file", "write_file", "http_request", "load_tools"], "chars": 6675, "file": "rea.md", "source": "ResearchSkill.kt#StarterSkills"},
+    {"name": "reanimate", "scope": "app", "origin": "starter", "trigger": "an animation from a GIF, video, or site must be rebuilt", "groups": [], "tools": ["http_request", "read_file", "write_file", "edit_file", "open_file", "layout", "visual_card"], "chars": 9462, "file": "reanimate.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "research", "scope": "app", "origin": "builtin", "trigger": "a study question, a claim to check, a measured build", "groups": ["study"], "tools": ["research_log", "research_report", "research_figure", "research_plot", "research_run", "reference", "calculate", "chart", "open_file", "http_request", "grep"], "requires_skills": ["deep-read", "review", "debug", "security"], "chars": 4340, "file": "research.md", "source": "ResearchSkill.kt#TEXT"},
     {"name": "reverse-engineering", "scope": "app", "origin": "starter", "trigger": "a program must be understood to its real algorithm or a backdoor", "groups": ["build", "device", "study", "remote"], "tools": ["install_android_sdk", "install_jdk", "install_module", "install_program", "shizuku_exec", "install_apk", "open_file", "capture_dump", "read_dump", "net_audit", "remote_put", "ssh_exec", "run_command", "read_file", "write_file", "edit_file", "grep", "http_request"], "requires_skills": ["android-apk"], "chars": 10747, "file": "reverse-engineering.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "review", "scope": "app", "origin": "starter", "trigger": "before saying a code change works", "groups": [], "tools": ["git_diff", "read_file", "run_command"], "chars": 364, "file": "review.md", "source": "ResearchSkill.kt#StarterSkills"},
