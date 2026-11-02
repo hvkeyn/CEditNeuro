@@ -37,11 +37,11 @@ class TeamBoardTest {
     fun teamToolRunsHelpersAndLeavesTheBrief() = runBlocking {
         val dir = Files.createTempDirectory("team-tool").toFile()
         try {
-            val statuses = mutableListOf<String>()
+            val updates = mutableListOf<TeamUpdate>()
             val tool = TeamTool(dir, { request ->
                 val head = if (request.role == "researcher") "FINDING" else "VERDICT"
-                "$head: checked. EVIDENCE: spinner.html L17."
-            }, { statuses += it })
+                "$head: checked. EVIDENCE: spinner.html L17 has the cycle. This report is deliberately long enough to satisfy the evidence gate."
+            }, { updates += it })
             val args = Json.parseToJsonElement(
                 """{"action":"help","task":"Ship the parser","question":"Is it safe?","roles":"reviewer,researcher"}""",
             ).jsonObject
@@ -49,9 +49,31 @@ class TeamBoardTest {
             assertTrue(result.content.contains("VERDICT: checked"))
             assertTrue(result.content.contains("FINDING: checked"))
             assertTrue(TeamBoard.briefFile(dir).isFile)
-            assertTrue(statuses.any { it.contains("started") })
+            assertTrue(updates.any { it.phase == "reports ready" })
+            assertTrue(updates.flatMap { it.agents }.any { it.status == "done" })
             val second = tool.execute(args)
             assertTrue(second.content.contains("one team"))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun dualRunsTwoIndependentSolvers() = runBlocking {
+        val dir = Files.createTempDirectory("team-dual").toFile()
+        try {
+            val tool = TeamTool(dir, { request ->
+                val n = if (request.role == "solver-a") "323" else "323"
+                "ANSWER: $n\nEVIDENCE: 17*19 arithmetic\nCHECK: 323 / 17 = 19 and 19*17 = 323, so the two independent paths agree."
+            })
+            val args = Json.parseToJsonElement(
+                """{"action":"dual","task":"Compute 17*19","question":"What is 17*19? Show a check."}""",
+            ).jsonObject
+            val result = tool.execute(args)
+            assertTrue(result.content.contains("solver-a"))
+            assertTrue(result.content.contains("solver-b"))
+            assertTrue(TeamBoard.reportFile(dir, "solver-a").isFile)
+            assertTrue(TeamBoard.reportFile(dir, "solver-b").isFile)
         } finally {
             dir.deleteRecursively()
         }

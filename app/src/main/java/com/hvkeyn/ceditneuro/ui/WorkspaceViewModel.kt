@@ -116,6 +116,7 @@ import com.hvkeyn.ceditneuro.tools.ShellTool
 import com.hvkeyn.ceditneuro.tools.Tool
 import com.hvkeyn.ceditneuro.tools.ToolRegistry
 import com.hvkeyn.ceditneuro.tools.TeamTool
+import com.hvkeyn.ceditneuro.tools.TeamUpdate
 import com.hvkeyn.ceditneuro.tools.WriteFileTool
 import com.hvkeyn.ceditneuro.workspace.FileEntry
 import com.hvkeyn.ceditneuro.workspace.Workspace
@@ -249,6 +250,8 @@ data class WorkspaceUiState(
     val online: Boolean = true,
     val agentRunning: Boolean = false,
     val agentActivity: AgentActivity? = null,
+    /** Live roster of the current read-only team, if one was called this run. */
+    val team: TeamUi? = null,
     val message: String? = null,
     val execPrompt: String? = null,
     val hostPrompt: HostTrustPrompt? = null,
@@ -298,6 +301,20 @@ data class AgentActivity(
     val focus: String,
     val startedAt: Long,
     val goal: String = "",
+)
+
+data class TeamAgentUi(
+    val role: String,
+    val status: String,
+    val summary: String = "",
+)
+
+data class TeamUi(
+    val task: String,
+    val agents: List<TeamAgentUi>,
+    val active: Boolean,
+    val phase: String,
+    val startedAt: Long,
 )
 
 private class LiveProject(
@@ -2152,6 +2169,7 @@ class WorkspaceViewModel(
         editProject(project) {
             it.copy(
                 agentRunning = true,
+                team = null,
                 chatVisible = true,
                 shellVisible = false,
                 readerInFront = false,
@@ -3301,6 +3319,21 @@ class WorkspaceViewModel(
         }
     }
 
+    private fun applyTeam(project: LiveProject, update: TeamUpdate) {
+        editProject(project) { shown ->
+            val started = shown.team?.startedAt ?: System.currentTimeMillis()
+            shown.copy(
+                team = TeamUi(
+                    task = update.task,
+                    agents = update.agents.map { TeamAgentUi(it.role, it.status, it.summary) },
+                    active = update.active,
+                    phase = update.phase,
+                    startedAt = started,
+                ),
+            )
+        }
+    }
+
     private fun skillLibrary(project: LiveProject?): SkillLibrary =
         SkillLibrary(project?.workspace?.root, appSkillsDir())
 
@@ -3562,11 +3595,9 @@ class WorkspaceViewModel(
                 }
             }
             report.toString().trim().ifBlank { "No report." }
-        }) { line ->
+        }) { update ->
             if (project.epoch.get() == epochAtBuild) {
-                viewModelScope.launch(Dispatchers.Main) {
-                    appendChat(project, ChatRole.Tool, line, "team")
-                }
+                viewModelScope.launch(Dispatchers.Main) { applyTeam(project, update) }
             }
         }
 

@@ -15,6 +15,8 @@ object TeamBoard {
         "reviewer" to "Audit the plan, diff, or current files. List correctness risks, missing cases, and tests. Do not edit code.",
         "architect" to "Compare two designs, boundaries, or data flows. Name the trade-off and the smallest safe change. Do not edit code.",
         "tester" to "Read the tests and the changed code. Propose exact checks and expected results. Do not edit code or run mutating commands.",
+        "solver-a" to "Solve the question independently. Show the exact computation and a check. Do not read solver B's answer.",
+        "solver-b" to "Solve the question independently. Show the exact computation and a check. Do not read solver A's answer.",
     )
 
     data class RoleReport(val role: String, val text: String, val failed: Boolean)

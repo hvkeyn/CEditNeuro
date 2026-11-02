@@ -105,6 +105,7 @@ import com.hvkeyn.ceditneuro.agent.SkillEntry
 import com.hvkeyn.ceditneuro.agent.agentBars
 import com.hvkeyn.ceditneuro.data.AgentSettings
 import com.hvkeyn.ceditneuro.ui.AgentActivity
+import com.hvkeyn.ceditneuro.ui.TeamUi
 import com.hvkeyn.ceditneuro.ui.FitDropdownMenu
 import com.hvkeyn.ceditneuro.ui.ChatEntry
 import com.hvkeyn.ceditneuro.ui.ChatRole
@@ -457,6 +458,9 @@ fun ChatPanel(
                     }
                 }
             }
+            state.team?.let { team ->
+                TeamStrip(team = team, agentRunning = state.agentRunning)
+            }
             val buttonSize = if (compact) 40.dp else 48.dp
             CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides buttonSize) {
             Row(
@@ -544,6 +548,145 @@ fun ChatPanel(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 4.dp),
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TeamStrip(team: TeamUi, agentRunning: Boolean) {
+    var expanded by remember(team.task) { mutableStateOf(false) }
+    val working = team.agents.count { it.status == "working" }
+    val done = team.agents.count { it.status == "done" }
+    val failed = team.agents.count { it.status == "failed" }
+    val total = team.agents.size
+    val label = when {
+        team.active && working > 0 -> "$working / $total agents working"
+        team.active -> "Starting $total agents"
+        agentRunning -> "$done / $total reports · main agent integrating"
+        else -> "$done / $total reports" + if (failed > 0) " · $failed failed" else ""
+    }
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(12.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .clickable { expanded = !expanded },
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "TEAM",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (failed > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (expanded) "Collapse team" else "Expand team",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            Text(
+                text = team.task,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = if (expanded) 2 else 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+            if (!expanded) {
+                val marks = team.agents.joinToString("   ") { agent ->
+                    val mark = when (agent.status) {
+                        "working" -> "●"
+                        "done" -> "✓"
+                        "failed" -> "✕"
+                        else -> "○"
+                    }
+                    agent.role + " " + mark
+                }
+                Text(
+                    text = marks,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 3.dp),
+                )
+            }
+            if (expanded) {
+                Spacer(Modifier.height(6.dp))
+                team.agents.forEach { agent ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp),
+                    ) {
+                        when (agent.status) {
+                            "working" -> CircularProgressIndicator(
+                                modifier = Modifier.size(12.dp),
+                                strokeWidth = 1.5.dp,
+                                color = MaterialTheme.colorScheme.tertiary,
+                            )
+                            "done" -> Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            "failed" -> Icon(
+                                Icons.Default.Close,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            else -> Text(
+                                "○",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.width(14.dp),
+                            )
+                        }
+                        Spacer(Modifier.width(7.dp))
+                        Text(
+                            text = agent.role,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.width(84.dp),
+                        )
+                        Text(
+                            text = agent.status,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = when (agent.status) {
+                                "working" -> MaterialTheme.colorScheme.tertiary
+                                "done" -> MaterialTheme.colorScheme.primary
+                                "failed" -> MaterialTheme.colorScheme.error
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            modifier = Modifier.width(58.dp),
+                        )
+                        Text(
+                            text = agent.summary,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
             }
         }
     }

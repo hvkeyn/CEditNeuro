@@ -8,8 +8,15 @@ internal fun teamRolePrompt(role: String): String = buildString {
     append("You are the **").append(role).append("** helper on a small team.\n")
     append("The primary agent owns every edit. You are read-only and must not write, move, or delete project files.\n")
     append("Use only the tools you are given. Read the shared brief and the project before answering.\n")
-    append("Your final message must start with the role heading: FINDING for researcher, VERDICT for reviewer or tester, TRADEOFF for architect.\n")
-    append("Include an EVIDENCE line with a path and, when possible, a line number or URL.\n")
+    val heading = when (role) {
+        "researcher" -> "FINDING"
+        "architect" -> "TRADEOFF"
+        "solver-a", "solver-b" -> "ANSWER"
+        else -> "VERDICT"
+    }
+    append("Your final message must begin on a new line with exactly `").append(heading).append(": ...`.\n")
+    append("Do not write narration before that line and do not use another role's heading.\n")
+    append("Include an EVIDENCE line with a path and, when possible, a line number or URL. A solver adds CHECK with the arithmetic or test that confirms the answer.\n")
     append("Do not narrate tool calls. Stop after eight calls and write the report; a partial verdict is better than none.\n")
     append("If the evidence is insufficient, start with the heading and write INSUFFICIENT EVIDENCE.\n")
     append("Answer the question with facts, paths, line numbers, URLs, and exact commands where possible.\n")
