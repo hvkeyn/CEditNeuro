@@ -24,6 +24,7 @@ class TeamTool(
     private val runHelper: suspend (TeamHelperRequest) -> String,
     private val onStatus: (String) -> Unit = {},
 ) : Tool {
+    private var helped = false
     override val name = "team"
     override val description =
         "Ask a small read-only team for help on a hard step. The primary agent stays the only writer. " +
@@ -51,6 +52,7 @@ class TeamTool(
     }
 
     private suspend fun help(args: JsonObject): ToolResult {
+        if (helped) return ToolResult.error("This run already used its one team. Use the reports in .ceditneuro/team and continue.")
         val task = args.stringArg("task").orEmpty().trim()
         val question = args.stringArg("question").orEmpty().trim().ifBlank { task }
         val roles = TeamBoard.normalize(args.stringArg("roles"))
@@ -60,6 +62,7 @@ class TeamTool(
                 "Choose 1 to 3 roles: " + TeamBoard.roles.keys.joinToString(", ") + ".",
             )
         }
+        helped = true
         TeamBoard.begin(root, task, question, roles)
         onStatus("Team · " + roles.joinToString(" + ") + " started")
 

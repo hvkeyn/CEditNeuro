@@ -47,6 +47,8 @@ class TeamBoardTest {
             assertTrue(result.content.contains("researcher: checked"))
             assertTrue(TeamBoard.briefFile(dir).isFile)
             assertTrue(statuses.any { it.contains("started") })
+            val second = tool.execute(args)
+            assertTrue(second.content.contains("one team"))
         } finally {
             dir.deleteRecursively()
         }
