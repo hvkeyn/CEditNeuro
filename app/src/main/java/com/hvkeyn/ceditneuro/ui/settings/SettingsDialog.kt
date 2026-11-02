@@ -359,14 +359,23 @@ fun SettingsDialog(
                             val sample = remember {
                                 runCatching {
                                     settingsContext.assets.open("companions/sample/atlas.png").use { input ->
-                                        android.graphics.BitmapFactory.decodeStream(input)?.asImageBitmap()
+                                        android.graphics.BitmapFactory.decodeStream(input)
                                     }
                                 }.getOrNull()
                             }
                             if (sample != null) {
+                                val frame = remember(sample) {
+                                    android.graphics.Bitmap.createBitmap(
+                                        sample,
+                                        0,
+                                        0,
+                                        (sample.width / 4).coerceAtLeast(1),
+                                        (sample.height / 8).coerceAtLeast(1),
+                                    ).asImageBitmap()
+                                }
                                 Image(
-                                    bitmap = sample,
-                                    contentDescription = "Sample sprite atlas",
+                                    bitmap = frame,
+                                    contentDescription = "Sample sprite frame",
                                     contentScale = ContentScale.Fit,
                                     modifier = Modifier.size(64.dp),
                                 )
