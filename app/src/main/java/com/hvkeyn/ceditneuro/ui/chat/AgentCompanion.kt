@@ -30,16 +30,21 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.hvkeyn.ceditneuro.data.AgentSettings
 import com.hvkeyn.ceditneuro.ui.CompanionCharacter
 import com.hvkeyn.ceditneuro.ui.CompanionMood
 import com.hvkeyn.ceditneuro.ui.CompanionRoster
+import com.hvkeyn.ceditneuro.ui.CompanionSpriteSheet
 import com.hvkeyn.ceditneuro.ui.WorkspaceUiState
 import com.hvkeyn.ceditneuro.ui.companionStatus
 import com.hvkeyn.ceditneuro.ui.idleAction
@@ -64,7 +69,17 @@ fun AgentCompanion(state: WorkspaceUiState, settings: AgentSettings, compact: Bo
             ?.let { path -> runCatching { java.io.File(path).takeIf { it.isFile } }.getOrNull() }
             ?.let { file -> android.graphics.BitmapFactory.decodeFile(file.absolutePath)?.asImageBitmap() }
     }
-    val displayName = if (customBitmap != null) "Custom" else character.name
+    val spriteSheet = remember(settings.companionSprite) {
+        settings.companionSprite.takeIf { it.isNotBlank() }
+            ?.let { path -> runCatching { java.io.File(path).takeIf { it.isFile } }.getOrNull() }
+            ?.let { file -> android.graphics.BitmapFactory.decodeFile(file.absolutePath)?.asImageBitmap() }
+            ?.takeIf { CompanionSpriteSheet.usable(it.width, it.height) }
+    }
+    val displayName = when {
+        spriteSheet != null -> "Sprite"
+        customBitmap != null -> "Custom"
+        else -> character.name
+    }
     var now by remember(state.projectRoot) { mutableLongStateOf(System.currentTimeMillis()) }
     var lastActive by remember(state.projectRoot) { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(state.agentRunning, state.agentActivity?.phase, state.chat.size, state.team?.agents) {
@@ -114,8 +129,11 @@ fun AgentCompanion(state: WorkspaceUiState, settings: AgentSettings, compact: Bo
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(modifier = Modifier.size(if (compact) 44.dp else 50.dp)) {
-            if (customBitmap != null) {
-                Image(
+            when {
+                spriteSheet != null -> Canvas(modifier = Modifier.size(if (compact) 44.dp else 50.dp)) {
+                    drawSpriteFrame(spriteSheet, mood.mood, now, size.width, size.height)
+                }
+                customBitmap != null -> Image(
                     bitmap = customBitmap,
                     contentDescription = "Custom companion",
                     contentScale = ContentScale.Crop,
@@ -123,9 +141,13 @@ fun AgentCompanion(state: WorkspaceUiState, settings: AgentSettings, compact: Bo
                         .size(if (compact) 44.dp else 50.dp)
                         .clip(CircleShape),
                 )
-            } else {
-                Canvas(modifier = Modifier.size(if (compact) 44.dp else 50.dp)) {
+                else -> Canvas(modifier = Modifier.size(if (compact) 44.dp else 50.dp)) {
                     drawChibi(character, mood.mood, beat, blink, look, sway)
+                }
+            }
+            if (settings.companionEffects) {
+                Canvas(modifier = Modifier.size(if (compact) 44.dp else 50.dp)) {
+                    drawPixelFx(character, mood.mood, now, mood.load, beat)
                 }
             }
             if (mood.mood == CompanionMood.SLEEPING) {
@@ -411,6 +433,130 @@ private fun DrawScope.drawChibi(
     if (mood == CompanionMood.TEAM) {
         drawCircle(Color(0xFFF2A65A), radius = w * 0.06f, center = Offset(cx - headR * 1.45f, h * 0.80f))
         drawCircle(Color(0xFF7DD3FC), radius = w * 0.05f, center = Offset(cx + headR * 1.45f, h * 0.80f))
+    }
+}
+
+private fun DrawScope.drawSpriteFrame(
+    sheet: ImageBitmap,
+    mood: CompanionMood,
+    now: Long,
+    width: Float,
+    height: Float,
+) {
+    val frameW = sheet.width / CompanionSpriteSheet.COLUMNS
+    val frameH = sheet.height / CompanionSpriteSheet.ROWS
+    val row = CompanionSpriteSheet.rowFor(mood)
+    val col = CompanionSpriteSheet.frameFor(now)
+    drawImage(
+        image = sheet,
+        srcOffset = IntOffset(col * frameW, row * frameH),
+        srcSize = IntSize(frameW, frameH),
+        dstOffset = IntOffset(0, 0),
+        dstSize = IntSize(width.toInt(), height.toInt()),
+        filterQuality = FilterQuality.None,
+    )
+}
+
+private fun DrawScope.drawPixelFx(
+    character: CompanionCharacter,
+    mood: CompanionMood,
+    now: Long,
+    load: Int,
+    beat: Float,
+) {
+    val w = size.width
+    val h = size.height
+    val cx = w / 2f
+    val headY = h * 0.37f
+    val accent = Color(character.accent)
+    val cream = Color(0xFFFFE9C9)
+    val red = Color(0xFFE36B5D)
+    fun pixel(x: Float, y: Float, s: Float, color: Color) {
+        drawRect(color, topLeft = Offset(x, y), size = Size(s, s))
+    }
+    fun z(x: Float, y: Float, s: Float, color: Color) {
+        val rows = listOf("111", "001", "010", "100", "111")
+        rows.forEachIndexed { row, line ->
+            line.forEachIndexed { col, bit ->
+                if (bit == '1') pixel(x + col * s, y + row * s, s, color)
+            }
+        }
+    }
+    fun star(x: Float, y: Float, s: Float, color: Color) {
+        pixel(x + s, y, s, color)
+        pixel(x, y + s, s, color)
+        pixel(x + s, y + s, s, color)
+        pixel(x + s * 2f, y + s, s, color)
+        pixel(x + s, y + s * 2f, s, color)
+    }
+    when (mood) {
+        CompanionMood.SLEEPING -> {
+            drawRect(Color.Black.copy(alpha = 0.06f), size = size)
+            val t = ((now / 900L) % 3L).toInt()
+            z(cx + w * 0.18f, headY - h * 0.22f - t * h * 0.03f, w * 0.035f, accent.copy(alpha = 0.75f))
+            z(cx + w * 0.30f, headY - h * 0.38f + t * h * 0.01f, w * 0.025f, accent.copy(alpha = 0.45f))
+        }
+        CompanionMood.THINKING -> {
+            repeat(3) { index ->
+                val phase = (now / 700.0 + index * 0.8) % 1.0
+                val x = cx + w * (0.18f + index * 0.08f)
+                val y = headY - h * (0.16f + phase.toFloat() * 0.14f)
+                pixel(x, y, w * 0.045f, cream.copy(alpha = 1f - phase.toFloat() * 0.7f))
+            }
+            pixel(cx + w * 0.34f, headY - h * 0.40f, w * 0.05f, accent)
+        }
+        CompanionMood.WORKING -> {
+            repeat(8) { index ->
+                val phase = ((now / 420.0) + index * 0.37) % 1.0
+                val side = if (index % 2 == 0) -1f else 1f
+                val x = cx + side * w * (0.22f + phase.toFloat() * 0.18f)
+                val y = h * 0.72f - phase.toFloat() * h * 0.35f
+                pixel(x, y, w * 0.035f, if (index % 3 == 0) cream else accent)
+            }
+            pixel(cx + w * 0.30f, h * 0.30f, w * 0.05f, accent.copy(alpha = 0.8f))
+        }
+        CompanionMood.TEAM -> {
+            val left = cx - w * 0.38f
+            val right = cx + w * 0.38f
+            val y = h * 0.78f + beat * 0.8f
+            pixel(left, y, w * 0.07f, Color(0xFFF2A65A))
+            pixel(right, y - w * 0.03f, w * 0.06f, Color(0xFF7DD3FC))
+            val dots = 3
+            repeat(dots) { index ->
+                val x = left + (right - left) * (index + 1) / (dots + 1).toFloat()
+                pixel(x, y + w * 0.015f, w * 0.025f, accent.copy(alpha = 0.6f))
+            }
+        }
+        CompanionMood.HAPPY -> {
+            repeat(8) { index ->
+                val phase = ((now / 650.0) + index * 0.125) % 1.0
+                val angle = index * Math.PI / 4
+                val radius = w * (0.20f + phase.toFloat() * 0.22f)
+                star(
+                    cx + kotlin.math.cos(angle).toFloat() * radius,
+                    headY + kotlin.math.sin(angle).toFloat() * radius,
+                    w * 0.022f,
+                    if (index % 2 == 0) accent else cream,
+                )
+            }
+        }
+        CompanionMood.WORRIED -> {
+            repeat(3) { index ->
+                pixel(cx - w * 0.28f, headY - h * 0.17f + index * h * 0.045f, w * 0.12f, red.copy(alpha = 0.35f))
+            }
+            pixel(cx + w * 0.30f, headY - h * 0.30f, w * 0.055f, red)
+            pixel(cx + w * 0.31f, headY - h * 0.22f, w * 0.04f, red)
+        }
+        CompanionMood.OFFLINE -> {
+            val line = ((now / 1200L) % 4L).toInt()
+            drawRect(Color(0xFF6F8098).copy(alpha = 0.10f), topLeft = Offset(0f, line * h / 4f), size = Size(w, h / 12f))
+        }
+        CompanionMood.IDLE -> {
+            repeat(2) { index ->
+                val phase = ((now / 2200.0) + index * 0.5) % 1.0
+                pixel(cx + w * (0.25f + index * 0.10f), h * (0.75f - phase.toFloat() * 0.25f), w * 0.02f, accent.copy(alpha = 0.35f))
+            }
+        }
     }
 }
 

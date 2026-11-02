@@ -98,6 +98,17 @@ fun SettingsDialog(
             }
         }
     }
+    val spritePicker = rememberLauncherForActivityResult(PickVisualMedia()) { uri ->
+        if (uri != null) {
+            runCatching {
+                val file = java.io.File(settingsContext.filesDir, "companion-sprite.img")
+                settingsContext.contentResolver.openInputStream(uri)?.use { input ->
+                    file.outputStream().use { output -> input.copyTo(output) }
+                }
+                draft = draft.copy(companionSprite = file.absolutePath)
+            }
+        }
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -329,6 +340,25 @@ fun SettingsDialog(
                             text = "A custom image stays on this phone. Use only art you have the right to use; copyrighted characters are not bundled.",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = "Sprite sheet: 4 columns × 8 rows, one transparent frame per cell. Rows: idle, sleep, think, work, team, happy, worry, offline.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = {
+                                spritePicker.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
+                            }) { Text(if (draft.companionSprite.isBlank()) "Choose sprite sheet" else "Replace sprite sheet") }
+                            if (draft.companionSprite.isNotBlank()) {
+                                TextButton(onClick = { draft = draft.copy(companionSprite = "") }) { Text("Use image/roster") }
+                            }
+                        }
+                        ToggleRow(
+                            title = "Pixel effects",
+                            detail = "Sleep z, thinking dots, work sparks, team links, happy stars, and worry glitches around the character.",
+                            checked = draft.companionEffects,
+                            onCheckedChange = { draft = draft.copy(companionEffects = it) },
                         )
                     }
                     SettingsSection(

@@ -34,6 +34,10 @@ data class AgentSettings(
     val companionCharacter: String = "auto",
     /** A user-chosen local image; empty keeps the drawn roster. */
     val companionImage: String = "",
+    /** Small pixel particles and state effects around the companion. */
+    val companionEffects: Boolean = true,
+    /** A 4 x 8 state sprite sheet imported by the user. */
+    val companionSprite: String = "",
     /** Estimated token prices in USD per 1M; 0 means no cost estimate. */
     val inputPricePerM: Double = 0.0,
     val outputPricePerM: Double = 0.0,
@@ -135,6 +139,8 @@ class SettingsStore(context: Context) {
             companionEnabled = prefs.getBoolean(KEY_COMPANION, true),
             companionCharacter = prefs.getString(KEY_COMPANION_CHAR, "auto") ?: "auto",
             companionImage = prefs.getString(KEY_COMPANION_IMAGE, "") ?: "",
+            companionEffects = prefs.getBoolean(KEY_COMPANION_FX, true),
+            companionSprite = prefs.getString(KEY_COMPANION_SPRITE, "") ?: "",
             inputPricePerM = prefs.getFloat(KEY_INPUT_PRICE, 0f).toDouble(),
             outputPricePerM = prefs.getFloat(KEY_OUTPUT_PRICE, 0f).toDouble(),
             cachedPricePerM = prefs.getFloat(KEY_CACHED_PRICE, 0f).toDouble(),
@@ -212,6 +218,8 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_COMPANION, settings.companionEnabled)
             .putString(KEY_COMPANION_CHAR, settings.companionCharacter)
             .putString(KEY_COMPANION_IMAGE, settings.companionImage)
+            .putBoolean(KEY_COMPANION_FX, settings.companionEffects)
+            .putString(KEY_COMPANION_SPRITE, settings.companionSprite)
             .putFloat(KEY_INPUT_PRICE, settings.inputPricePerM.toFloat())
             .putFloat(KEY_OUTPUT_PRICE, settings.outputPricePerM.toFloat())
             .putFloat(KEY_CACHED_PRICE, settings.cachedPricePerM.toFloat())
@@ -260,6 +268,8 @@ class SettingsStore(context: Context) {
         const val KEY_COMPANION = "companion_enabled"
         const val KEY_COMPANION_CHAR = "companion_character"
         const val KEY_COMPANION_IMAGE = "companion_image"
+        const val KEY_COMPANION_FX = "companion_effects"
+        const val KEY_COMPANION_SPRITE = "companion_sprite"
         const val KEY_INPUT_PRICE = "input_price_per_m"
         const val KEY_OUTPUT_PRICE = "output_price_per_m"
         const val KEY_CACHED_PRICE = "cached_price_per_m"
