@@ -461,6 +461,7 @@ fun ChatPanel(
                     }
                 }
             }
+            AgentCompanion(state = state, compact = compact)
             state.team?.let { team ->
                 TeamStrip(team = team, agentRunning = state.agentRunning)
             }
