@@ -51,6 +51,18 @@ class TeamTool(
         }
     }
 
+    private fun usable(role: String, text: String): Boolean {
+        val value = text.trim()
+        if (value.length < 120) return false
+        val head = when (role) {
+            "researcher" -> "FINDING"
+            "architect" -> "TRADEOFF"
+            else -> "VERDICT"
+        }
+        val upper = value.uppercase()
+        return head in upper && listOf("EVIDENCE", "PASS", "FAIL", "RISK", "INSUFFICIENT").any { it in upper }
+    }
+
     private suspend fun help(args: JsonObject): ToolResult {
         if (helped) return ToolResult.error("This run already used its one team. Use the reports in .ceditneuro/team and continue.")
         val task = args.stringArg("task").orEmpty().trim()
@@ -73,7 +85,7 @@ class TeamTool(
                     val text = runCatching { runHelper(request) }.getOrElse { error ->
                         "Helper failed: " + (error.message ?: error::class.java.simpleName)
                     }
-                    val failed = text.startsWith("Helper failed:")
+                    val failed = text.startsWith("Helper failed:") || !usable(role, text)
                     TeamBoard.RoleReport(role, text, failed).also { report ->
                         TeamBoard.record(root, report)
                     }

@@ -38,13 +38,16 @@ class TeamBoardTest {
         val dir = Files.createTempDirectory("team-tool").toFile()
         try {
             val statuses = mutableListOf<String>()
-            val tool = TeamTool(dir, { request -> "${request.role}: checked" }, { statuses += it })
+            val tool = TeamTool(dir, { request ->
+                val head = if (request.role == "researcher") "FINDING" else "VERDICT"
+                "$head: checked. EVIDENCE: spinner.html L17."
+            }, { statuses += it })
             val args = Json.parseToJsonElement(
                 """{"action":"help","task":"Ship the parser","question":"Is it safe?","roles":"reviewer,researcher"}""",
             ).jsonObject
             val result = tool.execute(args)
-            assertTrue(result.content.contains("reviewer: checked"))
-            assertTrue(result.content.contains("researcher: checked"))
+            assertTrue(result.content.contains("VERDICT: checked"))
+            assertTrue(result.content.contains("FINDING: checked"))
             assertTrue(TeamBoard.briefFile(dir).isFile)
             assertTrue(statuses.any { it.contains("started") })
             val second = tool.execute(args)

@@ -3550,7 +3550,7 @@ class WorkspaceViewModel(
                 toolSession = helperSession,
                 systemPrompt = teamRolePrompt(request.role),
                 setupPrompt = teamSetupPrompt(request, ws.root.absolutePath, helperNames),
-                maxToolRounds = 8,
+                maxToolRounds = 12,
                 maxAutoBatches = 1,
             )
             val report = StringBuilder()

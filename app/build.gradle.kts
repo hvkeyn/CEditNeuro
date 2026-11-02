@@ -18,8 +18,8 @@ android {
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
         }
-        versionCode = 158
-        versionName = "0.99.42"
+        versionCode = 159
+        versionName = "0.99.43"
     }
 
     buildTypes {
