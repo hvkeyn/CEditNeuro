@@ -23,14 +23,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.hvkeyn.ceditneuro.data.AgentSettings
+import com.hvkeyn.ceditneuro.ui.CompanionCharacter
 import com.hvkeyn.ceditneuro.ui.CompanionMood
-import com.hvkeyn.ceditneuro.ui.CompanionStatus
+import com.hvkeyn.ceditneuro.ui.CompanionRoster
 import com.hvkeyn.ceditneuro.ui.WorkspaceUiState
 import com.hvkeyn.ceditneuro.ui.companionStatus
 import com.hvkeyn.ceditneuro.ui.idleAction
@@ -39,11 +43,17 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 /**
- * Nib: an original paper-fox status pet. It is a reflection of the agent state,
- * not another model and not an editor.
+ * Original chibi companions drawn with Canvas. They are a reflection of the
+ * agent state, not another model and not an editor.
  */
 @Composable
-fun AgentCompanion(state: WorkspaceUiState, compact: Boolean) {
+fun AgentCompanion(state: WorkspaceUiState, settings: AgentSettings, compact: Boolean) {
+    if (!settings.companionEnabled) return
+    val character = CompanionRoster.resolve(
+        selection = settings.companionCharacter,
+        projectRoot = state.projectRoot,
+        workFocus = settings.workFocus,
+    )
     var now by remember(state.projectRoot) { mutableLongStateOf(System.currentTimeMillis()) }
     var lastActive by remember(state.projectRoot) { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(state.agentRunning, state.agentActivity?.phase, state.chat.size, state.team?.agents) {
@@ -76,8 +86,11 @@ fun AgentCompanion(state: WorkspaceUiState, compact: Boolean) {
         "LOOK_RIGHT" -> 1f
         else -> 0f
     }
-    val earTwitch = if (gesture?.name == "EAR_TWITCH") sin(now / 90.0).toFloat() * 1.2f else 0f
-    val swish = if (gesture?.name == "TAIL_SWISH") sin(now / 180.0).toFloat() * 2.4f else 0f
+    val sway = if (gesture?.name == "EAR_TWITCH" || gesture?.name == "TAIL_SWISH") {
+        sin(now / 150.0).toFloat() * 2.2f
+    } else {
+        0f
+    }
     val beat = if (mood.mood == CompanionMood.SLEEPING) 0f else sin(now / (520.0 - mood.load * 55.0)).toFloat()
 
     Row(
@@ -89,116 +102,9 @@ fun AgentCompanion(state: WorkspaceUiState, compact: Boolean) {
             .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(modifier = Modifier.size(if (compact) 42.dp else 48.dp)) {
-            Canvas(modifier = Modifier.size(if (compact) 42.dp else 48.dp)) {
-                val w = size.width
-                val h = size.height
-                val cx = w / 2f
-                val bodyTop = h * 0.28f - beat * 0.9f
-                val bodyW = w * 0.62f
-                val bodyH = h * 0.56f
-                val body = Color(0xFFEADDC6)
-                val ink = Color(0xFF2D2823)
-                val earColor = Color(0xFFC97B5A)
-                val scarf = Color(0xFFB14F3A)
-                val active = mood.mood != CompanionMood.SLEEPING && mood.mood != CompanionMood.OFFLINE
-
-                // Tail behind the body.
-                val tail = Path().apply {
-                    moveTo(cx + bodyW * 0.28f, bodyTop + bodyH * 0.72f)
-                    cubicTo(
-                        cx + bodyW * 0.82f + swish, bodyTop + bodyH * 0.62f,
-                        cx + bodyW * 0.78f + swish, bodyTop + bodyH * 0.18f,
-                        cx + bodyW * 0.5f + swish, bodyTop + bodyH * 0.08f,
-                    )
-                }
-                drawPath(tail, body.copy(alpha = 0.9f), style = Stroke(width = w * 0.085f))
-
-                // Ears.
-                val leftEar = Path().apply {
-                    moveTo(cx - bodyW * 0.44f, bodyTop + bodyH * 0.18f)
-                    lineTo(cx - bodyW * 0.58f, bodyTop - h * 0.18f + earTwitch)
-                    lineTo(cx - bodyW * 0.12f, bodyTop + bodyH * 0.02f)
-                    close()
-                }
-                val rightEar = Path().apply {
-                    moveTo(cx + bodyW * 0.12f, bodyTop + bodyH * 0.02f)
-                    lineTo(cx + bodyW * 0.58f, bodyTop - h * 0.18f - earTwitch)
-                    lineTo(cx + bodyW * 0.44f, bodyTop + bodyH * 0.18f)
-                    close()
-                }
-                drawPath(leftEar, body)
-                drawPath(rightEar, body)
-                drawPath(leftEar, earColor.copy(alpha = 0.45f), style = Stroke(width = w * 0.025f))
-                drawPath(rightEar, earColor.copy(alpha = 0.45f), style = Stroke(width = w * 0.025f))
-
-                // Body and paws.
-                drawOval(
-                    color = body,
-                    topLeft = Offset(cx - bodyW / 2f, bodyTop),
-                    size = androidx.compose.ui.geometry.Size(bodyW, bodyH),
-                )
-                drawCircle(ink.copy(alpha = 0.12f), radius = w * 0.05f, center = Offset(cx - bodyW * 0.26f, bodyTop + bodyH * 0.88f))
-                drawCircle(ink.copy(alpha = 0.12f), radius = w * 0.05f, center = Offset(cx + bodyW * 0.26f, bodyTop + bodyH * 0.88f))
-
-                // Scarf.
-                drawArc(
-                    color = scarf,
-                    startAngle = 12f,
-                    sweepAngle = 156f,
-                    useCenter = false,
-                    topLeft = Offset(cx - bodyW * 0.40f, bodyTop + bodyH * 0.55f),
-                    size = androidx.compose.ui.geometry.Size(bodyW * 0.80f, bodyH * 0.34f),
-                    style = Stroke(width = w * 0.07f),
-                )
-
-                // Eyes.
-                val eyeY = bodyTop + bodyH * 0.40f
-                val eyeDx = bodyW * 0.17f
-                val eyeR = w * 0.045f
-                if (mood.mood == CompanionMood.SLEEPING || blink) {
-                    drawLine(ink, Offset(cx - eyeDx - eyeR, eyeY), Offset(cx - eyeDx + eyeR, eyeY), strokeWidth = w * 0.035f)
-                    drawLine(ink, Offset(cx + eyeDx - eyeR, eyeY), Offset(cx + eyeDx + eyeR, eyeY), strokeWidth = w * 0.035f)
-                } else if (mood.mood == CompanionMood.HAPPY) {
-                    drawArc(
-                        ink, 200f, 140f, false,
-                        topLeft = Offset(cx - eyeDx - eyeR, eyeY - eyeR),
-                        size = androidx.compose.ui.geometry.Size(eyeR * 2f, eyeR * 1.6f),
-                        style = Stroke(width = w * 0.035f),
-                    )
-                    drawArc(
-                        ink, 200f, 140f, false,
-                        topLeft = Offset(cx + eyeDx - eyeR, eyeY - eyeR),
-                        size = androidx.compose.ui.geometry.Size(eyeR * 2f, eyeR * 1.6f),
-                        style = Stroke(width = w * 0.035f),
-                    )
-                } else {
-                    drawCircle(ink, radius = eyeR, center = Offset(cx - eyeDx + look * eyeR * 0.5f, eyeY))
-                    drawCircle(ink, radius = eyeR, center = Offset(cx + eyeDx + look * eyeR * 0.5f, eyeY))
-                }
-
-                // Nose and brows.
-                drawCircle(scarf, radius = w * 0.035f, center = Offset(cx, bodyTop + bodyH * 0.52f))
-                if (mood.mood == CompanionMood.WORRIED) {
-                    drawLine(ink, Offset(cx - eyeDx - eyeR, eyeY - eyeR * 2.2f), Offset(cx - eyeDx + eyeR, eyeY - eyeR * 1.2f), strokeWidth = w * 0.03f)
-                    drawLine(ink, Offset(cx + eyeDx - eyeR, eyeY - eyeR * 1.2f), Offset(cx + eyeDx + eyeR, eyeY - eyeR * 2.2f), strokeWidth = w * 0.03f)
-                }
-                if (mood.mood == CompanionMood.OFFLINE) {
-                    drawLine(ink.copy(alpha = 0.35f), Offset(cx - eyeDx - eyeR, eyeY), Offset(cx - eyeDx + eyeR, eyeY), strokeWidth = w * 0.035f)
-                    drawLine(ink.copy(alpha = 0.35f), Offset(cx + eyeDx - eyeR, eyeY), Offset(cx + eyeDx + eyeR, eyeY), strokeWidth = w * 0.035f)
-                }
-                if (mood.mood == CompanionMood.TEAM) {
-                    drawCircle(Color(0xFFF2A65A), radius = w * 0.055f, center = Offset(cx + bodyW * 0.34f, bodyTop + bodyH * 0.76f))
-                    drawCircle(Color(0xFF7DD3FC), radius = w * 0.045f, center = Offset(cx - bodyW * 0.38f, bodyTop + bodyH * 0.72f))
-                }
-                if (mood.mood == CompanionMood.WORKING || mood.mood == CompanionMood.THINKING) {
-                    val spark = Offset(cx + bodyW * 0.58f, bodyTop + bodyH * 0.10f + beat * 1.2f)
-                    drawCircle(Color(0xFFF2A65A), radius = w * 0.035f, center = spark)
-                    drawLine(Color(0xFFF2A65A), spark, spark + Offset(w * 0.10f, -h * 0.07f), strokeWidth = w * 0.025f)
-                }
-                if (!active) {
-                    drawCircle(body.copy(alpha = 0.16f), radius = w * 0.5f, center = Offset(cx, bodyTop + bodyH * 0.55f))
-                }
+        Box(modifier = Modifier.size(if (compact) 44.dp else 50.dp)) {
+            Canvas(modifier = Modifier.size(if (compact) 44.dp else 50.dp)) {
+                drawChibi(character, mood.mood, beat, blink, look, sway)
             }
             if (mood.mood == CompanionMood.SLEEPING) {
                 Text(
@@ -228,10 +134,10 @@ fun AgentCompanion(state: WorkspaceUiState, compact: Boolean) {
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "NIB",
+                    character.name.uppercase(),
                     style = MaterialTheme.typography.labelSmall,
                     fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.tertiary,
+                    color = Color(character.accent),
                 )
                 Spacer(Modifier.width(7.dp))
                 Text(
@@ -249,13 +155,169 @@ fun AgentCompanion(state: WorkspaceUiState, compact: Boolean) {
                 }
             }
             Text(
-                mood.message,
+                mood.message.replace("Nib", character.name),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = if (compact) 1 else 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
+    }
+}
+
+private fun DrawScope.drawChibi(
+    character: CompanionCharacter,
+    mood: CompanionMood,
+    beat: Float,
+    blink: Boolean,
+    look: Float,
+    sway: Float,
+) {
+    val w = size.width
+    val h = size.height
+    val cx = w / 2f
+    val skin = Color(character.skin)
+    val hair = Color(character.hair)
+    val eyes = Color(character.eyes)
+    val outfit = Color(character.outfit)
+    val accent = Color(character.accent)
+    val ink = Color(0xFF2E2825)
+    val bob = beat * 0.7f
+    val headY = h * 0.37f + bob
+    val headR = w * 0.255f
+
+    // Twin tails behind the head.
+    drawOval(
+        hair.copy(alpha = 0.9f),
+        topLeft = Offset(cx - headR * 1.55f - sway, headY - headR * 0.25f),
+        size = Size(headR * 0.75f, headR * 1.15f),
+    )
+    drawOval(
+        hair.copy(alpha = 0.9f),
+        topLeft = Offset(cx + headR * 0.80f + sway, headY - headR * 0.25f),
+        size = Size(headR * 0.75f, headR * 1.15f),
+    )
+
+    // Body.
+    drawRoundRect(
+        outfit,
+        topLeft = Offset(cx - w * 0.22f, h * 0.62f + bob),
+        size = Size(w * 0.44f, h * 0.30f),
+        cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.12f, w * 0.12f),
+    )
+    drawRoundRect(
+        accent.copy(alpha = 0.85f),
+        topLeft = Offset(cx - w * 0.22f, h * 0.68f + bob),
+        size = Size(w * 0.44f, h * 0.045f),
+        cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.03f, w * 0.03f),
+    )
+
+    // Hair cap + face.
+    drawCircle(hair, radius = headR * 1.08f, center = Offset(cx, headY - headR * 0.18f))
+    drawOval(
+        skin,
+        topLeft = Offset(cx - headR * 0.82f, headY - headR * 0.52f),
+        size = Size(headR * 1.64f, headR * 1.48f),
+    )
+    val bangs = Path().apply {
+        moveTo(cx - headR * 0.90f, headY - headR * 0.30f)
+        quadraticTo(cx - headR * 0.35f, headY - headR * 0.95f, cx + headR * 0.02f, headY - headR * 0.55f)
+        quadraticTo(cx + headR * 0.40f, headY - headR * 0.92f, cx + headR * 0.90f, headY - headR * 0.28f)
+        lineTo(cx + headR * 0.72f, headY - headR * 0.55f)
+        lineTo(cx + headR * 0.28f, headY - headR * 0.35f)
+        lineTo(cx - headR * 0.05f, headY - headR * 0.60f)
+        lineTo(cx - headR * 0.35f, headY - headR * 0.30f)
+        lineTo(cx - headR * 0.66f, headY - headR * 0.52f)
+        close()
+    }
+    drawPath(bangs, hair)
+
+    // Eyes.
+    val eyeY = headY + headR * 0.08f
+    val eyeDx = headR * 0.36f
+    val eyeW = headR * 0.25f
+    val eyeH = headR * 0.34f
+    when {
+        mood == CompanionMood.SLEEPING || blink -> {
+            drawLine(ink, Offset(cx - eyeDx - eyeW, eyeY), Offset(cx - eyeDx + eyeW, eyeY), strokeWidth = w * 0.025f)
+            drawLine(ink, Offset(cx + eyeDx - eyeW, eyeY), Offset(cx + eyeDx + eyeW, eyeY), strokeWidth = w * 0.025f)
+        }
+        mood == CompanionMood.HAPPY -> {
+            drawArc(
+                ink, 200f, 140f, false,
+                topLeft = Offset(cx - eyeDx - eyeW, eyeY - eyeH * 0.38f),
+                size = Size(eyeW * 2f, eyeH * 0.8f),
+                style = Stroke(width = w * 0.025f),
+            )
+            drawArc(
+                ink, 200f, 140f, false,
+                topLeft = Offset(cx + eyeDx - eyeW, eyeY - eyeH * 0.38f),
+                size = Size(eyeW * 2f, eyeH * 0.8f),
+                style = Stroke(width = w * 0.025f),
+            )
+        }
+        else -> {
+            drawOval(eyes, Offset(cx - eyeDx - eyeW, eyeY - eyeH / 2f), Size(eyeW * 2f, eyeH))
+            drawOval(eyes, Offset(cx + eyeDx - eyeW, eyeY - eyeH / 2f), Size(eyeW * 2f, eyeH))
+            drawCircle(Color.White.copy(alpha = 0.9f), radius = eyeW * 0.32f, center = Offset(cx - eyeDx + look * eyeW * 0.4f, eyeY - eyeH * 0.25f))
+            drawCircle(Color.White.copy(alpha = 0.9f), radius = eyeW * 0.32f, center = Offset(cx + eyeDx + look * eyeW * 0.4f, eyeY - eyeH * 0.25f))
+        }
+    }
+
+    // Blush, mouth, brows.
+    drawCircle(Color(0xFFE98A7A).copy(alpha = 0.30f), radius = headR * 0.20f, center = Offset(cx - headR * 0.56f, eyeY + headR * 0.35f))
+    drawCircle(Color(0xFFE98A7A).copy(alpha = 0.30f), radius = headR * 0.20f, center = Offset(cx + headR * 0.56f, eyeY + headR * 0.35f))
+    drawArc(
+        ink.copy(alpha = 0.7f), 200f, 140f, false,
+        topLeft = Offset(cx - headR * 0.12f, eyeY + headR * 0.38f),
+        size = Size(headR * 0.24f, headR * 0.15f),
+        style = Stroke(width = w * 0.018f),
+    )
+    if (mood == CompanionMood.WORRIED) {
+        drawLine(ink, Offset(cx - eyeDx - eyeW, eyeY - eyeH * 0.95f), Offset(cx - eyeDx + eyeW, eyeY - eyeH * 0.65f), strokeWidth = w * 0.022f)
+        drawLine(ink, Offset(cx + eyeDx - eyeW, eyeY - eyeH * 0.65f), Offset(cx + eyeDx + eyeW, eyeY - eyeH * 0.95f), strokeWidth = w * 0.022f)
+    }
+    if (mood == CompanionMood.OFFLINE) {
+        drawLine(ink.copy(alpha = 0.4f), Offset(cx - eyeDx - eyeW, eyeY), Offset(cx - eyeDx + eyeW, eyeY), strokeWidth = w * 0.025f)
+        drawLine(ink.copy(alpha = 0.4f), Offset(cx + eyeDx - eyeW, eyeY), Offset(cx + eyeDx + eyeW, eyeY), strokeWidth = w * 0.025f)
+    }
+
+    // Accessory.
+    when (character.accessory) {
+        "goggles" -> {
+            drawLine(accent, Offset(cx - headR * 0.85f, headY - headR * 0.72f), Offset(cx + headR * 0.85f, headY - headR * 0.72f), strokeWidth = w * 0.035f)
+            drawCircle(accent, radius = headR * 0.16f, center = Offset(cx - headR * 0.34f, headY - headR * 0.72f), style = Stroke(width = w * 0.025f))
+            drawCircle(accent, radius = headR * 0.16f, center = Offset(cx + headR * 0.34f, headY - headR * 0.72f), style = Stroke(width = w * 0.025f))
+        }
+        "glasses" -> {
+            drawCircle(ink.copy(alpha = 0.7f), radius = eyeW * 1.15f, center = Offset(cx - eyeDx, eyeY), style = Stroke(width = w * 0.018f))
+            drawCircle(ink.copy(alpha = 0.7f), radius = eyeW * 1.15f, center = Offset(cx + eyeDx, eyeY), style = Stroke(width = w * 0.018f))
+            drawLine(ink.copy(alpha = 0.7f), Offset(cx - eyeDx + eyeW * 1.15f, eyeY), Offset(cx + eyeDx - eyeW * 1.15f, eyeY), strokeWidth = w * 0.015f)
+        }
+        "headset" -> {
+            drawArc(accent, 200f, 140f, false, topLeft = Offset(cx - headR * 1.1f, headY - headR * 1.25f), size = Size(headR * 2.2f, headR * 1.8f), style = Stroke(width = w * 0.03f))
+            drawLine(accent, Offset(cx + headR * 0.95f, headY - headR * 0.55f), Offset(cx + headR * 1.12f, headY + headR * 0.12f), strokeWidth = w * 0.025f)
+        }
+        "hood" -> {
+            drawArc(outfit, 190f, 160f, false, topLeft = Offset(cx - headR * 1.28f, headY - headR * 1.15f), size = Size(headR * 2.56f, headR * 2.25f), style = Stroke(width = w * 0.04f))
+        }
+        "snowclip" -> {
+            val x = cx + headR * 0.70f
+            val y = headY - headR * 0.55f
+            drawLine(accent, Offset(x - w * 0.05f, y), Offset(x + w * 0.05f, y), strokeWidth = w * 0.018f)
+            drawLine(accent, Offset(x, y - w * 0.05f), Offset(x, y + w * 0.05f), strokeWidth = w * 0.018f)
+        }
+    }
+
+    // A small activity spark for a working agent.
+    if (mood == CompanionMood.WORKING || mood == CompanionMood.THINKING) {
+        val spark = Offset(cx + headR * 1.35f, headY - headR * 0.1f + beat * 1.5f)
+        drawCircle(accent, radius = w * 0.028f, center = spark)
+        drawLine(accent, spark, spark + Offset(w * 0.06f, -h * 0.05f), strokeWidth = w * 0.015f)
+    }
+    if (mood == CompanionMood.TEAM) {
+        drawCircle(Color(0xFFF2A65A), radius = w * 0.06f, center = Offset(cx - headR * 1.45f, h * 0.80f))
+        drawCircle(Color(0xFF7DD3FC), radius = w * 0.05f, center = Offset(cx + headR * 1.45f, h * 0.80f))
     }
 }
 

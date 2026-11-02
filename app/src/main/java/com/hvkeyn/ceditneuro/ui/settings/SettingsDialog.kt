@@ -51,6 +51,7 @@ import com.hvkeyn.ceditneuro.data.ModelCatalog
 import com.hvkeyn.ceditneuro.data.ModelProvider
 import com.hvkeyn.ceditneuro.data.RemoteServer
 import com.hvkeyn.ceditneuro.net.ProviderBalance
+import com.hvkeyn.ceditneuro.ui.CompanionRoster
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -232,6 +233,49 @@ fun SettingsDialog(
                             detail = "Reserved for the diff review flow; edits already apply immediately.",
                             checked = draft.autoApproveEdits,
                             onCheckedChange = { draft = draft.copy(autoApproveEdits = it) },
+                        )
+                    }
+                    SettingsSection(
+                        title = "Companion",
+                        summary = if (!draft.companionEnabled) "Off" else {
+                            val selected = CompanionRoster.byId(draft.companionCharacter)
+                            selected?.name ?: "Auto"
+                        },
+                        expanded = openSection == "companion",
+                        onToggle = { openSection = if (openSection == "companion") "" else "companion" },
+                    ) {
+                        ToggleRow(
+                            title = "Show the companion",
+                            detail = "A small status character above the composer. It reads the agent state; it has no model and no tools.",
+                            checked = draft.companionEnabled,
+                            onCheckedChange = { draft = draft.copy(companionEnabled = it) },
+                        )
+                        Text(
+                            text = "Auto picks a stable character for each project from the ones suited to the current work focus. Pick a name to keep one everywhere.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Row(
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            FilterChip(
+                                selected = draft.companionCharacter == CompanionRoster.AUTO,
+                                onClick = { draft = draft.copy(companionCharacter = CompanionRoster.AUTO) },
+                                label = { Text("Auto") },
+                            )
+                            CompanionRoster.all.forEach { character ->
+                                FilterChip(
+                                    selected = draft.companionCharacter == character.id,
+                                    onClick = { draft = draft.copy(companionCharacter = character.id) },
+                                    label = { Text(character.name) },
+                                )
+                            }
+                        }
+                        Text(
+                            text = CompanionRoster.all.joinToString(" · ") { it.name + " — " + it.tagline },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     SettingsSection(
