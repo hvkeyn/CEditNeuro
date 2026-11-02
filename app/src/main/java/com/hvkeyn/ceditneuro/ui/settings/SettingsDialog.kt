@@ -1,7 +1,13 @@
 package com.hvkeyn.ceditneuro.ui.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,6 +41,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -76,6 +85,18 @@ fun SettingsDialog(
     var draft by remember(settings) { mutableStateOf(settings) }
     var profileDraft by rememberSaveable(profileName) { mutableStateOf(profileName) }
     var openSection by rememberSaveable { mutableStateOf("models") }
+    val settingsContext = LocalContext.current
+    val companionPicker = rememberLauncherForActivityResult(PickVisualMedia()) { uri ->
+        if (uri != null) {
+            runCatching {
+                val file = java.io.File(settingsContext.filesDir, "companion-custom.img")
+                settingsContext.contentResolver.openInputStream(uri)?.use { input ->
+                    file.outputStream().use { output -> input.copyTo(output) }
+                }
+                draft = draft.copy(companionImage = file.absolutePath)
+            }
+        }
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -274,6 +295,37 @@ fun SettingsDialog(
                         }
                         Text(
                             text = CompanionRoster.all.joinToString(" · ") { it.name + " — " + it.tagline },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (draft.companionImage.isNotBlank()) {
+                            val imageFile = java.io.File(draft.companionImage)
+                            if (imageFile.isFile) {
+                                val bitmap = remember(imageFile.absolutePath, imageFile.lastModified()) {
+                                    android.graphics.BitmapFactory.decodeFile(imageFile.absolutePath)?.asImageBitmap()
+                                }
+                                if (bitmap != null) {
+                                    Image(
+                                        bitmap = bitmap,
+                                        contentDescription = "Custom companion",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .size(56.dp)
+                                            .clip(CircleShape),
+                                    )
+                                }
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = {
+                                companionPicker.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
+                            }) { Text(if (draft.companionImage.isBlank()) "Choose an image" else "Replace image") }
+                            if (draft.companionImage.isNotBlank()) {
+                                TextButton(onClick = { draft = draft.copy(companionImage = "") }) { Text("Use drawn roster") }
+                            }
+                        }
+                        Text(
+                            text = "A custom image stays on this phone. Use only art you have the right to use; copyrighted characters are not bundled.",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

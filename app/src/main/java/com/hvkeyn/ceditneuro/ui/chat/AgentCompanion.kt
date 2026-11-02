@@ -1,7 +1,9 @@
 package com.hvkeyn.ceditneuro.ui.chat
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +24,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -54,6 +59,12 @@ fun AgentCompanion(state: WorkspaceUiState, settings: AgentSettings, compact: Bo
         projectRoot = state.projectRoot,
         workFocus = settings.workFocus,
     )
+    val customBitmap = remember(settings.companionImage) {
+        settings.companionImage.takeIf { it.isNotBlank() }
+            ?.let { path -> runCatching { java.io.File(path).takeIf { it.isFile } }.getOrNull() }
+            ?.let { file -> android.graphics.BitmapFactory.decodeFile(file.absolutePath)?.asImageBitmap() }
+    }
+    val displayName = if (customBitmap != null) "Custom" else character.name
     var now by remember(state.projectRoot) { mutableLongStateOf(System.currentTimeMillis()) }
     var lastActive by remember(state.projectRoot) { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(state.agentRunning, state.agentActivity?.phase, state.chat.size, state.team?.agents) {
@@ -103,8 +114,19 @@ fun AgentCompanion(state: WorkspaceUiState, settings: AgentSettings, compact: Bo
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(modifier = Modifier.size(if (compact) 44.dp else 50.dp)) {
-            Canvas(modifier = Modifier.size(if (compact) 44.dp else 50.dp)) {
-                drawChibi(character, mood.mood, beat, blink, look, sway)
+            if (customBitmap != null) {
+                Image(
+                    bitmap = customBitmap,
+                    contentDescription = "Custom companion",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(if (compact) 44.dp else 50.dp)
+                        .clip(CircleShape),
+                )
+            } else {
+                Canvas(modifier = Modifier.size(if (compact) 44.dp else 50.dp)) {
+                    drawChibi(character, mood.mood, beat, blink, look, sway)
+                }
             }
             if (mood.mood == CompanionMood.SLEEPING) {
                 Text(
@@ -134,7 +156,7 @@ fun AgentCompanion(state: WorkspaceUiState, settings: AgentSettings, compact: Bo
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    character.name.uppercase(),
+                    displayName.uppercase(),
                     style = MaterialTheme.typography.labelSmall,
                     fontFamily = FontFamily.Monospace,
                     color = Color(character.accent),
@@ -155,7 +177,7 @@ fun AgentCompanion(state: WorkspaceUiState, settings: AgentSettings, compact: Bo
                 }
             }
             Text(
-                mood.message.replace("Nib", character.name),
+                mood.message.replace("Nib", displayName),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = if (compact) 1 else 2,
@@ -186,17 +208,66 @@ private fun DrawScope.drawChibi(
     val headY = h * 0.37f + bob
     val headR = w * 0.255f
 
-    // Twin tails behind the head.
-    drawOval(
-        hair.copy(alpha = 0.9f),
-        topLeft = Offset(cx - headR * 1.55f - sway, headY - headR * 0.25f),
-        size = Size(headR * 0.75f, headR * 1.15f),
-    )
-    drawOval(
-        hair.copy(alpha = 0.9f),
-        topLeft = Offset(cx + headR * 0.80f + sway, headY - headR * 0.25f),
-        size = Size(headR * 0.75f, headR * 1.15f),
-    )
+    // A different silhouette for each character.
+    when (character.hairstyle) {
+        "twin" -> {
+            drawOval(
+                hair.copy(alpha = 0.9f),
+                topLeft = Offset(cx - headR * 1.55f - sway, headY - headR * 0.25f),
+                size = Size(headR * 0.75f, headR * 1.15f),
+            )
+            drawOval(
+                hair.copy(alpha = 0.9f),
+                topLeft = Offset(cx + headR * 0.80f + sway, headY - headR * 0.25f),
+                size = Size(headR * 0.75f, headR * 1.15f),
+            )
+        }
+        "long" -> {
+            drawOval(
+                hair.copy(alpha = 0.9f),
+                topLeft = Offset(cx - headR * 1.30f, headY - headR * 0.35f),
+                size = Size(headR * 0.55f, headR * 2.1f),
+            )
+            drawOval(
+                hair.copy(alpha = 0.9f),
+                topLeft = Offset(cx + headR * 0.75f, headY - headR * 0.35f),
+                size = Size(headR * 0.55f, headR * 2.1f),
+            )
+        }
+        "bob" -> {
+            drawOval(
+                hair.copy(alpha = 0.92f),
+                topLeft = Offset(cx - headR * 1.12f, headY - headR * 0.45f),
+                size = Size(headR * 0.45f, headR * 1.35f),
+            )
+            drawOval(
+                hair.copy(alpha = 0.92f),
+                topLeft = Offset(cx + headR * 0.67f, headY - headR * 0.45f),
+                size = Size(headR * 0.45f, headR * 1.35f),
+            )
+        }
+        "ponytail" -> {
+            drawOval(
+                hair,
+                topLeft = Offset(cx + headR * 1.05f + sway, headY - headR * 0.70f),
+                size = Size(headR * 0.55f, headR * 1.55f),
+            )
+            drawCircle(accent.copy(alpha = 0.8f), radius = headR * 0.13f, center = Offset(cx + headR * 1.06f, headY - headR * 0.55f))
+        }
+        else -> {
+            val spikes = listOf(-0.85f, -0.50f, -0.15f, 0.20f, 0.55f, 0.90f)
+            spikes.forEachIndexed { index, at ->
+                val tipY = headY - headR * (1.15f + (index % 2) * 0.18f) + sway
+                val spike = Path().apply {
+                    moveTo(cx + headR * at - headR * 0.22f, headY - headR * 0.70f)
+                    lineTo(cx + headR * at, tipY)
+                    lineTo(cx + headR * at + headR * 0.22f, headY - headR * 0.70f)
+                    close()
+                }
+                drawPath(spike, hair)
+            }
+        }
+    }
 
     // Body.
     drawRoundRect(
@@ -306,6 +377,28 @@ private fun DrawScope.drawChibi(
             val y = headY - headR * 0.55f
             drawLine(accent, Offset(x - w * 0.05f, y), Offset(x + w * 0.05f, y), strokeWidth = w * 0.018f)
             drawLine(accent, Offset(x, y - w * 0.05f), Offset(x, y + w * 0.05f), strokeWidth = w * 0.018f)
+        }
+        "flower" -> {
+            val x = cx - headR * 0.72f
+            val y = headY - headR * 0.62f
+            repeat(5) { petal ->
+                val angle = petal * (Math.PI * 2 / 5).toFloat()
+                drawCircle(
+                    accent,
+                    radius = w * 0.032f,
+                    center = Offset(x + kotlin.math.cos(angle) * w * 0.035f, y + sin(angle) * w * 0.035f),
+                )
+            }
+            drawCircle(Color(0xFFFFF3C4), radius = w * 0.022f, center = Offset(x, y))
+        }
+        "bandana" -> {
+            drawRoundRect(
+                accent,
+                topLeft = Offset(cx - headR * 0.92f, headY - headR * 0.92f),
+                size = Size(headR * 1.84f, headR * 0.22f),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(headR * 0.08f, headR * 0.08f),
+            )
+            drawLine(accent, Offset(cx - headR * 0.85f, headY - headR * 0.80f), Offset(cx - headR * 1.25f, headY - headR * 0.45f), strokeWidth = w * 0.025f)
         }
     }
 

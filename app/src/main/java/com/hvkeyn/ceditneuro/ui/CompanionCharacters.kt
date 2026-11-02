@@ -17,6 +17,7 @@ data class CompanionCharacter(
     val outfit: Long,
     val accent: Long,
     val accessory: String,
+    val hairstyle: String,
 )
 
 object CompanionRoster {
@@ -33,6 +34,7 @@ object CompanionRoster {
             outfit = 0xFF31465E,
             accent = 0xFFF2A65A,
             accessory = "goggles",
+            hairstyle = "spiky",
         ),
         CompanionCharacter(
             id = "momo",
@@ -44,6 +46,7 @@ object CompanionRoster {
             outfit = 0xFF2F4F4A,
             accent = 0xFF7DD3FC,
             accessory = "glasses",
+            hairstyle = "long",
         ),
         CompanionCharacter(
             id = "sora",
@@ -55,6 +58,7 @@ object CompanionRoster {
             outfit = 0xFF263B57,
             accent = 0xFF9CC7FF,
             accessory = "headset",
+            hairstyle = "twin",
         ),
         CompanionCharacter(
             id = "rei",
@@ -66,6 +70,7 @@ object CompanionRoster {
             outfit = 0xFF332E3D,
             accent = 0xFFE0A6C8,
             accessory = "hood",
+            hairstyle = "bob",
         ),
         CompanionCharacter(
             id = "yuki",
@@ -77,16 +82,41 @@ object CompanionRoster {
             outfit = 0xFF3E4A50,
             accent = 0xFFB7E4E8,
             accessory = "snowclip",
+            hairstyle = "ponytail",
+        ),
+        CompanionCharacter(
+            id = "hana",
+            name = "Hana",
+            tagline = "Bright support",
+            skin = 0xFFFFDFC8,
+            hair = 0xFFB05A7A,
+            eyes = 0xFF7A354D,
+            outfit = 0xFF4A3348,
+            accent = 0xFFF2B8D0,
+            accessory = "flower",
+            hairstyle = "bob",
+        ),
+        CompanionCharacter(
+            id = "ren",
+            name = "Ren",
+            tagline = "Focused runner",
+            skin = 0xFFFFD7BF,
+            hair = 0xFF2E3448,
+            eyes = 0xFF39445C,
+            outfit = 0xFF2E4152,
+            accent = 0xFF8FD3C7,
+            accessory = "bandana",
+            hairstyle = "spiky",
         ),
     )
 
     fun byId(id: String): CompanionCharacter? = all.firstOrNull { it.id == id }
 
     fun candidates(workFocus: String): List<CompanionCharacter> = when (workFocus) {
-        AgentSettings.WORK_BUILD -> listOf(byId("kira")!!, byId("momo")!!)
+        AgentSettings.WORK_BUILD -> listOf(byId("kira")!!, byId("ren")!!, byId("momo")!!)
         AgentSettings.WORK_STUDY -> listOf(byId("momo")!!, byId("yuki")!!)
         AgentSettings.WORK_REMOTE -> listOf(byId("sora")!!, byId("rei")!!)
-        else -> listOf(byId("rei")!!, byId("kira")!!, byId("yuki")!!)
+        else -> listOf(byId("rei")!!, byId("kira")!!, byId("hana")!!, byId("yuki")!!)
     }
 
     /**

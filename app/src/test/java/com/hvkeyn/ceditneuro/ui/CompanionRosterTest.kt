@@ -28,7 +28,7 @@ class CompanionRosterTest {
         val study = CompanionRoster.candidates(AgentSettings.WORK_STUDY).map { it.id }.toSet()
         assertEquals(setOf("momo", "yuki"), study)
         val build = CompanionRoster.candidates(AgentSettings.WORK_BUILD).map { it.id }.toSet()
-        assertEquals(setOf("kira", "momo"), build)
+        assertEquals(setOf("kira", "ren", "momo"), build)
         assertNotEquals(
             CompanionRoster.resolve("auto", "/x", AgentSettings.WORK_STUDY).id,
             "sora",
