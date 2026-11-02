@@ -6,6 +6,7 @@ import com.hvkeyn.ceditneuro.agent.ChatMessage
 import com.hvkeyn.ceditneuro.agent.ContextBudget
 import com.hvkeyn.ceditneuro.agent.FunctionCall
 import com.hvkeyn.ceditneuro.agent.ToolCall
+import com.hvkeyn.ceditneuro.agent.TokenUsage
 import com.hvkeyn.ceditneuro.agent.ToolTranscript
 import com.hvkeyn.ceditneuro.data.AgentSettings
 import com.hvkeyn.ceditneuro.data.ModelCatalog
@@ -55,6 +56,7 @@ class DeepSeekBackend(
     }
 
     override fun complete(messages: List<ChatMessage>, tools: List<Tool>): Flow<BackendChunk> = flow {
+        val startedAt = System.currentTimeMillis()
         val settings = settingsProvider()
         val model = settings.model
         val provider = settings.provider
@@ -156,6 +158,7 @@ class DeepSeekBackend(
             val accumulator = ToolCallAccumulator()
             var finishReason: String? = null
             var cacheNote: String? = null
+            var usage: TokenUsage? = null
 
             while (!source.exhausted()) {
                 val line = source.readUtf8Line() ?: break
@@ -173,6 +176,7 @@ class DeepSeekBackend(
                     throw IOException("${provider.name} error ($type): $text.$hint")
                 }
                 cacheNote = cacheNote(frame) ?: cacheNote
+                usage = usageOf(frame) ?: usage
                 val choices = frame["choices"] as? JsonArray ?: continue
                 val choice = choices.firstOrNull() as? JsonObject ?: continue
 
@@ -196,7 +200,13 @@ class DeepSeekBackend(
             }
 
             if (accumulator.hasCalls()) emit(BackendChunk.ToolCalls(accumulator.build()))
-            emit(BackendChunk.Finished(finishReason, cacheNote))
+            emit(
+                BackendChunk.Finished(
+                    finishReason,
+                    cacheNote,
+                    usage?.copy(latencyMs = System.currentTimeMillis() - startedAt),
+                ),
+            )
         }
     }.flowOn(Dispatchers.IO)
 
@@ -229,6 +239,21 @@ class DeepSeekBackend(
             code == 429 -> " The bridge allows RATE_LIMIT_PER_MINUTE requests a minute (30 by default); wait or raise it."
             code == 404 && "model" in body -> " The bridge knows deepseek-chat and deepseek-expert."
             else -> ""
+        }
+
+        fun usageOf(frame: JsonObject): TokenUsage? {
+            val usage = frame["usage"] as? JsonObject ?: return null
+            fun number(key: String): Int =
+                (usage[key] as? JsonPrimitive)?.intOrNull ?: 0
+            val details = usage["prompt_tokens_details"] as? JsonObject
+            val cached = (details?.get("cached_tokens") as? JsonPrimitive)?.intOrNull
+                ?: (usage["prompt_cache_hit_tokens"] as? JsonPrimitive)?.intOrNull
+                ?: 0
+            return TokenUsage(
+                promptTokens = number("prompt_tokens"),
+                completionTokens = number("completion_tokens"),
+                cachedTokens = cached,
+            )
         }
 
         fun cacheNote(frame: JsonObject): String? {

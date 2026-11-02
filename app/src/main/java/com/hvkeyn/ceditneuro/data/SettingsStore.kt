@@ -34,6 +34,10 @@ data class AgentSettings(
     val companionCharacter: String = "auto",
     /** A user-chosen local image; empty keeps the drawn roster. */
     val companionImage: String = "",
+    /** Estimated token prices in USD per 1M; 0 means no cost estimate. */
+    val inputPricePerM: Double = 0.0,
+    val outputPricePerM: Double = 0.0,
+    val cachedPricePerM: Double = 0.0,
     /** Null until the user answers the prompt. True lets installed compilers run. */
     val execAllowed: Boolean? = null,
     /** edit, build, or remote. The chat selector writes this. */
@@ -131,6 +135,9 @@ class SettingsStore(context: Context) {
             companionEnabled = prefs.getBoolean(KEY_COMPANION, true),
             companionCharacter = prefs.getString(KEY_COMPANION_CHAR, "auto") ?: "auto",
             companionImage = prefs.getString(KEY_COMPANION_IMAGE, "") ?: "",
+            inputPricePerM = prefs.getFloat(KEY_INPUT_PRICE, 0f).toDouble(),
+            outputPricePerM = prefs.getFloat(KEY_OUTPUT_PRICE, 0f).toDouble(),
+            cachedPricePerM = prefs.getFloat(KEY_CACHED_PRICE, 0f).toDouble(),
             execAllowed = if (prefs.contains(KEY_EXEC)) prefs.getBoolean(KEY_EXEC, false) else null,
             workFocus = prefs.getString(KEY_WORK, null)?.takeIf { it in AgentSettings.WORK_FOCUSES }
                 ?: AgentSettings.WORK_EDIT,
@@ -205,6 +212,9 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_COMPANION, settings.companionEnabled)
             .putString(KEY_COMPANION_CHAR, settings.companionCharacter)
             .putString(KEY_COMPANION_IMAGE, settings.companionImage)
+            .putFloat(KEY_INPUT_PRICE, settings.inputPricePerM.toFloat())
+            .putFloat(KEY_OUTPUT_PRICE, settings.outputPricePerM.toFloat())
+            .putFloat(KEY_CACHED_PRICE, settings.cachedPricePerM.toFloat())
         val execAllowed = settings.execAllowed
         if (execAllowed == null) editor.remove(KEY_EXEC) else editor.putBoolean(KEY_EXEC, execAllowed)
         editor.putString(KEY_WORK, settings.workFocus)
@@ -250,6 +260,9 @@ class SettingsStore(context: Context) {
         const val KEY_COMPANION = "companion_enabled"
         const val KEY_COMPANION_CHAR = "companion_character"
         const val KEY_COMPANION_IMAGE = "companion_image"
+        const val KEY_INPUT_PRICE = "input_price_per_m"
+        const val KEY_OUTPUT_PRICE = "output_price_per_m"
+        const val KEY_CACHED_PRICE = "cached_price_per_m"
         const val KEY_EXEC = "exec_allowed"
         const val KEY_WORK = "work_focus"
         const val KEY_REMOTES = "remote_servers"

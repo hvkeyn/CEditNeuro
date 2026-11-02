@@ -24,6 +24,9 @@ import com.hvkeyn.ceditneuro.agent.HarnessBook
 import com.hvkeyn.ceditneuro.agent.AgentLoop
 import com.hvkeyn.ceditneuro.agent.ChatMessage
 import com.hvkeyn.ceditneuro.agent.ToolTranscript
+import com.hvkeyn.ceditneuro.agent.TokenUsage
+import com.hvkeyn.ceditneuro.agent.UsageLedger
+import com.hvkeyn.ceditneuro.agent.UsageRecord
 import com.hvkeyn.ceditneuro.agent.ProjectMemory
 import com.hvkeyn.ceditneuro.agent.ResearchSkill
 import com.hvkeyn.ceditneuro.agent.SkillEntry
@@ -353,6 +356,7 @@ class WorkspaceViewModel(
     private var workspace: Workspace? = null
     private val projects = linkedMapOf<String, LiveProject>()
     private var current: LiveProject? = null
+    private val usageLedger by lazy { UsageLedger(UsageLedger.file(appContext.filesDir)) }
     private val deviceShell = DeviceShell(appContext, { settingsStore.current.networkEnabled }) { settingsStore.current.proxy }
     private val shizukuShell = ShizukuShell(appContext)
     private val webBackend by lazy {
@@ -3338,6 +3342,24 @@ class WorkspaceViewModel(
         }
     }
 
+    private fun recordUsage(project: LiveProject, usage: TokenUsage, role: String) {
+        if (usage.isEmpty) return
+        val settings = settingsStore.current
+        val record = UsageRecord(
+            timestamp = System.currentTimeMillis(),
+            project = project.workspace.root.name.ifBlank { project.workspace.root.path },
+            provider = settings.provider.name,
+            model = settings.modelLabel(),
+            role = role,
+            focus = settings.workFocus,
+            promptTokens = usage.promptTokens,
+            completionTokens = usage.completionTokens,
+            cachedTokens = usage.cachedTokens,
+            latencyMs = usage.latencyMs,
+        )
+        viewModelScope.launch(Dispatchers.IO) { usageLedger.append(record) }
+    }
+
     private fun applyTeam(project: LiveProject, update: TeamUpdate) {
         editProject(project) { shown ->
             val started = shown.team?.startedAt ?: System.currentTimeMillis()
@@ -3607,6 +3629,7 @@ class WorkspaceViewModel(
                 toolSession = helperSession,
                 systemPrompt = teamRolePrompt(request.role),
                 setupPrompt = teamSetupPrompt(request, ws.root.absolutePath, helperNames),
+                onUsage = { usage -> recordUsage(project, usage, request.role) },
                 maxToolRounds = 12,
                 maxAutoBatches = 1,
             )
@@ -3632,6 +3655,7 @@ class WorkspaceViewModel(
             toolSession = toolSession,
             systemPrompt = buildSystemPrompt(),
             peerFeed = ::takePeerFeed,
+            onUsage = { usage -> recordUsage(project, usage, "main") },
             setupPrompt = buildSetupPrompt(
                 projectRoot = ws.root.absolutePath,
                 toolchainBin = deviceShell.toolchainBin.absolutePath,

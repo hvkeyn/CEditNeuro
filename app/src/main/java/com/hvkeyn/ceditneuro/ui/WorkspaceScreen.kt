@@ -115,6 +115,7 @@ import com.hvkeyn.ceditneuro.ui.theme.NeuroSelected
 import com.hvkeyn.ceditneuro.ui.reader.ReaderPane
 import com.hvkeyn.ceditneuro.ui.editor.EditorPane
 import com.hvkeyn.ceditneuro.ui.settings.SettingsDialog
+import com.hvkeyn.ceditneuro.ui.settings.UsageDialog
 import com.hvkeyn.ceditneuro.ui.shell.ShellPanel
 import com.hvkeyn.ceditneuro.workspace.FileEntry
 import com.hvkeyn.ceditneuro.workspace.StoragePaths
@@ -132,6 +133,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
     val snackbarHostState = remember { SnackbarHostState() }
 
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showUsage by rememberSaveable { mutableStateOf(false) }
     val versionName = remember { AppUpdater.localVersion(context) }
     var projectPanelOpen by rememberSaveable { mutableStateOf(true) }
     var projectsListOpen by rememberSaveable { mutableStateOf(true) }
@@ -297,7 +299,24 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
             onReadSkill = viewModel::readSkill,
             onWriteSkill = viewModel::writeSkill,
             onDeleteSkill = viewModel::deleteSkill,
+            onOpenUsage = { showSettings = false; showUsage = true },
             onDismiss = { showSettings = false },
+        )
+    }
+
+    if (showUsage) {
+        UsageDialog(
+            settings = settings,
+            onRates = { input, output, cached ->
+                viewModel.updateSettings {
+                    it.copy(
+                        inputPricePerM = input,
+                        outputPricePerM = output,
+                        cachedPricePerM = cached,
+                    )
+                }
+            },
+            onDismiss = { showUsage = false },
         )
     }
 

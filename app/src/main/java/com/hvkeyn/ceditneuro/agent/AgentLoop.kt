@@ -26,6 +26,7 @@ class AgentLoop(
     private val systemPrompt: String,
     private val setupPrompt: String,
     private val peerFeed: () -> String = { "" },
+    private val onUsage: (TokenUsage) -> Unit = {},
     private val maxToolRounds: Int = 40,
     private val maxAutoBatches: Int = 15,
 ) {
@@ -132,6 +133,7 @@ class AgentLoop(
                             is BackendChunk.Finished -> {
                                 finishReason = chunk.finishReason
                                 cacheNote = chunk.cacheNote ?: cacheNote
+                                chunk.usage?.takeIf { !it.isEmpty }?.let(onUsage)
                             }
                         }
                     }

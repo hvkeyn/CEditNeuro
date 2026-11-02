@@ -80,6 +80,7 @@ fun SettingsDialog(
     onReadSkill: (String, String) -> SkillNote,
     onWriteSkill: (String, String, String, Boolean) -> SkillNote,
     onDeleteSkill: (String, String) -> SkillNote,
+    onOpenUsage: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     var draft by remember(settings) { mutableStateOf(settings) }
@@ -464,6 +465,19 @@ fun SettingsDialog(
                         onToggle = { openSection = if (openSection == "skills") "" else "skills" },
                     ) {
                         SkillsEditor(onListSkills, onReadSkill, onWriteSkill, onDeleteSkill)
+                    }
+                    SettingsSection(
+                        title = "Token usage",
+                        summary = "Spend, cache, models",
+                        expanded = openSection == "usage",
+                        onToggle = { openSection = if (openSection == "usage") "" else "usage" },
+                    ) {
+                        Text(
+                            "A local ledger of prompt, completion, cached, and latency per call. It stores no prompts or code.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        TextButton(onClick = onOpenUsage) { Text("Open usage report") }
                     }
                     SettingsSection(
                         title = "Profile",
