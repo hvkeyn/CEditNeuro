@@ -4,6 +4,7 @@ import android.graphics.Typeface
 import android.util.TypedValue
 import kotlin.math.abs
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,10 +13,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
@@ -26,6 +29,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -35,6 +39,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
@@ -47,6 +52,7 @@ import com.hvkeyn.ceditneuro.ui.WorkspaceUiState
 import io.github.rosemoe.sora.event.ContentChangeEvent
 import io.github.rosemoe.sora.lsp.editor.LspEditor
 import io.github.rosemoe.sora.widget.CodeEditor
+import io.github.rosemoe.sora.widget.EditorSearcher
 import io.github.rosemoe.sora.widget.schemes.SchemeDarcula
 import java.io.File
 
@@ -82,6 +88,12 @@ fun EditorPane(
     val kind = previewKind(activePath)
     val runnable = com.hvkeyn.ceditneuro.ui.isRunnable(activePath)
     var previewing by remember(activePath) { mutableStateOf(kind != null) }
+    var editor by remember { mutableStateOf<CodeEditor?>(null) }
+    var searchOpen by rememberSaveable(activePath) { mutableStateOf(false) }
+    var searchText by rememberSaveable(activePath) { mutableStateOf("") }
+    var replaceText by rememberSaveable(activePath) { mutableStateOf("") }
+    var wrapped by remember(activePath) { mutableStateOf(true) }
+    var lineNumbers by remember(activePath) { mutableStateOf(true) }
     val file = state.projectRoot?.let { File(it, activePath) }
 
     Column(modifier) {
@@ -103,6 +115,43 @@ fun EditorPane(
                 canRender = composition,
                 rendering = rendering != null,
                 onRender = { onRender(activePath) },
+            )
+        }
+        val codeVisible = kind == null || (!previewing && kind != "image" && kind != "video")
+        if (codeVisible) {
+            EditorTools(
+                onFind = { searchOpen = !searchOpen },
+                onUndo = { editor?.undo() },
+                onRedo = { editor?.redo() },
+                onFormat = { editor?.formatCodeAsync() },
+                wrapped = wrapped,
+                onWrap = {
+                    wrapped = !wrapped
+                    editor?.setWordwrap(wrapped)
+                },
+                lineNumbers = lineNumbers,
+                onLineNumbers = {
+                    lineNumbers = !lineNumbers
+                    editor?.setLineNumberEnabled(lineNumbers)
+                },
+            )
+        }
+        if (searchOpen && codeVisible) {
+            SearchBar(
+                query = searchText,
+                replacement = replaceText,
+                onQuery = { value ->
+                    searchText = value
+                    val target = editor ?: return@SearchBar
+                    if (value.isBlank()) target.searcher.stopSearch()
+                    else target.searcher.search(value, EditorSearcher.SearchOptions(false, false))
+                },
+                onReplacement = { replaceText = it },
+                onPrevious = { editor?.searcher?.gotoPrevious() },
+                onNext = { editor?.searcher?.gotoNext() },
+                onReplace = { editor?.searcher?.replaceThis(replaceText) },
+                onReplaceAll = { editor?.searcher?.replaceAll(replaceText) },
+                onClose = { searchOpen = false },
             )
         }
         val body = Modifier
@@ -134,6 +183,7 @@ fun EditorPane(
                 contentProvider = contentProvider,
                 reloadCounter = state.reloadCounter,
                 onContentChanged = onContentChanged,
+                onEditorReady = { editor = it },
                 modifier = body,
             )
         }
@@ -190,6 +240,86 @@ private fun FileActions(
                 Icon(Icons.Default.Movie, contentDescription = null, modifier = Modifier.size(18.dp))
                 Text(if (rendering) " Rendering" else " Render MP4")
             }
+        }
+    }
+}
+
+@Composable
+private fun EditorTools(
+    onFind: () -> Unit,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onFormat: () -> Unit,
+    wrapped: Boolean,
+    onWrap: () -> Unit,
+    lineNumbers: Boolean,
+    onLineNumbers: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        listOf(
+            "Find" to onFind,
+            "Undo" to onUndo,
+            "Redo" to onRedo,
+            "Format" to onFormat,
+            (if (wrapped) "Wrap" else "No wrap") to onWrap,
+            (if (lineNumbers) "Lines" else "No lines") to onLineNumbers,
+        ).forEach { (label, action) ->
+            TextButton(
+                onClick = action,
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+            ) {
+                Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchBar(
+    query: String,
+    replacement: String,
+    onQuery: (String) -> Unit,
+    onReplacement: (String) -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onReplace: () -> Unit,
+    onReplaceAll: () -> Unit,
+    onClose: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQuery,
+            label = { Text("Find") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = replacement,
+            onValueChange = onReplacement,
+            label = { Text("Replace with") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            TextButton(onClick = onPrevious) { Text("Prev") }
+            TextButton(onClick = onNext) { Text("Next") }
+            TextButton(onClick = onReplace) { Text("Replace") }
+            TextButton(onClick = onReplaceAll) { Text("All") }
+            TextButton(onClick = onClose) { Text("Close") }
         }
     }
 }
@@ -270,6 +400,7 @@ private fun CodeEditorHost(
     contentProvider: (String) -> String,
     reloadCounter: Long,
     onContentChanged: (String, String) -> Unit,
+    onEditorReady: (CodeEditor) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -299,6 +430,7 @@ private fun CodeEditorHost(
                 }
 
                 holder.editor = this
+                onEditorReady(this)
             }
         },
     )
