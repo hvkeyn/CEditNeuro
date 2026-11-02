@@ -27,12 +27,12 @@ class AgentLoop(
     private val setupPrompt: String,
     private val peerFeed: () -> String = { "" },
     private val maxToolRounds: Int = 40,
+    private val maxAutoBatches: Int = 15,
 ) {
     private companion object {
         const val MAX_LENGTH_CONTINUES = 12
         const val MAX_EMPTY_CONTINUES = 1
         const val MAX_NET_RETRIES = 2
-        const val MAX_AUTO_BATCHES = 15
         private val READ_ONLY = setOf(
             "list_dir", "read_file", "grep", "glob", "git_status", "git_diff",
             "list_skills", "read_skill", "search_sessions", "device_status", "list_apps", "calculate", "chart", "layout", "reference",
@@ -85,7 +85,7 @@ class AgentLoop(
             emit(AgentEvent.Context(ToolTranscript.seal(messages.filter { it.role != "system" })))
         }
 
-        while (batch < MAX_AUTO_BATCHES) {
+        while (batch < maxAutoBatches) {
         var round = 0
         while (round < maxToolRounds) {
             val sealed = ToolTranscript.seal(messages)
@@ -209,7 +209,7 @@ class AgentLoop(
             round++
         }
             batch++
-            if (batch >= MAX_AUTO_BATCHES) break
+            if (batch >= maxAutoBatches) break
             emit(activity(messages, batch * maxToolRounds, "Step limit reached, continuing"))
             messages += ChatMessage.user(
                 "Continue the same task from the latest step. Do not repeat work that already finished.",

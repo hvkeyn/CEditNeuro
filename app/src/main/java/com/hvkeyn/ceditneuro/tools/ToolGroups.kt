@@ -38,6 +38,7 @@ object ToolGroups {
         "ascii_art",
         "visual_card",
         "list_models",
+        "team",
     )
 
     val groups: Map<String, List<String>> = linkedMapOf(

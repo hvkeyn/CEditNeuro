@@ -30,6 +30,8 @@ import com.hvkeyn.ceditneuro.agent.SkillEntry
 import com.hvkeyn.ceditneuro.agent.SkillLibrary
 import com.hvkeyn.ceditneuro.agent.SkillNote
 import com.hvkeyn.ceditneuro.agent.buildSetupPrompt
+import com.hvkeyn.ceditneuro.agent.teamRolePrompt
+import com.hvkeyn.ceditneuro.agent.teamSetupPrompt
 import com.hvkeyn.ceditneuro.agent.buildSystemPrompt
 import com.hvkeyn.ceditneuro.agent.deepseek.DeepSeekBackend
 import com.hvkeyn.ceditneuro.data.AgentSettings
@@ -113,6 +115,7 @@ import com.hvkeyn.ceditneuro.tools.SshExecTool
 import com.hvkeyn.ceditneuro.tools.ShellTool
 import com.hvkeyn.ceditneuro.tools.Tool
 import com.hvkeyn.ceditneuro.tools.ToolRegistry
+import com.hvkeyn.ceditneuro.tools.TeamTool
 import com.hvkeyn.ceditneuro.tools.WriteFileTool
 import com.hvkeyn.ceditneuro.workspace.FileEntry
 import com.hvkeyn.ceditneuro.workspace.Workspace
@@ -3526,6 +3529,45 @@ class WorkspaceViewModel(
                 "start path ${remote.startPath}." +
                 remote.webUrl.takeIf { it.isNotBlank() }?.let { " Site URL: $it." }.orEmpty() +
                 " Call remote_connect again if the user gives a different server."
+        }
+
+        val helperToolNames = setOf(
+            "list_dir", "read_file", "grep", "glob", "git_status", "git_diff",
+            "list_skills", "read_skill", "search_sessions", "calculate",
+            "web_search", "browse_page", "video_brief", "read_dump", "net_audit",
+            "find_skills", "review_skill", "device_status", "list_apps",
+        )
+        val helperTools = tools.filter { it.name in helperToolNames }
+        val helperRegistry = ToolRegistry(helperTools)
+        val helperSession = ToolSession(setOf("study", "remote")).apply {
+            present = helperTools.map { it.name }.toSet()
+        }
+        val helperNames = helperTools.joinToString(", ") { it.name }
+        tools += TeamTool(ws.root, { request ->
+            val helper = AgentLoop(
+                backend = backend,
+                toolRegistry = helperRegistry,
+                toolSession = helperSession,
+                systemPrompt = teamRolePrompt(request.role),
+                setupPrompt = teamSetupPrompt(request, ws.root.absolutePath, helperNames),
+                maxToolRounds = 8,
+                maxAutoBatches = 1,
+            )
+            val report = StringBuilder()
+            helper.run(emptyList(), request.question).collect { event ->
+                when (event) {
+                    is AgentEvent.AssistantText -> report.append(event.text)
+                    is AgentEvent.Failed -> report.append("\nHelper error: ").append(event.message)
+                    else -> Unit
+                }
+            }
+            report.toString().trim().ifBlank { "No report." }
+        }) { line ->
+            if (project.epoch.get() == epochAtBuild) {
+                viewModelScope.launch(Dispatchers.Main) {
+                    appendChat(project, ChatRole.Tool, line, "team")
+                }
+            }
         }
 
         toolSession.present = tools.map { it.name }.toSet()
