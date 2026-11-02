@@ -80,6 +80,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -131,6 +132,7 @@ fun ChatPanel(
     onOpenLink: (String) -> Unit = {},
     onRecheck: () -> Unit = {},
     onYouShouldKnow: (Boolean) -> Unit = {},
+    onToggleTeam: () -> Unit = {},
 ) {
     var input by rememberSaveable { mutableStateOf("") }
     var attachments by remember { mutableStateOf<List<Uri>>(emptyList()) }
@@ -256,6 +258,7 @@ fun ChatPanel(
                 onListSkills = onListSkills,
                 onUseSkill = onToggleSkill,
                 activeSkills = state.activeSkills,
+                onToggleTeam = onToggleTeam,
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
@@ -556,15 +559,25 @@ fun ChatPanel(
 @Composable
 private fun TeamStrip(team: TeamUi, agentRunning: Boolean) {
     var expanded by remember(team.task) { mutableStateOf(false) }
+    var now by remember(team.task) { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(team.active, team.agents) {
+        while (team.active) {
+            now = System.currentTimeMillis()
+            delay(1000)
+        }
+    }
     val working = team.agents.count { it.status == "working" }
     val done = team.agents.count { it.status == "done" }
     val failed = team.agents.count { it.status == "failed" }
     val total = team.agents.size
+    val end = team.agents.mapNotNull { it.finishedAt.takeIf { at -> at > 0 } }.maxOrNull()
+        ?: if (team.active) now else team.startedAt
+    val totalTime = (end - team.startedAt).coerceAtLeast(0L)
     val label = when {
-        team.active && working > 0 -> "$working / $total agents working"
-        team.active -> "Starting $total agents"
-        agentRunning -> "$done / $total reports · main agent integrating"
-        else -> "$done / $total reports" + if (failed > 0) " · $failed failed" else ""
+        team.active && working > 0 -> "$working / $total agents working · ${mmss(totalTime)}"
+        team.active -> "Starting $total agents · ${mmss(totalTime)}"
+        agentRunning -> "$done / $total reports · main agent integrating · ${mmss(totalTime)}"
+        else -> "$done / $total reports · ${mmss(totalTime)}" + if (failed > 0) " · $failed failed" else ""
     }
     Surface(
         color = MaterialTheme.colorScheme.surface,
@@ -678,7 +691,13 @@ private fun TeamStrip(team: TeamUi, agentRunning: Boolean) {
                             modifier = Modifier.width(58.dp),
                         )
                         Text(
-                            text = agent.summary,
+                            text = listOfNotNull(
+                                agent.summary.takeIf { it.isNotBlank() },
+                                agent.startedAt.takeIf { it > 0 }?.let { start ->
+                                    val stop = agent.finishedAt.takeIf { it > 0 } ?: now
+                                    mmss((stop - start).coerceAtLeast(0L))
+                                },
+                            ).joinToString(" · "),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -690,6 +709,11 @@ private fun TeamStrip(team: TeamUi, agentRunning: Boolean) {
             }
         }
     }
+}
+
+private fun mmss(millis: Long): String {
+    val total = (millis / 1000).coerceAtLeast(0)
+    return "%d:%02d".format(total / 60, total % 60)
 }
 
 private fun attachmentName(context: android.content.Context, uri: Uri): String {
@@ -814,6 +838,7 @@ private fun AgentToolbar(
     onUseSkill: (SkillEntry) -> Unit,
     activeSkills: List<String>,
     onYouShouldKnow: (Boolean) -> Unit,
+    onToggleTeam: () -> Unit,
 ) {
     var modelOpen by rememberSaveable { mutableStateOf(false) }
     var focusOpen by remember { mutableStateOf(false) }
@@ -888,6 +913,31 @@ private fun AgentToolbar(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp).widthIn(max = 280.dp),
+                    )
+                    DropdownMenuItem(
+                        leadingIcon = {
+                            Icon(
+                                if (settings.teamEnabled) Icons.Filled.CheckBox else Icons.Filled.CheckBoxOutlineBlank,
+                                contentDescription = if (settings.teamEnabled) "Team on" else "Team off",
+                                tint = if (settings.teamEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
+                        text = {
+                            Column(modifier = Modifier.widthIn(max = 280.dp)) {
+                                Text(if (settings.teamEnabled) "Team mode · on" else "Team mode · off")
+                                Text(
+                                    "On: the agent may call read-only helpers for a hard step. Off: one agent, no team.",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        },
+                        onClick = {
+                            onToggleTeam()
+                            skillsOpen = false
+                        },
                     )
                     skillList.forEach { entry ->
                         val on = "${entry.scope}:${entry.name}" in activeSkills

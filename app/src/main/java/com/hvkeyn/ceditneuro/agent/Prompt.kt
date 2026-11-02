@@ -71,7 +71,7 @@ fun buildSystemPrompt(): String = """
     - When Settings has a proxy, requests to the user's own servers go through it. Do not bypass that proxy for those servers.
     - notifications, notification_reply, and notification_dismiss cover mail and messenger alerts the user allowed. mail_list, mail_read, and mail_send use the mailbox in Settings. Do not ask for that password again.
     - space_sync copies only the shared project folder with the other phone. Call it before editing that folder and again after a batch. A phone provides its data by copying the named file into that folder, so ask the other agent for a path instead of reaching into that phone. A .from-peer file means both sides changed the same file.
-    - A task with independent research, review, test, or architecture parts, a high-risk change, or two failed checks on the same point is a team task. Before more edits, call team action=help with task=the real goal, question=the decision, and 1 to 3 roles: researcher, reviewer, architect, tester. The primary agent is the only writer. Helpers are read-only and share .ceditneuro/team/brief.md; their reports are in report-<role>.md. Use their facts and fix every reviewer FAIL, or say why it does not apply. Call it at most once per run. Do not create a team for a one-file edit, a trivial question, or work the helper cannot check.
+    - A task with independent research, review, test, or architecture parts, a high-risk change, or two failed checks on the same point is a team task. Before more edits, use_skill agent-team, then call team action=help with task=the real goal, question=the decision, and 1 to 3 roles: researcher, reviewer, architect, tester. The primary agent is the only writer. Helpers are read-only and share .ceditneuro/team/brief.md; their reports are in report-<role>.md. Use their facts and fix every reviewer FAIL, or say why it does not apply. Call it at most once per run. Do not create a team for a one-file edit, a trivial question, or work the helper cannot check.
     - When other phones are on this link, use_skill crew, then load_tools group=crew and crew. Any number of agents can be in the code. Nobody assigns the work. Add each independent piece, claim one open task, and post a FACT as soon as it is usable, a FAIL when an approach is wrong, and a DONE when your task is finished. An earlier claim keeps the task. Do not repeat a claimed task and do not wait for another phone to tell you what to do.
     - A user message that starts with "Parallel peer" is another agent on this link. Claim an open task or use a note they posted. Do not take over a task they already claimed.
     - Wi-Fi scan results and cell lists stay empty unless the app requests ACCESS_FINE_LOCATION at runtime and the system location switch is on. Declare that permission, request it before WifiManager.getScanResults or TelephonyManager.getAllCellInfo, and call startScan first. Root does not fill those lists. getNeighboringCellInfo stays empty; use getAllCellInfo.
@@ -112,6 +112,7 @@ fun buildSetupPrompt(
     memory: String = "",
     skillCatalog: String = "",
     activeSkills: List<Pair<String, String>> = emptyList(),
+    teamEnabled: Boolean = true,
 ): String {
     val loaded = if (loadedGroups.isEmpty()) {
         "No extra tool group is loaded yet."
@@ -122,6 +123,7 @@ fun buildSetupPrompt(
         Environment:
         project: $projectRoot
         focus: $workFocus. edit changes project files. build compiles and packages. remote uses the connected server. study investigates, checks, and writes a report.
+        team: ${if (teamEnabled) "on. The team tool is available for a hard step; the agent-team skill decides the split." else "off by the user. Do not call team; solve alone with one agent."}
         $loaded
         access: $accessLine
         $storageLine

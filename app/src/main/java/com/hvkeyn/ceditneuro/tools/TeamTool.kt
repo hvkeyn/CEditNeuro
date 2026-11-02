@@ -19,6 +19,8 @@ data class TeamAgentUpdate(
     val role: String,
     val status: String,
     val summary: String = "",
+    val startedAt: Long = 0L,
+    val finishedAt: Long = 0L,
 )
 
 data class TeamUpdate(
@@ -35,6 +37,7 @@ data class TeamUpdate(
 class TeamTool(
     private val root: File,
     private val runHelper: suspend (TeamHelperRequest) -> String,
+    private val enabled: () -> Boolean = { true },
     private val onUpdate: (TeamUpdate) -> Unit = {},
 ) : Tool {
     private var helped = false
@@ -58,6 +61,9 @@ class TeamTool(
     )
 
     override suspend fun execute(args: JsonObject): ToolResult = withContext(Dispatchers.IO) {
+        if (!enabled()) {
+            return@withContext ToolResult.error("Team is off in Settings. Solve alone, or turn Team on in the Skills menu.")
+        }
         when (args.stringArg("action").orEmpty().trim().lowercase()) {
             "status" -> ToolResult.ok(TeamBoard.summary(root))
             "help" -> runTeam(args, dual = false)
@@ -95,7 +101,13 @@ class TeamTool(
         val agents = roles.associateWith { TeamAgentUpdate(it, "queued") }.toMutableMap()
         fun snapshot(): List<TeamAgentUpdate> = synchronized(agents) { roles.map { agents.getValue(it) } }
         fun setAgent(update: TeamAgentUpdate) {
-            synchronized(agents) { agents[update.role] = update }
+            synchronized(agents) {
+                val previous = agents[update.role]
+                agents[update.role] = update.copy(
+                    startedAt = update.startedAt.takeIf { it > 0 } ?: previous?.startedAt ?: 0L,
+                    finishedAt = update.finishedAt,
+                )
+            }
             onUpdate(TeamUpdate(goal, snapshot(), true, update.role + " " + update.status))
         }
         onUpdate(TeamUpdate(goal, snapshot(), true, "brief ready"))
@@ -103,7 +115,7 @@ class TeamTool(
         val replies = coroutineScope {
             roles.map { role ->
                 async {
-                    setAgent(TeamAgentUpdate(role, "working"))
+                    setAgent(TeamAgentUpdate(role, "working", startedAt = System.currentTimeMillis()))
                     val request = TeamHelperRequest(role, goal, asked, TeamBoard.briefFile(root).absolutePath)
                     val raw = runCatching { runHelper(request) }.getOrElse { error ->
                         "Helper failed: " + (error.message ?: error::class.java.simpleName)
@@ -123,7 +135,14 @@ class TeamTool(
                     } else {
                         raw.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty()
                     }
-                    setAgent(TeamAgentUpdate(role, if (failed) "failed" else "done", summary.take(140)))
+                    setAgent(
+                        TeamAgentUpdate(
+                            role = role,
+                            status = if (failed) "failed" else "done",
+                            summary = summary.take(140),
+                            finishedAt = System.currentTimeMillis(),
+                        ),
+                    )
                     report
                 }
             }.awaitAll()

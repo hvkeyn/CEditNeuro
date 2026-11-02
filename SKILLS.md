@@ -2,7 +2,7 @@
 
 A complete snapshot of every skill available in CEditNeuro **0.99.31 (versionCode 147)**, taken on **2026-10-22**, updated **2026-10-24**, from the phone's app-scope folder and the built-in source.
 
-**41 skills:** 39 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
+**42 skills:** 40 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
 
 This file is a catalog and a porting guide. The app does not load `SKILLS.md`; it loads the `.md` files in the two skill folders described below. The JSON at the end is the same inventory in a machine-readable form.
 
@@ -190,48 +190,59 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 | # | Skill | Origin | Use when | Group(s) | Chars |
 | --- | --- | --- | --- | --- | --- |
 | 1 | [android-apk](#android-apk) | starter | an APK must be read before it is trusted | build | 6,665 |
-| 2 | [android-app](#android-app) | starter | a new Android/KMP app, a feature, or its architecture | build | 3,077 |
-| 3 | [android-compose](#android-compose) | starter | Compose, Navigation 3, an XML migration, edge-to-edge | — | 1,715 |
-| 4 | [android-debug](#android-debug) | starter | an app crashes or a phone setting misbehaves | device, debug | 1,942 |
-| 5 | [android-ui](#android-ui) | starter | how an Android screen should look | — | 774 |
-| 6 | [book-notes](#book-notes) | starter | summarize, explain, or quiz from the open book | — | 462 |
-| 7 | [ascii-studio](#ascii-studio) | starter | a picture, banner, terminal animation, or video must be made in ASCII | video, device | 3,681 |
-| 8 | [crew](#crew) | starter | other phones are on the link and work can be split | crew | 1,051 |
-| 9 | [debug](#debug) | starter | something fails on a short path | — | 479 |
-| 10 | [deep-read](#deep-read) | starter | study a book, note, or scheme in front of you | — | 494 |
-| 11 | [diff-tour](#diff-tour) | starter | a diff must be explained visually or handed off | device | 8,983 |
-| 12 | [dreams](#dreams) | starter | a dream or nightmare is told and asks to be read | — | 4,404 |
-| 13 | [find-skills](#find-skills) | starter | find or install a skill for a task | skills | 960 |
-| 14 | [frontend-design](#frontend-design) | starter | a landing page, cabinet, form, or product screen | design | 4,804 |
-| 15 | [health](#health) | starter | a lab sheet, scan report, or family health record | health | 1,361 |
-| 16 | [genealogy](#genealogy) | starter | family history, ancestors, or archive records in the former USSR | remote | 11,976 |
-| 17 | [hyperframes](#hyperframes) | starter | a video, animation, title card, or HyperFrames composition | video | 11,930 |
-| 18 | [learn](#learn) | starter | learn a subject, be taught, or practice | learn | 2,501 |
-| 19 | [net-map](#net-map) | starter | a network must be drawn from packets | study | 5,603 |
-| 20 | [network-study](#network-study) | starter | a network concept or topology must be taught with a drawing | study, device | 6,531 |
-| 21 | [photo-ocr](#photo-ocr) | user | a photo arrived and the message has only paths | — | 1,491 |
-| 22 | [research](#research) | builtin | a study question, a claim to check, a measured build | study | 4,340 |
-| 23 | [rea](#rea) | starter | a software system must be understood with REA 6.8.0 on a PC | remote | 6,675 |
-| 24 | [reanimate](#reanimate) | starter | an animation from a GIF, video, or site must be rebuilt | — | 9,462 |
-| 25 | [reverse-engineering](#reverse-engineering) | starter | a program must be understood to its real algorithm or a backdoor | build, device, study, remote | 10,747 |
-| 26 | [review](#review) | starter | before saying a code change works | — | 364 |
-| 27 | [rrsi](#rrsi) | starter | improve the agent's own harness | harness | 1,749 |
-| 28 | [ru-translate](#ru-translate) | starter | translate into Russian or polish Russian | — | 4,809 |
-| 29 | [second-monitor](#second-monitor) | starter | the phone becomes an extra monitor | remote | 1,556 |
-| 30 | [security](#security) | starter | the task touches keys, logins, accounts, or another app | — | 415 |
-| 31 | [skill-security](#skill-security) | starter | a skill must be checked for vulnerabilities before install | skills | 6,001 |
-| 32 | [spec-kit](#spec-kit) | starter | a feature needs a spec and a plan before code | — | 10,108 |
-| 33 | [systematic-debugging](#systematic-debugging) | starter | a failure needs a cause before a fix | debug | 2,095 |
-| 34 | [ub-mode](#ub-mode) | starter | a feature must be written cleanly and tested | — | 6,683 |
-| 35 | [understand-anything](#understand-anything) | starter | a repository or docs tree must be understood as a whole | device | 11,086 |
-| 36 | [video-download](#video-download) | starter | a film, clip, stream, or video page must be saved | video | 1,615 |
-| 37 | [video-notes](#video-notes) | starter | the point of a YouTube/RuTube/Yandex/Dzen video | study | 1,679 |
-| 38 | [visualize](#visualize) | starter | a picture, process, architecture, or schema must be drawn in chat | — | 10,907 |
-| 39 | [visual-explainer](#visual-explainer) | starter | a system, diff, plan, or concept needs a designed explanation | design | 7,448 |
-| 40 | [web-reach](#web-reach) | starter | read a link, page, article, repo, thread, or feed | study | 3,454 |
-| 41 | [web-to-app](#web-to-app) | starter | a website or HTML file must become an Android app | device | 793 |
+| 2 | [agent-team](#agent-team) | starter | decide whether to use a team, how many helpers, and their roles | meta | 4,449 |
+| 3 | [android-app](#android-app) | starter | a new Android/KMP app, a feature, or its architecture | build | 3,077 |
+| 4 | [android-compose](#android-compose) | starter | Compose, Navigation 3, an XML migration, edge-to-edge | — | 1,715 |
+| 5 | [android-debug](#android-debug) | starter | an app crashes or a phone setting misbehaves | device, debug | 1,942 |
+| 6 | [android-ui](#android-ui) | starter | how an Android screen should look | — | 774 |
+| 7 | [book-notes](#book-notes) | starter | summarize, explain, or quiz from the open book | — | 462 |
+| 8 | [ascii-studio](#ascii-studio) | starter | a picture, banner, terminal animation, or video must be made in ASCII | video, device | 3,681 |
+| 9 | [crew](#crew) | starter | other phones are on the link and work can be split | crew | 1,051 |
+| 10 | [debug](#debug) | starter | something fails on a short path | — | 479 |
+| 11 | [deep-read](#deep-read) | starter | study a book, note, or scheme in front of you | — | 494 |
+| 12 | [diff-tour](#diff-tour) | starter | a diff must be explained visually or handed off | device | 8,983 |
+| 13 | [dreams](#dreams) | starter | a dream or nightmare is told and asks to be read | — | 4,404 |
+| 14 | [find-skills](#find-skills) | starter | find or install a skill for a task | skills | 960 |
+| 15 | [frontend-design](#frontend-design) | starter | a landing page, cabinet, form, or product screen | design | 4,804 |
+| 16 | [health](#health) | starter | a lab sheet, scan report, or family health record | health | 1,361 |
+| 17 | [genealogy](#genealogy) | starter | family history, ancestors, or archive records in the former USSR | remote | 11,976 |
+| 18 | [hyperframes](#hyperframes) | starter | a video, animation, title card, or HyperFrames composition | video | 11,930 |
+| 19 | [learn](#learn) | starter | learn a subject, be taught, or practice | learn | 2,501 |
+| 20 | [net-map](#net-map) | starter | a network must be drawn from packets | study | 5,603 |
+| 21 | [network-study](#network-study) | starter | a network concept or topology must be taught with a drawing | study, device | 6,531 |
+| 22 | [photo-ocr](#photo-ocr) | user | a photo arrived and the message has only paths | — | 1,491 |
+| 23 | [research](#research) | builtin | a study question, a claim to check, a measured build | study | 4,340 |
+| 24 | [rea](#rea) | starter | a software system must be understood with REA 6.8.0 on a PC | remote | 6,675 |
+| 25 | [reanimate](#reanimate) | starter | an animation from a GIF, video, or site must be rebuilt | — | 9,462 |
+| 26 | [reverse-engineering](#reverse-engineering) | starter | a program must be understood to its real algorithm or a backdoor | build, device, study, remote | 10,747 |
+| 27 | [review](#review) | starter | before saying a code change works | — | 364 |
+| 28 | [rrsi](#rrsi) | starter | improve the agent's own harness | harness | 1,749 |
+| 29 | [ru-translate](#ru-translate) | starter | translate into Russian or polish Russian | — | 4,809 |
+| 30 | [second-monitor](#second-monitor) | starter | the phone becomes an extra monitor | remote | 1,556 |
+| 31 | [security](#security) | starter | the task touches keys, logins, accounts, or another app | — | 415 |
+| 32 | [skill-security](#skill-security) | starter | a skill must be checked for vulnerabilities before install | skills | 6,001 |
+| 33 | [spec-kit](#spec-kit) | starter | a feature needs a spec and a plan before code | — | 10,108 |
+| 34 | [systematic-debugging](#systematic-debugging) | starter | a failure needs a cause before a fix | debug | 2,095 |
+| 35 | [ub-mode](#ub-mode) | starter | a feature must be written cleanly and tested | — | 6,683 |
+| 36 | [understand-anything](#understand-anything) | starter | a repository or docs tree must be understood as a whole | device | 11,086 |
+| 37 | [video-download](#video-download) | starter | a film, clip, stream, or video page must be saved | video | 1,615 |
+| 38 | [video-notes](#video-notes) | starter | the point of a YouTube/RuTube/Yandex/Dzen video | study | 1,679 |
+| 39 | [visualize](#visualize) | starter | a picture, process, architecture, or schema must be drawn in chat | — | 10,907 |
+| 40 | [visual-explainer](#visual-explainer) | starter | a system, diff, plan, or concept needs a designed explanation | design | 7,448 |
+| 41 | [web-reach](#web-reach) | starter | read a link, page, article, repo, thread, or feed | study | 3,454 |
+| 42 | [web-to-app](#web-to-app) | starter | a website or HTML file must become an Android app | device | 793 |
 
 ## Every skill
+
+### agent-team
+
+**Scope:** app · **Origin:** starter · **File:** `agent-team.md` · **Size:** 4,449 chars
+
+**Use when:** a task needs more than one independent pass, a risky change needs a reviewer, or the user asks for a team or dual check.
+
+**Tools:** `team`, `read_file`, `grep`, `glob`, `write_file`, `edit_file`.
+
+**Shape:** one agent for a local edit; a team only for independent research/review/test parts; at most three read-only helpers; one team call per run; the primary agent remains the only writer. The Team switch in the Skills menu turns the team off for single-agent work.
 
 ### android-apk
 
@@ -654,7 +665,7 @@ The JSON below is the same inventory. `origin` is `starter`, `builtin`, or `user
   "schema": 1,
   "app": "CEditNeuro 0.99.31 (versionCode 147)",
   "generated": "2026-10-24",
-  "skill_count": 41,
+  "skill_count": 42,
   "limits": {
     "skill_chars": 12000,
     "active_skill_chars": 12000,
@@ -680,6 +691,7 @@ The JSON below is the same inventory. `origin` is `starter`, `builtin`, or `user
     "harness": ["harness_rrsi"]
   },
   "skills": [
+    {"name": "agent-team", "scope": "app", "origin": "starter", "trigger": "decide whether to use a team, how many helpers, and their roles", "groups": [], "tools": ["team", "read_file", "grep", "glob", "write_file", "edit_file"], "chars": 4449, "file": "agent-team.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "android-apk", "scope": "app", "origin": "starter", "trigger": "read an APK before it is trusted", "groups": ["build"], "tools": ["install_android_sdk", "install_jdk", "install_module", "install_program", "run_command", "grep", "http_request"], "chars": 6665, "file": "android-apk.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "android-app", "scope": "app", "origin": "starter", "trigger": "a new Android or Kotlin Multiplatform app, a feature, or its architecture", "groups": ["build"], "tools": ["install_jdk", "install_android_sdk", "run_command", "install_apk", "http_request"], "requires_skills": ["android-debug", "android-apk"], "chars": 3077, "file": "android-app.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "android-compose", "scope": "app", "origin": "starter", "trigger": "Jetpack Compose, a screen, Navigation 3, XML migration, edge-to-edge", "groups": [], "tools": ["http_request"], "chars": 1715, "file": "android-compose.md", "source": "ResearchSkill.kt#StarterSkills"},

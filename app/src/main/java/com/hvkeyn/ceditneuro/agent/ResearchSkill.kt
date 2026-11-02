@@ -516,6 +516,106 @@ object StarterSkills {
             2. For a video: `render_video` result with path and duration.
             3. One caption and one next step (loop longer, change ink, or add a title).
         """.trimIndent() + "\n",
+        "agent-team" to """
+            # Agent Team: decide the smallest helpful team
+
+            Use this when a task is large enough that one pass will miss a real risk. The team is not a ceremony: the primary agent still owns the code, and helpers only return evidence.
+
+            ## First decide whether a team is needed
+
+            Use **one agent** when:
+
+            - one file or one known command is enough;
+            - the change is local and the user named the exact edit;
+            - the question is a fact, a calculation, or a lookup;
+            - the work is already well understood and only needs execution.
+
+            Use a **team** when at least one is true:
+
+            - two independent questions must be answered before an edit;
+            - a change is risky and a reviewer can check it;
+            - the user asks for a plan, an audit, a comparison, or a second opinion;
+            - the task mixes research, implementation, and verification;
+            - two checks already failed on the same point;
+            - the user explicitly asks for a team, multiple agents, or a dual check.
+
+            Never use a team to avoid reading the file. Never use it for a one-line edit.
+
+            ## Choose the shape
+
+            | Situation | Shape | Helpers |
+            | --- | --- | --- |
+            | One uncertain answer that must be computed twice | `team action=dual` | solver-a, solver-b |
+            | Research a public fact or API | `team action=help roles=researcher` | 1 |
+            | Audit an existing change | `team action=help roles=reviewer` | 1 |
+            | Compare two designs | `team action=help roles=architect,reviewer` | 2 |
+            | Research + risk audit | `team action=help roles=researcher,reviewer` | 2 |
+            | Non-trivial change with a plan, a risk, and tests | `roles=architect,reviewer,tester` | 3 |
+            | Too many independent parts | split once into at most 3 roles; the primary agent does the rest | 3 |
+
+            Hard bounds:
+
+            - **maximum three helpers**;
+            - **one team call per run**;
+            - helpers are read-only;
+            - every role is distinct;
+            - the primary agent is the only writer.
+
+            ## Write the brief before calling
+
+            A useful team call contains:
+
+            ```text
+            task: the real goal in one or two sentences
+            question: the decision, check, or calculation the team must answer
+            roles: comma-separated, at most three
+            ```
+
+            The brief must name:
+
+            - the project path and the files or URLs in scope;
+            - what is already known and what was already tried;
+            - the exact output the primary agent needs: a verdict, a risk, a URL, a computation, or a test list;
+            - what is **out of scope**, so helpers do not reopen fixed items.
+
+            A bad brief asks "look at the project". A good brief asks "does `spinner.html` put the trail one sector behind the bright pair at t=0? Cite line numbers."
+
+            ## Roles
+
+            - **researcher** — public facts, documentation, APIs, examples. Starts `FINDING` and cites a URL or path.
+            - **reviewer** — correctness, boundaries, missing cases, contradiction with the spec. Starts `VERDICT`; uses `FAIL` for a real defect.
+            - **architect** — two viable designs, trade-offs, the smallest safe change. Starts `TRADEOFF`; must not rewrite the code.
+            - **tester** — exact checks, inputs, expected results. Starts `VERDICT`; no mutating commands.
+            - **solver-a / solver-b** — two independent answers to the same computation, each with `ANSWER`, `CHECK`, and `EVIDENCE`.
+
+            ## After the reports
+
+            1. Read the **board**, not only the first paragraph of each report.
+            2. If two helpers disagree, inspect the current file or run the check; do not average them.
+            3. Apply every real `FAIL`, or state why it does not apply.
+            4. Ignore narration, repeated facts, and suggested edits that conflict with the user's scope.
+            5. If a helper failed its role heading or evidence, treat it as missing evidence, not as a pass.
+            6. The primary agent writes the fix and runs the verification.
+            7. Report which helpers ran, what each found, and what was changed.
+
+            ## Visibility and control
+
+            - The chat shows `TEAM n / n agents working` and the elapsed time; tap the card to see each role and its report heading.
+            - The Android notification carries the same team count and per-role time.
+            - The user can turn **Team off** in the Skills menu. Then one agent solves alone; do not call `team`.
+            - A team call is not a substitute for the final answer. The primary agent still summarizes the result in the chat.
+
+            ## Stop conditions
+
+            Stop the team path and continue alone when:
+
+            - helpers have no new evidence after one pass;
+            - the question is outside their read-only tools;
+            - the task needs a login, payment, DRM, or a destructive command;
+            - the next step is a single edit the primary agent can make now.
+
+            Do not create a second team. Use the reports already on disk.
+        """.trimIndent() + "\n",
         "android-apk" to """
             # Android APK check
 

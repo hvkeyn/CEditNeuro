@@ -7,12 +7,20 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.view.View
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import com.hvkeyn.ceditneuro.MainActivity
 import com.hvkeyn.ceditneuro.R
 
 /** What the status shade shows while one project's agent is working. */
+data class TeamStatusLine(
+    val role: String,
+    val status: String,
+    val startedAt: Long,
+    val finishedAt: Long,
+)
+
 data class AgentStatus(
     val key: String,
     val name: String,
@@ -22,6 +30,8 @@ data class AgentStatus(
     val startedAt: Long,
     val workLine: String,
     val done: Boolean = false,
+    val team: List<TeamStatusLine> = emptyList(),
+    val teamStartedAt: Long = 0L,
 )
 
 /**
@@ -135,14 +145,20 @@ object AgentNotifications {
         ).joinToString("\n")
 
         val title = "${status.name} · $clock"
+        val team = teamDetail(status)
+        val compactTeam = teamCompact(status)
         val compact = RemoteViews(context.packageName, R.layout.notification_agent_compact)
         compact.setTextViewText(R.id.agent_title, title)
         compact.setTextViewText(R.id.agent_phase, phase)
+        compact.setTextViewText(R.id.agent_team, compactTeam)
+        compact.setViewVisibility(R.id.agent_team, if (compactTeam.isBlank()) View.GONE else View.VISIBLE)
         compact.setProgressBar(R.id.agent_progress, 100, bars.overall, false)
 
         val expanded = RemoteViews(context.packageName, R.layout.notification_agent)
         expanded.setTextViewText(R.id.agent_title, title)
         expanded.setTextViewText(R.id.agent_phase, phase)
+        expanded.setTextViewText(R.id.agent_team, team)
+        expanded.setViewVisibility(R.id.agent_team, if (team.isBlank()) View.GONE else View.VISIBLE)
         expanded.setTextViewText(R.id.agent_detail, detail.ifBlank { "Working" })
         expanded.setProgressBar(R.id.agent_progress, 100, bars.overall, false)
         expanded.setProgressBar(R.id.agent_phase_bar, 100, bars.step, bars.stepIndeterminate)
@@ -159,7 +175,7 @@ object AgentNotifications {
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setContentTitle(title)
-            .setContentText(phase)
+            .setContentText(if (status.team.isEmpty()) phase else "$phase · team ${status.team.count { it.status == "done" }}/${status.team.size}")
             .setContentIntent(open)
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setCustomContentView(compact)
@@ -181,14 +197,20 @@ object AgentNotifications {
         ).joinToString("\n")
 
         val title = if (status.done) "+ ${status.name} · $clock" else "${status.name} stopped · $clock"
+        val team = teamDetail(status)
+        val compactTeam = teamCompact(status)
         val compact = RemoteViews(context.packageName, R.layout.notification_agent_compact)
         compact.setTextViewText(R.id.agent_title, title)
         compact.setTextViewText(R.id.agent_phase, reason)
+        compact.setTextViewText(R.id.agent_team, compactTeam)
+        compact.setViewVisibility(R.id.agent_team, if (compactTeam.isBlank()) View.GONE else View.VISIBLE)
         compact.setProgressBar(R.id.agent_progress, 100, 100, false)
 
         val expanded = RemoteViews(context.packageName, R.layout.notification_agent)
         expanded.setTextViewText(R.id.agent_title, title)
         expanded.setTextViewText(R.id.agent_phase, reason)
+        expanded.setTextViewText(R.id.agent_team, team)
+        expanded.setViewVisibility(R.id.agent_team, if (team.isBlank()) View.GONE else View.VISIBLE)
         expanded.setTextViewText(R.id.agent_detail, detail.ifBlank { "Swipe to clear, or choose Continue or Stop." })
         expanded.setProgressBar(R.id.agent_progress, 100, 100, false)
         expanded.setProgressBar(R.id.agent_phase_bar, 100, 100, false)
@@ -251,6 +273,55 @@ object AgentNotifications {
         val intent = Intent(app, AgentService::class.java).setAction(ACTION_REFRESH)
         if (retire != null) intent.putExtra(EXTRA_RETIRE, retire)
         app.startService(intent)
+    }
+
+    private fun teamCompact(status: AgentStatus): String {
+        if (status.team.isEmpty()) return ""
+        val done = status.team.count { it.status == "done" }
+        val total = if (status.teamStartedAt > 0) System.currentTimeMillis() - status.teamStartedAt else 0L
+        val parts = status.team.take(3).map { line ->
+            val spent = when {
+                line.startedAt <= 0 -> 0L
+                line.finishedAt > 0 -> line.finishedAt - line.startedAt
+                else -> System.currentTimeMillis() - line.startedAt
+            }
+            val mark = when (line.status) {
+                "done" -> " ✓"
+                "failed" -> " ✕"
+                else -> " ●"
+            }
+            line.role + " " + duration(spent) + mark
+        }
+        return buildString {
+            append("Team ").append(done).append('/').append(status.team.size)
+                .append(" · ").append(duration(total))
+            append('\n').append(parts.take(2).joinToString(" · "))
+            if (parts.size > 2) append('\n').append(parts[2])
+        }
+    }
+
+    private fun teamDetail(status: AgentStatus): String {
+        if (status.team.isEmpty()) return ""
+        val done = status.team.count { it.status == "done" }
+        val total = if (status.teamStartedAt > 0) System.currentTimeMillis() - status.teamStartedAt else 0L
+        return buildString {
+            append("Team ").append(done).append('/').append(status.team.size)
+                .append(" · ").append(duration(total))
+            status.team.take(3).forEach { line ->
+                val spent = when {
+                    line.startedAt <= 0 -> 0L
+                    line.finishedAt > 0 -> line.finishedAt - line.startedAt
+                    else -> System.currentTimeMillis() - line.startedAt
+                }
+                append('\n').append(line.role).append(" · ").append(duration(spent))
+                    .append(" · ").append(line.status)
+            }
+        }
+    }
+
+    private fun duration(millis: Long): String {
+        val elapsed = (millis / 1000).coerceAtLeast(0)
+        return "%d:%02d".format(elapsed / 60, elapsed % 60)
     }
 
     private fun clock(startedAt: Long): String {

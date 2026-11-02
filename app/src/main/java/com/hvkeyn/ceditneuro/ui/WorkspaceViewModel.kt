@@ -307,6 +307,8 @@ data class TeamAgentUi(
     val role: String,
     val status: String,
     val summary: String = "",
+    val startedAt: Long = 0L,
+    val finishedAt: Long = 0L,
 )
 
 data class TeamUi(
@@ -1736,6 +1738,13 @@ class WorkspaceViewModel(
             execWaiter?.complete(after)
         }
     }
+    /** Turns the helper team on or off; the matching skill follows the switch. */
+    fun toggleTeam() {
+        val enabled = !settingsStore.current.teamEnabled
+        updateSettings { it.copy(teamEnabled = enabled) }
+        current?.let { project -> switchSkill(project, "agent-team", "app", enable = enabled) }
+    }
+
 
     fun answerHostPrompt(allow: Boolean) {
         val prompt = _state.value.hostPrompt
@@ -2130,6 +2139,7 @@ class WorkspaceViewModel(
 
         appendChat(project, ChatRole.User, prompt)
         val autoSkill = when {
+            settingsStore.current.teamEnabled && wantsTeamSkill(prompt) -> "agent-team"
             wantsExplainerSkill(prompt) -> "visual-explainer"
             wantsReanimateSkill(prompt) -> "reanimate"
             wantsVisualSkill(prompt) -> "visualize"
@@ -2888,6 +2898,15 @@ class WorkspaceViewModel(
         startedAt = startedAt,
         workLine = workLine(),
         done = done,
+        team = project.ui.team?.agents.orEmpty().map {
+            com.hvkeyn.ceditneuro.agent.TeamStatusLine(
+                role = it.role,
+                status = it.status,
+                startedAt = it.startedAt,
+                finishedAt = it.finishedAt,
+            )
+        },
+        teamStartedAt = project.ui.team?.startedAt ?: 0L,
     )
 
     private fun workLine(): String {
@@ -3325,13 +3344,18 @@ class WorkspaceViewModel(
             shown.copy(
                 team = TeamUi(
                     task = update.task,
-                    agents = update.agents.map { TeamAgentUi(it.role, it.status, it.summary) },
+                    agents = update.agents.map {
+                        TeamAgentUi(it.role, it.status, it.summary, it.startedAt, it.finishedAt)
+                    },
                     active = update.active,
                     phase = update.phase,
                     startedAt = started,
                 ),
             )
         }
+        val working = update.agents.count { it.status == "working" }
+        val phase = if (update.active) "Team · $working/${update.agents.size}" else "Team · reports ready"
+        setActivity(project, phase = phase, focus = update.task.take(100))
     }
 
     private fun skillLibrary(project: LiveProject?): SkillLibrary =
@@ -3595,7 +3619,7 @@ class WorkspaceViewModel(
                 }
             }
             report.toString().trim().ifBlank { "No report." }
-        }) { update ->
+        }, { settingsStore.current.teamEnabled }) { update ->
             if (project.epoch.get() == epochAtBuild) {
                 viewModelScope.launch(Dispatchers.Main) { applyTeam(project, update) }
             }
@@ -3630,6 +3654,7 @@ class WorkspaceViewModel(
                 memory = ProjectMemory.read(ws.root),
                 skillCatalog = skills.catalog(),
                 activeSkills = activeSkillTexts(project, skills),
+                teamEnabled = settingsStore.current.teamEnabled,
             ),
         )
     }

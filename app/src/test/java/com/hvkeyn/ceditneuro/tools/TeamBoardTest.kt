@@ -41,7 +41,7 @@ class TeamBoardTest {
             val tool = TeamTool(dir, { request ->
                 val head = if (request.role == "researcher") "FINDING" else "VERDICT"
                 "$head: checked. EVIDENCE: spinner.html L17 has the cycle. This report is deliberately long enough to satisfy the evidence gate."
-            }, { updates += it })
+            }, { true }, { updates += it })
             val args = Json.parseToJsonElement(
                 """{"action":"help","task":"Ship the parser","question":"Is it safe?","roles":"reviewer,researcher"}""",
             ).jsonObject

@@ -26,6 +26,8 @@ data class AgentSettings(
     val networkEnabled: Boolean = true,
     /** A local note above the message when a reply hides a failure. On until the user turns it off. */
     val youShouldKnow: Boolean = true,
+    /** The read-only helper team is available. Off means one agent and no team. */
+    val teamEnabled: Boolean = true,
     /** Null until the user answers the prompt. True lets installed compilers run. */
     val execAllowed: Boolean? = null,
     /** edit, build, or remote. The chat selector writes this. */
@@ -119,6 +121,7 @@ class SettingsStore(context: Context) {
             autoApproveEdits = prefs.getBoolean(KEY_AUTO_APPROVE, false),
             networkEnabled = prefs.getBoolean(KEY_NETWORK, true),
             youShouldKnow = prefs.getBoolean(KEY_KNOW, true),
+            teamEnabled = prefs.getBoolean(KEY_TEAM, true),
             execAllowed = if (prefs.contains(KEY_EXEC)) prefs.getBoolean(KEY_EXEC, false) else null,
             workFocus = prefs.getString(KEY_WORK, null)?.takeIf { it in AgentSettings.WORK_FOCUSES }
                 ?: AgentSettings.WORK_EDIT,
@@ -189,6 +192,7 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_AUTO_APPROVE, settings.autoApproveEdits)
             .putBoolean(KEY_NETWORK, settings.networkEnabled)
             .putBoolean(KEY_KNOW, settings.youShouldKnow)
+            .putBoolean(KEY_TEAM, settings.teamEnabled)
         val execAllowed = settings.execAllowed
         if (execAllowed == null) editor.remove(KEY_EXEC) else editor.putBoolean(KEY_EXEC, execAllowed)
         editor.putString(KEY_WORK, settings.workFocus)
@@ -230,6 +234,7 @@ class SettingsStore(context: Context) {
         const val KEY_AUTO_APPROVE = "auto_approve_edits"
         const val KEY_NETWORK = "agent_network"
         const val KEY_KNOW = "you_should_know"
+        const val KEY_TEAM = "team_enabled"
         const val KEY_EXEC = "exec_allowed"
         const val KEY_WORK = "work_focus"
         const val KEY_REMOTES = "remote_servers"

@@ -17,6 +17,14 @@
         android:layout_height="wrap_content"
         android:textAppearance="@android:style/TextAppearance.Material.Notification.Line2" />
 
+    <TextView
+        android:id="@+id/agent_team"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:maxLines="3"
+        android:textAppearance="@android:style/TextAppearance.Material.Notification.Info" />
+
     <ProgressBar
         android:id="@+id/agent_progress"
         style="?android:attr/progressBarStyleHorizontal"

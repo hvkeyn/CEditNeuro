@@ -187,6 +187,15 @@ class SkillWiringTest {
     }
 
     @Test
+    fun agentTeamDecidesTheSmallestTeam() {
+        val text = StarterSkills.skills.getValue("agent-team")
+        listOf("one agent", "maximum three helpers", "one team call per run", "team action=dual", "Team off")
+            .forEach { assertTrue("agent-team lacks $it", text.contains(it, ignoreCase = true)) }
+        assertTrue(text.length <= ACTIVE_SKILL_CHARS)
+        assertTrue(buildSystemPrompt().contains("use_skill agent-team"))
+    }
+
+    @Test
     fun visualExplainerLeadsWithFigures() {
         val text = StarterSkills.skills.getValue("visual-explainer")
         listOf("first screen is the answer", "one claim", "layout", "open_file", "not its Node/MCP")
