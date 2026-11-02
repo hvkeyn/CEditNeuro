@@ -1,0 +1,8 @@
+CC0 1.0 Universal
+
+The sample companion atlas in atlas.png was generated for CEditNeuro as a format test.
+To the extent possible under law, the CEditNeuro contributors waive all copyright and
+related or neighboring rights to this sample art. It may be copied, modified, and
+distributed without attribution.
+
+It is not a known anime character and no third-party sprite was used.

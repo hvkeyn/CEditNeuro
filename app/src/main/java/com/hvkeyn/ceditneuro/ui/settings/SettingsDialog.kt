@@ -350,8 +350,26 @@ fun SettingsDialog(
                             TextButton(onClick = {
                                 spritePicker.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
                             }) { Text(if (draft.companionSprite.isBlank()) "Choose sprite sheet" else "Replace sprite sheet") }
+                            TextButton(onClick = { draft = draft.copy(companionSprite = "sample") }) { Text("Use sample atlas") }
                             if (draft.companionSprite.isNotBlank()) {
                                 TextButton(onClick = { draft = draft.copy(companionSprite = "") }) { Text("Use image/roster") }
+                            }
+                        }
+                        if (draft.companionSprite == "sample") {
+                            val sample = remember {
+                                runCatching {
+                                    settingsContext.assets.open("companions/sample/atlas.png").use { input ->
+                                        android.graphics.BitmapFactory.decodeStream(input)?.asImageBitmap()
+                                    }
+                                }.getOrNull()
+                            }
+                            if (sample != null) {
+                                Image(
+                                    bitmap = sample,
+                                    contentDescription = "Sample sprite atlas",
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier.size(64.dp),
+                                )
                             }
                         }
                         ToggleRow(

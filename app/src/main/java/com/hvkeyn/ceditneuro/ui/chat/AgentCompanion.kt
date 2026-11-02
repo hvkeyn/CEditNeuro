@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -69,11 +70,19 @@ fun AgentCompanion(state: WorkspaceUiState, settings: AgentSettings, compact: Bo
             ?.let { path -> runCatching { java.io.File(path).takeIf { it.isFile } }.getOrNull() }
             ?.let { file -> android.graphics.BitmapFactory.decodeFile(file.absolutePath)?.asImageBitmap() }
     }
-    val spriteSheet = remember(settings.companionSprite) {
-        settings.companionSprite.takeIf { it.isNotBlank() }
-            ?.let { path -> runCatching { java.io.File(path).takeIf { it.isFile } }.getOrNull() }
-            ?.let { file -> android.graphics.BitmapFactory.decodeFile(file.absolutePath)?.asImageBitmap() }
-            ?.takeIf { CompanionSpriteSheet.usable(it.width, it.height) }
+    val context = LocalContext.current
+    val spriteSheet = remember(settings.companionSprite, context) {
+        val bitmap = when (settings.companionSprite) {
+            "sample" -> runCatching {
+                context.assets.open("companions/sample/atlas.png").use { input ->
+                    android.graphics.BitmapFactory.decodeStream(input)
+                }
+            }.getOrNull()
+            else -> settings.companionSprite.takeIf { it.isNotBlank() }
+                ?.let { path -> runCatching { java.io.File(path).takeIf { it.isFile } }.getOrNull() }
+                ?.let { file -> android.graphics.BitmapFactory.decodeFile(file.absolutePath) }
+        }
+        bitmap?.asImageBitmap()?.takeIf { CompanionSpriteSheet.usable(it.width, it.height) }
     }
     val displayName = when {
         spriteSheet != null -> "Sprite"
