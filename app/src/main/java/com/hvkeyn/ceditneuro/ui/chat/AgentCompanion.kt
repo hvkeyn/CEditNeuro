@@ -570,6 +570,13 @@ private fun DrawScope.drawPixelFx(
 }
 
 @Composable
+fun CompanionAvatar(character: CompanionCharacter, mood: CompanionMood, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        drawChibi(character, mood, 0f, false, 0f, 0f)
+    }
+}
+
+@Composable
 private fun moodColor(mood: CompanionMood): Color = when (mood) {
     CompanionMood.WORRIED -> MaterialTheme.colorScheme.error
     CompanionMood.TEAM -> MaterialTheme.colorScheme.tertiary

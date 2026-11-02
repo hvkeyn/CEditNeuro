@@ -107,6 +107,7 @@ import com.hvkeyn.ceditneuro.agent.agentBars
 import com.hvkeyn.ceditneuro.data.AgentSettings
 import com.hvkeyn.ceditneuro.ui.AgentActivity
 import com.hvkeyn.ceditneuro.ui.TeamUi
+import com.hvkeyn.ceditneuro.ui.TeamLooks
 import com.hvkeyn.ceditneuro.ui.FitDropdownMenu
 import com.hvkeyn.ceditneuro.ui.ChatEntry
 import com.hvkeyn.ceditneuro.ui.ChatRole
@@ -619,25 +620,47 @@ private fun TeamStrip(team: TeamUi, agentRunning: Boolean) {
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 2.dp),
             )
-            if (!expanded) {
-                val marks = team.agents.joinToString("   ") { agent ->
-                    val mark = when (agent.status) {
-                        "working" -> "●"
-                        "done" -> "✓"
-                        "failed" -> "✕"
-                        else -> "○"
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                modifier = Modifier.padding(top = 4.dp),
+            ) {
+                team.agents.forEach { agent ->
+                    val character = TeamLooks.forRole(agent.role)
+                    if (character != null) {
+                        Box(modifier = Modifier.size(22.dp)) {
+                            CompanionAvatar(
+                                character = character,
+                                mood = TeamLooks.mood(agent.status),
+                                modifier = Modifier.size(22.dp),
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .size(7.dp)
+                                    .background(
+                                        when (agent.status) {
+                                            "working" -> MaterialTheme.colorScheme.tertiary
+                                            "done" -> MaterialTheme.colorScheme.primary
+                                            "failed" -> MaterialTheme.colorScheme.error
+                                            else -> MaterialTheme.colorScheme.outline
+                                        },
+                                        CircleShape,
+                                    ),
+                            )
+                        }
                     }
-                    agent.role + " " + mark
                 }
-                Text(
-                    text = marks,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 3.dp),
-                )
+                if (!expanded) {
+                    Text(
+                        text = team.agents.joinToString(" · ") { it.role },
+                        style = MaterialTheme.typography.labelSmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
             if (expanded) {
                 Spacer(Modifier.height(6.dp))
@@ -648,6 +671,14 @@ private fun TeamStrip(team: TeamUi, agentRunning: Boolean) {
                             .fillMaxWidth()
                             .padding(vertical = 2.dp),
                     ) {
+                        TeamLooks.forRole(agent.role)?.let { character ->
+                            CompanionAvatar(
+                                character = character,
+                                mood = TeamLooks.mood(agent.status),
+                                modifier = Modifier.size(24.dp),
+                            )
+                            Spacer(Modifier.width(6.dp))
+                        }
                         when (agent.status) {
                             "working" -> CircularProgressIndicator(
                                 modifier = Modifier.size(12.dp),
