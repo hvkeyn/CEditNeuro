@@ -4,21 +4,27 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.FilterChip
@@ -60,7 +66,10 @@ import com.hvkeyn.ceditneuro.data.ModelCatalog
 import com.hvkeyn.ceditneuro.data.ModelProvider
 import com.hvkeyn.ceditneuro.data.RemoteServer
 import com.hvkeyn.ceditneuro.net.ProviderBalance
+import com.hvkeyn.ceditneuro.ui.CompanionMood
 import com.hvkeyn.ceditneuro.ui.CompanionRoster
+import com.hvkeyn.ceditneuro.ui.chat.CompanionAvatar
+import com.hvkeyn.ceditneuro.ui.theme.NeuroSelected
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -294,9 +303,10 @@ fun SettingsDialog(
                     }
                     SettingsSection(
                         title = "Companion",
-                        summary = if (!draft.companionEnabled) "Off" else {
-                            val selected = CompanionRoster.byId(draft.companionCharacter)
-                            selected?.name ?: "Auto"
+                        summary = if (!draft.companionEnabled) "Off" else when {
+                            draft.companionSprite == "sample" -> "Pixel"
+                            draft.companionSprite.isNotBlank() -> "Custom sprite"
+                            else -> CompanionRoster.byId(draft.companionCharacter)?.name ?: "Auto"
                         },
                         expanded = openSection == "companion",
                         onToggle = { openSection = if (openSection == "companion") "" else "companion" },
@@ -312,25 +322,89 @@ fun SettingsDialog(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        Text(
+                            text = "Choose a character",
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                        val sampleFrame = remember {
+                            runCatching {
+                                settingsContext.assets.open("companions/sample/atlas.png").use { input ->
+                                    android.graphics.BitmapFactory.decodeStream(input)
+                                }
+                            }.getOrNull()?.let { bitmap ->
+                                android.graphics.Bitmap.createBitmap(
+                                    bitmap,
+                                    0,
+                                    0,
+                                    (bitmap.width / 4).coerceAtLeast(1),
+                                    (bitmap.height / 8).coerceAtLeast(1),
+                                ).asImageBitmap()
+                            }
+                        }
                         Row(
                             modifier = Modifier.horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            FilterChip(
-                                selected = draft.companionCharacter == CompanionRoster.AUTO,
-                                onClick = { draft = draft.copy(companionCharacter = CompanionRoster.AUTO) },
-                                label = { Text("Auto") },
-                            )
-                            CompanionRoster.all.forEach { character ->
-                                FilterChip(
-                                    selected = draft.companionCharacter == character.id,
-                                    onClick = { draft = draft.copy(companionCharacter = character.id) },
-                                    label = { Text(character.name) },
+                            CompanionChoice(
+                                name = "Auto",
+                                selected = draft.companionCharacter == CompanionRoster.AUTO &&
+                                    draft.companionSprite.isBlank(),
+                                onClick = {
+                                    draft = draft.copy(
+                                        companionCharacter = CompanionRoster.AUTO,
+                                        companionSprite = "",
+                                    )
+                                },
+                            ) {
+                                Icon(
+                                    Icons.Default.AutoAwesome,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(30.dp),
                                 )
                             }
+                            if (sampleFrame != null) {
+                                CompanionChoice(
+                                    name = "Pixel",
+                                    selected = draft.companionSprite == "sample",
+                                    onClick = { draft = draft.copy(companionSprite = "sample") },
+                                ) {
+                                    Image(
+                                        bitmap = sampleFrame,
+                                        contentDescription = "Pixel companion",
+                                        contentScale = ContentScale.Fit,
+                                        modifier = Modifier.size(58.dp),
+                                    )
+                                }
+                            }
+                            CompanionRoster.all.forEach { character ->
+                                CompanionChoice(
+                                    name = character.name,
+                                    selected = draft.companionCharacter == character.id &&
+                                        draft.companionSprite.isBlank(),
+                                    onClick = {
+                                        draft = draft.copy(
+                                            companionCharacter = character.id,
+                                            companionSprite = "",
+                                        )
+                                    },
+                                ) {
+                                    CompanionAvatar(
+                                        character = character,
+                                        mood = CompanionMood.IDLE,
+                                        modifier = Modifier.size(58.dp),
+                                    )
+                                }
+                            }
                         }
+                        val selectedCharacter = CompanionRoster.byId(draft.companionCharacter)
                         Text(
-                            text = CompanionRoster.all.joinToString(" · ") { it.name + " — " + it.tagline },
+                            text = when {
+                                draft.companionSprite == "sample" -> "Pixel — bundled CC0 sample sprite."
+                                draft.companionSprite.isNotBlank() -> "Custom sprite sheet."
+                                selectedCharacter != null -> "${selectedCharacter.name} — ${selectedCharacter.tagline}"
+                                else -> "Auto follows the project and current work focus."
+                            },
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -1186,4 +1260,39 @@ private fun SkillsEditor(
 
 private object SkillLibraryName {
     fun normalize(raw: String): String? = com.hvkeyn.ceditneuro.agent.SkillLibrary.normalizeName(raw)
+}
+
+
+@Composable
+private fun CompanionChoice(
+    name: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .width(76.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (selected) NeuroSelected else MaterialTheme.colorScheme.surfaceVariant)
+            .border(
+                width = if (selected) 2.dp else 1.dp,
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                shape = RoundedCornerShape(14.dp),
+            )
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp, horizontal = 4.dp),
+    ) {
+        Box(modifier = Modifier.size(58.dp), contentAlignment = Alignment.Center) {
+            content()
+        }
+        Text(
+            text = name,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+    }
 }

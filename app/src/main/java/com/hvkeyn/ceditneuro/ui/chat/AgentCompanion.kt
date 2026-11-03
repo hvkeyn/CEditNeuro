@@ -85,7 +85,8 @@ fun AgentCompanion(state: WorkspaceUiState, settings: AgentSettings, compact: Bo
         bitmap?.asImageBitmap()?.takeIf { CompanionSpriteSheet.usable(it.width, it.height) }
     }
     val displayName = when {
-        spriteSheet != null -> "Sprite"
+        spriteSheet != null && settings.companionSprite == "sample" -> "Pixel"
+        spriteSheet != null -> "Custom sprite"
         customBitmap != null -> "Custom"
         else -> character.name
     }
