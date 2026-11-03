@@ -273,6 +273,24 @@ fun SettingsDialog(
                             checked = draft.autoSave,
                             onCheckedChange = { draft = draft.copy(autoSave = it) },
                         )
+                        Text("Editor theme", style = MaterialTheme.typography.labelLarge)
+                        Row(
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            listOf(
+                                "darcula" to "Darcula",
+                                "github" to "GitHub",
+                                "vs2019" to "VS2019",
+                                "eclipse" to "Eclipse",
+                            ).forEach { (id, label) ->
+                                FilterChip(
+                                    selected = draft.editorTheme == id,
+                                    onClick = { draft = draft.copy(editorTheme = id) },
+                                    label = { Text(label) },
+                                )
+                            }
+                        }
                     }
                     SettingsSection(
                         title = "Companion",

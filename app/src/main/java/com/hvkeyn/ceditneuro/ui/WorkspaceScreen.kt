@@ -691,6 +691,7 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel) {
                         EditorSurface(
                             viewModel,
                             state,
+                            editorTheme = settings.editorTheme,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f),
@@ -920,6 +921,7 @@ private fun AgentChat(
 private fun EditorSurface(
     viewModel: WorkspaceViewModel,
     state: WorkspaceUiState,
+    editorTheme: String,
     modifier: Modifier = Modifier,
 ) {
     var quickOpen by rememberSaveable { mutableStateOf(false) }
@@ -941,6 +943,7 @@ private fun EditorSurface(
         onImportReel = viewModel::importEdit,
         onQuickOpen = { quickOpen = true },
         onGit = { gitOpen = true },
+        editorTheme = editorTheme,
     )
     if (quickOpen) {
         QuickOpenDialog(

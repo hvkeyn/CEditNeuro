@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Merge
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
@@ -128,6 +129,46 @@ private fun commitEverything(root: File, message: String): String? {
     }
 }
 
+private fun createPullRequest(root: File, token: String, base: String, title: String): String {
+    if (token.isBlank()) return "A GitHub token is required to create a pull request."
+    if (title.isBlank()) return "Write a pull-request title first."
+    if (base.isBlank()) return "Write a base branch first."
+    val repo = repositoryOf(root) ?: return "Not a git repository."
+    repo.use {
+        val remote = repo.config.getString("remote", "origin", "url").orEmpty()
+        val slug = when {
+            remote.contains("github.com/") -> remote.substringAfter("github.com/").removeSuffix(".git").trim('/')
+            remote.startsWith("git@github.com:") -> remote.removePrefix("git@github.com:").removeSuffix(".git").trim('/')
+            else -> ""
+        }
+        if (slug.count { it == '/' } != 1) return "Origin is not a GitHub owner/repo URL."
+        val branch = repo.branch ?: return "Detached HEAD; checkout a branch first."
+        return runCatching {
+            val payload = """{"title":"${jsonEscape(title)}","head":"${jsonEscape(branch)}","base":"${jsonEscape(base)}","body":"Created from CEdiNeuro."}"""
+            val connection = (java.net.URL("https://api.github.com/repos/$slug/pulls").openConnection() as java.net.HttpURLConnection).apply {
+                requestMethod = "POST"
+                connectTimeout = 15_000
+                readTimeout = 20_000
+                doOutput = true
+                setRequestProperty("Authorization", "Bearer ${token.trim()}")
+                setRequestProperty("Accept", "application/vnd.github+json")
+                setRequestProperty("Content-Type", "application/json")
+                setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
+            }
+            connection.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
+            val code = connection.responseCode
+            val body = (if (code in 200..299) connection.inputStream else connection.errorStream)
+                ?.bufferedReader()?.use { it.readText() }.orEmpty()
+            if (code !in 200..299) return "GitHub returned $code: ${body.take(240)}"
+            val url = Regex("\"html_url\"\\s*:\\s*\"([^\"]+)\"").find(body)?.groupValues?.get(1)
+            "Pull request created: ${url ?: "see GitHub"}"
+        }.getOrElse { error -> error.message ?: "Pull request failed." }
+    }
+}
+
+private fun jsonEscape(value: String): String =
+    value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+
 private fun pullOrigin(root: File, token: String): String {
     val repo = repositoryOf(root) ?: return "Not a git repository."
     repo.use {
@@ -193,6 +234,8 @@ fun GitPanel(
     var snapshot by remember { mutableStateOf<GitSnapshot?>(null) }
     var message by remember { mutableStateOf("") }
     var token by remember { mutableStateOf("") }
+    var prTitle by remember { mutableStateOf("") }
+    var prBase by remember { mutableStateOf("main") }
     var notice by remember { mutableStateOf("") }
     var working by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -269,6 +312,20 @@ fun GitPanel(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    OutlinedTextField(
+                        value = prTitle,
+                        onValueChange = { prTitle = it },
+                        label = { Text("Pull request title") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OutlinedTextField(
+                        value = prBase,
+                        onValueChange = { prBase = it },
+                        label = { Text("PR base branch") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                         IconButton(
                             enabled = !working && !current.clean,
@@ -319,6 +376,19 @@ fun GitPanel(
                                 }
                             },
                         ) { Icon(Icons.Default.ArrowUpward, contentDescription = "Push") }
+                        IconButton(
+                            enabled = !working && token.isNotBlank() && prTitle.isNotBlank(),
+                            onClick = {
+                                working = true
+                                scope.launch {
+                                    notice = withContext(Dispatchers.IO) {
+                                        createPullRequest(rootFile, token, prBase, prTitle)
+                                    }
+                                    working = false
+                                    reload++
+                                }
+                            },
+                        ) { Icon(Icons.Default.Merge, contentDescription = "Create pull request") }
                         IconButton(onClick = { reload++ }) {
                             Icon(Icons.Default.Refresh, contentDescription = "Refresh Git status")
                         }

@@ -39,9 +39,11 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.TextDecrease
 import androidx.compose.material.icons.filled.TextIncrease
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.VerticalSplit
 import androidx.compose.material.icons.filled.WrapText
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DataObject
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
@@ -76,6 +78,9 @@ import io.github.rosemoe.sora.lsp.editor.LspEditor
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.EditorSearcher
 import io.github.rosemoe.sora.widget.schemes.SchemeDarcula
+import io.github.rosemoe.sora.widget.schemes.SchemeEclipse
+import io.github.rosemoe.sora.widget.schemes.SchemeGitHub
+import io.github.rosemoe.sora.widget.schemes.SchemeVS2019
 import java.io.File
 
 /**
@@ -103,6 +108,7 @@ fun EditorPane(
     onImportReel: (String, String) -> Unit = { _, _ -> },
     onQuickOpen: () -> Unit = {},
     onGit: () -> Unit = {},
+    editorTheme: String = "darcula",
 ) {
     val activePath = state.activePath
     if (activePath == null || state.openFiles.isEmpty()) {
@@ -119,12 +125,37 @@ fun EditorPane(
     var wrapped by rememberSaveable { mutableStateOf(true) }
     var lineNumbers by rememberSaveable { mutableStateOf(true) }
     var outlineOpen by rememberSaveable(activePath) { mutableStateOf(false) }
+    var problemsOpen by rememberSaveable(activePath) { mutableStateOf(false) }
+    var snippetsOpen by rememberSaveable(activePath) { mutableStateOf(false) }
     var split by rememberSaveable(activePath) { mutableStateOf(false) }
     var fontScale by rememberSaveable { mutableFloatStateOf(1f) }
     val secondaryPath = state.openFiles.firstOrNull {
         it.path != activePath && previewKind(it.path) !in setOf("image", "video")
     }?.path
     val file = state.projectRoot?.let { File(it, activePath) }
+    val history = remember { EditorHistory() }
+    LaunchedEffect(activePath, secondaryPath) {
+        history.seed(activePath, contentProvider(activePath))
+        secondaryPath?.let { history.seed(it, contentProvider(it)) }
+    }
+    val trackedChange: (String, String) -> Unit = { path, text ->
+        history.record(path, text)
+        onContentChanged(path, text)
+    }
+    fun applyUndo() {
+        val target = editor ?: return
+        val text = history.undo(activePath) ?: return
+        target.setText(text)
+        onContentChanged(activePath, text)
+        target.ensureSelectionVisible()
+    }
+    fun applyRedo() {
+        val target = editor ?: return
+        val text = history.redo(activePath) ?: return
+        target.setText(text)
+        onContentChanged(activePath, text)
+        target.ensureSelectionVisible()
+    }
 
     Column(modifier) {
         if (state.openFiles.isNotEmpty()) {
@@ -151,8 +182,8 @@ fun EditorPane(
         if (codeVisible) {
             EditorTools(
                 onFind = { searchOpen = !searchOpen },
-                onUndo = { editor?.undo() },
-                onRedo = { editor?.redo() },
+                onUndo = ::applyUndo,
+                onRedo = ::applyRedo,
                 onFormat = { editor?.formatCodeAsync() },
                 wrapped = wrapped,
                 onWrap = {
@@ -167,6 +198,8 @@ fun EditorPane(
                 onQuickOpen = onQuickOpen,
                 onGit = onGit,
                 onOutline = { outlineOpen = true },
+                onProblems = { problemsOpen = true },
+                onSnippets = { snippetsOpen = true },
                 splitAvailable = secondaryPath != null,
                 split = split,
                 onSplit = { split = !split },
@@ -196,6 +229,40 @@ fun EditorPane(
                 onReplace = { editor?.searcher?.replaceThis(replaceText) },
                 onReplaceAll = { editor?.searcher?.replaceAll(replaceText) },
                 onClose = { searchOpen = false },
+            )
+        }
+        if (snippetsOpen) {
+            SnippetDialog(
+                onPick = { snippet ->
+                    snippetsOpen = false
+                    val target = editor ?: return@SnippetDialog
+                    val cursor = target.cursor ?: return@SnippetDialog
+                    val offset = target.text.getCharIndex(
+                        cursor.leftLine,
+                        cursor.leftColumn.coerceAtMost(target.text.getColumnCount(cursor.leftLine)),
+                    )
+                    target.text.insert(cursor.leftLine, cursor.leftColumn, snippet.text)
+                    target.setSelection(offset, offset + snippet.text.length)
+                    target.ensureSelectionVisible()
+                },
+                onDismiss = { snippetsOpen = false },
+            )
+        }
+        if (problemsOpen) {
+            ProblemsDialog(
+                text = contentProvider(activePath),
+                path = activePath,
+                onSelectLine = { line ->
+                    problemsOpen = false
+                    val target = editor ?: return@ProblemsDialog
+                    val text = target.text
+                    if (line in 0 until text.lineCount) {
+                        val offset = text.getCharIndex(line, 0)
+                        target.setSelection(offset, offset)
+                        target.ensureSelectionVisible()
+                    }
+                },
+                onDismiss = { problemsOpen = false },
             )
         }
         if (outlineOpen) {
@@ -247,7 +314,7 @@ fun EditorPane(
                                 projectRoot = state.projectRoot,
                                 contentProvider = contentProvider,
                                 reloadCounter = state.reloadCounter,
-                                onContentChanged = onContentChanged,
+                                onContentChanged = trackedChange,
                                 onEditorReady = { editor = it },
                                 modifier = Modifier.weight(1f).fillMaxHeight(),
                             )
@@ -262,7 +329,7 @@ fun EditorPane(
                                 projectRoot = state.projectRoot,
                                 contentProvider = contentProvider,
                                 reloadCounter = state.reloadCounter,
-                                onContentChanged = onContentChanged,
+                                onContentChanged = trackedChange,
                                 modifier = Modifier.weight(1f).fillMaxHeight(),
                             )
                         }
@@ -273,9 +340,10 @@ fun EditorPane(
                                 projectRoot = state.projectRoot,
                                 contentProvider = contentProvider,
                                 reloadCounter = state.reloadCounter,
-                                onContentChanged = onContentChanged,
+                                onContentChanged = trackedChange,
                                 onEditorReady = { editor = it },
                                 fontScale = fontScale,
+                                theme = editorTheme,
                                 modifier = Modifier.weight(1f).fillMaxWidth(),
                             )
                             Box(
@@ -289,8 +357,9 @@ fun EditorPane(
                                 projectRoot = state.projectRoot,
                                 contentProvider = contentProvider,
                                 reloadCounter = state.reloadCounter,
-                                onContentChanged = onContentChanged,
+                                onContentChanged = trackedChange,
                                 fontScale = fontScale,
+                                theme = editorTheme,
                                 modifier = Modifier.weight(1f).fillMaxWidth(),
                             )
                         }
@@ -302,9 +371,10 @@ fun EditorPane(
                     projectRoot = state.projectRoot,
                     contentProvider = contentProvider,
                     reloadCounter = state.reloadCounter,
-                    onContentChanged = onContentChanged,
+                    onContentChanged = trackedChange,
                     onEditorReady = { editor = it },
                     fontScale = fontScale,
+                    theme = editorTheme,
                     modifier = body,
                 )
             }
@@ -401,6 +471,8 @@ private fun EditorTools(
     onQuickOpen: () -> Unit,
     onGit: () -> Unit,
     onOutline: () -> Unit,
+    onProblems: () -> Unit,
+    onSnippets: () -> Unit,
     splitAvailable: Boolean,
     split: Boolean,
     onSplit: () -> Unit,
@@ -417,6 +489,8 @@ private fun EditorTools(
     ) {
         ToolButton(Icons.Default.FolderOpen, "Quick open", onQuickOpen)
         ToolButton(Icons.Default.FormatListBulleted, "Outline", onOutline)
+        ToolButton(Icons.Default.Warning, "Problems", onProblems)
+        ToolButton(Icons.Default.DataObject, "Insert snippet", onSnippets)
         ToolButton(Icons.Default.AccountTree, "Git", onGit)
         ToolButton(
             Icons.Default.VerticalSplit,
@@ -546,6 +620,55 @@ private fun EditorTabs(
     }
 }
 
+private fun editorScheme(name: String) = when (name) {
+    "github" -> SchemeGitHub()
+    "vs2019" -> SchemeVS2019()
+    "eclipse" -> SchemeEclipse()
+    else -> SchemeDarcula()
+}
+
+private class EditorHistory {
+    private val undo = mutableMapOf<String, ArrayDeque<String>>()
+    private val redo = mutableMapOf<String, ArrayDeque<String>>()
+    private val current = mutableMapOf<String, String>()
+
+    fun seed(path: String, text: String) {
+        current[path] = text
+    }
+
+    fun record(path: String, text: String) {
+        val previous = current[path]
+        if (previous == null) {
+            current[path] = text
+            return
+        }
+        if (previous == text) return
+        val stack = undo.getOrPut(path) { ArrayDeque() }
+        stack.addLast(previous)
+        while (stack.size > 80) stack.removeFirst()
+        redo.remove(path)
+        current[path] = text
+    }
+
+    fun undo(path: String): String? {
+        val stack = undo[path] ?: return null
+        val previous = stack.removeLastOrNull() ?: return null
+        val now = current[path] ?: return null
+        redo.getOrPut(path) { ArrayDeque() }.addLast(now)
+        current[path] = previous
+        return previous
+    }
+
+    fun redo(path: String): String? {
+        val stack = redo[path] ?: return null
+        val next = stack.removeLastOrNull() ?: return null
+        val now = current[path] ?: return null
+        undo.getOrPut(path) { ArrayDeque() }.addLast(now)
+        current[path] = next
+        return next
+    }
+}
+
 private class EditorHolder {
     var editor: CodeEditor? = null
     var lspEditor: LspEditor? = null
@@ -562,6 +685,7 @@ private fun CodeEditorHost(
     onContentChanged: (String, String) -> Unit,
     onEditorReady: (CodeEditor) -> Unit = {},
     fontScale: Float = 1f,
+    theme: String = "darcula",
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -578,7 +702,7 @@ private fun CodeEditorHost(
                 typefaceText = Typeface.MONOSPACE
                 setTypefaceLineNumber(Typeface.MONOSPACE)
                 setEditorLanguage(SourceLanguage.forPath(currentPath))
-                colorScheme = SchemeDarcula()
+                colorScheme = editorScheme(theme)
                 setWordwrap(true)
                 props.autoIndent = true
                 props.symbolPairAutoCompletion = true
@@ -597,6 +721,10 @@ private fun CodeEditorHost(
             }
         },
     )
+
+    LaunchedEffect(theme) {
+        holder.editor?.colorScheme = editorScheme(theme)
+    }
 
     DisposableEffect(Unit) {
         onDispose {
