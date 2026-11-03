@@ -25,6 +25,22 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Redo
+import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.AccountTree
+import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.FindReplace
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.FormatListBulleted
+import androidx.compose.material.icons.filled.FormatListNumbered
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.TextDecrease
+import androidx.compose.material.icons.filled.TextIncrease
+import androidx.compose.material.icons.filled.VerticalSplit
+import androidx.compose.material.icons.filled.WrapText
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Movie
@@ -313,40 +329,62 @@ private fun FileActions(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = 6.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         if (runnable) {
             if (running) {
-                TextButton(onClick = onStop) {
-                    Icon(Icons.Default.Stop, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
-                    Text(" Stop", color = MaterialTheme.colorScheme.error)
+                IconButton(onClick = onStop, modifier = Modifier.size(40.dp)) {
+                    Icon(
+                        Icons.Default.Stop,
+                        contentDescription = "Stop",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp),
+                    )
                 }
-                Text("Running · output in Shell", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    "Running · output in Shell",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             } else {
-                TextButton(onClick = onRun) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Text(" Run")
+                IconButton(onClick = onRun, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = "Run", modifier = Modifier.size(22.dp))
                 }
             }
         }
         if (canPreview) {
-            TextButton(onClick = onTogglePreview) {
+            IconButton(onClick = onTogglePreview, modifier = Modifier.size(40.dp)) {
                 Icon(
                     if (previewing) Icons.Default.Code else Icons.Default.Visibility,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
+                    contentDescription = if (previewing) "Show code" else "Preview",
+                    modifier = Modifier.size(20.dp),
                 )
-                Text(if (previewing) " Code" else " Preview")
             }
         }
         if (canRender) {
-            TextButton(onClick = onRender, enabled = !rendering) {
-                Icon(Icons.Default.Movie, contentDescription = null, modifier = Modifier.size(18.dp))
-                Text(if (rendering) " Rendering" else " Render MP4")
+            IconButton(onClick = onRender, enabled = !rendering, modifier = Modifier.size(40.dp)) {
+                Icon(Icons.Default.Movie, contentDescription = "Render MP4", modifier = Modifier.size(20.dp))
             }
         }
+    }
+}
+
+@Composable
+private fun ToolButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    description: String,
+    onClick: () -> Unit,
+    active: Boolean = false,
+) {
+    IconButton(onClick = onClick, modifier = Modifier.size(40.dp)) {
+        Icon(
+            imageVector = icon,
+            contentDescription = description,
+            modifier = Modifier.size(20.dp),
+            tint = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -374,30 +412,26 @@ private fun EditorTools(
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 4.dp, vertical = 2.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+            .padding(horizontal = 2.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        listOf(
-            "Open" to onQuickOpen,
-            "Outline" to onOutline,
-            "Git" to onGit,
-            (if (split) "Unsplit" else "Split") to { if (splitAvailable) onSplit() },
-            "A-" to onFontSmaller,
-            "A+" to onFontLarger,
-            "Find" to onFind,
-            "Undo" to onUndo,
-            "Redo" to onRedo,
-            "Format" to onFormat,
-            (if (wrapped) "Wrap" else "No wrap") to onWrap,
-            (if (lineNumbers) "Lines" else "No lines") to onLineNumbers,
-        ).forEach { (label, action) ->
-            TextButton(
-                onClick = action,
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-            ) {
-                Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
-            }
-        }
+        ToolButton(Icons.Default.FolderOpen, "Quick open", onQuickOpen)
+        ToolButton(Icons.Default.FormatListBulleted, "Outline", onOutline)
+        ToolButton(Icons.Default.AccountTree, "Git", onGit)
+        ToolButton(
+            Icons.Default.VerticalSplit,
+            if (split) "Unsplit" else "Split",
+            { if (splitAvailable) onSplit() },
+            active = split,
+        )
+        ToolButton(Icons.Default.TextDecrease, "Smaller text", onFontSmaller)
+        ToolButton(Icons.Default.TextIncrease, "Larger text", onFontLarger)
+        ToolButton(Icons.Default.Search, "Find and replace", onFind)
+        ToolButton(Icons.AutoMirrored.Filled.Undo, "Undo", onUndo)
+        ToolButton(Icons.AutoMirrored.Filled.Redo, "Redo", onRedo)
+        ToolButton(Icons.Default.AutoFixHigh, "Format", onFormat)
+        ToolButton(Icons.Default.WrapText, "Word wrap", onWrap, active = wrapped)
+        ToolButton(Icons.Default.FormatListNumbered, "Line numbers", onLineNumbers, active = lineNumbers)
     }
 }
 
@@ -435,11 +469,11 @@ private fun SearchBar(
             modifier = Modifier.fillMaxWidth(),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            TextButton(onClick = onPrevious) { Text("Prev") }
-            TextButton(onClick = onNext) { Text("Next") }
-            TextButton(onClick = onReplace) { Text("Replace") }
-            TextButton(onClick = onReplaceAll) { Text("All") }
-            TextButton(onClick = onClose) { Text("Close") }
+            IconButton(onClick = onPrevious) { Icon(Icons.Default.KeyboardArrowUp, "Previous match") }
+            IconButton(onClick = onNext) { Icon(Icons.Default.KeyboardArrowDown, "Next match") }
+            IconButton(onClick = onReplace) { Icon(Icons.Default.FindReplace, "Replace current") }
+            IconButton(onClick = onReplaceAll) { Icon(Icons.Default.DoneAll, "Replace all") }
+            IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Close search") }
         }
     }
 }

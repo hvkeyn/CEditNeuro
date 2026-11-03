@@ -10,7 +10,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -261,7 +270,7 @@ fun GitPanel(
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                        TextButton(
+                        IconButton(
                             enabled = !working && !current.clean,
                             onClick = {
                                 working = true
@@ -272,8 +281,8 @@ fun GitPanel(
                                     reload++
                                 }
                             },
-                        ) { Text("Stage all") }
-                        TextButton(
+                        ) { Icon(Icons.Default.Add, contentDescription = "Stage all") }
+                        IconButton(
                             enabled = !working && !current.clean,
                             onClick = {
                                 working = true
@@ -287,8 +296,8 @@ fun GitPanel(
                                     reload++
                                 }
                             },
-                        ) { Text("Commit") }
-                        TextButton(
+                        ) { Icon(Icons.Default.Check, contentDescription = "Commit") }
+                        IconButton(
                             enabled = !working,
                             onClick = {
                                 working = true
@@ -298,8 +307,8 @@ fun GitPanel(
                                     reload++
                                 }
                             },
-                        ) { Text("Pull") }
-                        TextButton(
+                        ) { Icon(Icons.Default.ArrowDownward, contentDescription = "Pull") }
+                        IconButton(
                             enabled = !working,
                             onClick = {
                                 working = true
@@ -309,8 +318,10 @@ fun GitPanel(
                                     reload++
                                 }
                             },
-                        ) { Text("Push") }
-                        TextButton(onClick = { reload++ }) { Text("Refresh") }
+                        ) { Icon(Icons.Default.ArrowUpward, contentDescription = "Push") }
+                        IconButton(onClick = { reload++ }) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh Git status")
+                        }
                     }
                     if (notice.isNotBlank()) {
                         Text(
@@ -323,6 +334,6 @@ fun GitPanel(
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        dismissButton = { IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = "Close") } },
     )
 }
