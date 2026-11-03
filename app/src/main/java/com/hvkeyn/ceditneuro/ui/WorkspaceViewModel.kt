@@ -22,6 +22,7 @@ import com.hvkeyn.ceditneuro.agent.AgentEvent
 import com.hvkeyn.ceditneuro.agent.AgentDoctor
 import com.hvkeyn.ceditneuro.agent.HarnessBook
 import com.hvkeyn.ceditneuro.agent.AgentLoop
+import com.hvkeyn.ceditneuro.agent.BackendChunk
 import com.hvkeyn.ceditneuro.agent.ChatMessage
 import com.hvkeyn.ceditneuro.agent.ToolTranscript
 import com.hvkeyn.ceditneuro.agent.TokenUsage
@@ -360,6 +361,7 @@ class WorkspaceViewModel(
     private var current: LiveProject? = null
     private val usageLedger by lazy { UsageLedger(UsageLedger.file(appContext.filesDir)) }
     private val autoSaveJobs = mutableMapOf<String, Job>()
+    private var editorSuggestionJob: Job? = null
     private val deviceShell = DeviceShell(appContext, { settingsStore.current.networkEnabled }) { settingsStore.current.proxy }
     private val shizukuShell = ShizukuShell(appContext)
     private val webBackend by lazy {
@@ -1450,6 +1452,83 @@ class WorkspaceViewModel(
         current?.buffers?.get(path)
             ?: _state.value.openFiles.firstOrNull { it.path == path }?.onDisk
             ?: ""
+
+    /**
+     * One-shot, tool-free editor suggestion. The caller owns the editor buffer and applies
+     * the returned text only after the person chooses Apply or Insert.
+     */
+    fun requestEditorSuggestion(
+        mode: String,
+        code: String,
+        selection: String,
+        instruction: String,
+        onResult: (Result<String>) -> Unit,
+    ) {
+        editorSuggestionJob?.cancel()
+        val project = current
+        editorSuggestionJob = viewModelScope.launch {
+            val system = """
+                You are an inline code editor inside a phone IDE.
+                Return ONLY the requested code or prose. Do not use Markdown fences. Do not explain unless the mode is explain.
+                Preserve the existing indentation and language. Never invent APIs, files, or credentials.
+                If the request is ambiguous, return a short TODO comment instead of a risky rewrite.
+            """.trimIndent()
+            val user = buildString {
+                appendLine("Mode: $mode")
+                appendLine("File: ${_state.value.activePath.orEmpty()}")
+                if (instruction.isNotBlank()) appendLine("Instruction: $instruction")
+                if (selection.isNotBlank()) {
+                    appendLine("Selected text:")
+                    appendLine("<<<SELECTION")
+                    appendLine(selection.take(8_000))
+                    appendLine("SELECTION>>>")
+                }
+                appendLine("Current file context:")
+                appendLine("<<<CODE")
+                appendLine(code.take(16_000))
+                appendLine("CODE>>>")
+                appendLine(
+                    when (mode) {
+                        "explain" -> "Explain the selected code briefly and concretely."
+                        "rewrite" -> "Rewrite only the selected text. Return the replacement text only."
+                        "snippet" -> "Generate a small, complete snippet that fits the instruction. Return code only."
+                        else -> "Continue the code at the cursor. Return only the continuation, with no repeated prefix."
+                    },
+                )
+            }.trimEnd()
+            try {
+                var output = StringBuilder()
+                var usage: TokenUsage? = null
+                backend.complete(
+                    listOf(ChatMessage.system(system), ChatMessage.user(user)),
+                    emptyList(),
+                ).collect { chunk ->
+                    when (chunk) {
+                        is BackendChunk.Text -> output.append(chunk.value)
+                        is BackendChunk.Finished -> usage = chunk.usage
+                        else -> Unit
+                    }
+                }
+                usage?.takeIf { !it.isEmpty }?.let { counted ->
+                    project?.let { recordUsage(it, counted, "editor") }
+                }
+                val text = output.toString().trim()
+                withContext(Dispatchers.Main) {
+                    if (text.isBlank()) onResult(Result.failure(IllegalStateException("The model returned no text.")))
+                    else onResult(Result.success(text))
+                }
+            } catch (error: Exception) {
+                withContext(Dispatchers.Main) {
+                    onResult(Result.failure(error))
+                }
+            }
+        }
+    }
+
+    fun cancelEditorSuggestion() {
+        editorSuggestionJob?.cancel()
+        editorSuggestionJob = null
+    }
 
     fun onEditorTextChanged(path: String, text: String) {
         val buffers = current?.buffers ?: return

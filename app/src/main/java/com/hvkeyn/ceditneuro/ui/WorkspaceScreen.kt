@@ -944,6 +944,10 @@ private fun EditorSurface(
         onQuickOpen = { quickOpen = true },
         onGit = { gitOpen = true },
         editorTheme = editorTheme,
+        onAgentCancel = viewModel::cancelEditorSuggestion,
+        onAgentSuggest = { mode, code, selection, instruction, onResult ->
+            viewModel.requestEditorSuggestion(mode, code, selection, instruction, onResult)
+        },
     )
     if (quickOpen) {
         QuickOpenDialog(

@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.AccountTree
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.FindReplace
@@ -109,6 +110,14 @@ fun EditorPane(
     onQuickOpen: () -> Unit = {},
     onGit: () -> Unit = {},
     editorTheme: String = "darcula",
+    onAgentCancel: () -> Unit = {},
+    onAgentSuggest: (
+        mode: String,
+        code: String,
+        selection: String,
+        instruction: String,
+        onResult: (Result<String>) -> Unit,
+    ) -> Unit = { _, _, _, _, result -> result(Result.failure(IllegalStateException("Agent is unavailable."))) },
 ) {
     val activePath = state.activePath
     if (activePath == null || state.openFiles.isEmpty()) {
@@ -127,6 +136,7 @@ fun EditorPane(
     var outlineOpen by rememberSaveable(activePath) { mutableStateOf(false) }
     var problemsOpen by rememberSaveable(activePath) { mutableStateOf(false) }
     var snippetsOpen by rememberSaveable(activePath) { mutableStateOf(false) }
+    var agentContext by remember { mutableStateOf<AgentEditContext?>(null) }
     var split by rememberSaveable(activePath) { mutableStateOf(false) }
     var fontScale by rememberSaveable { mutableFloatStateOf(1f) }
     val secondaryPath = state.openFiles.firstOrNull {
@@ -200,6 +210,24 @@ fun EditorPane(
                 onOutline = { outlineOpen = true },
                 onProblems = { problemsOpen = true },
                 onSnippets = { snippetsOpen = true },
+                onAgent = {
+                    val target = editor
+                    if (target != null) {
+                        val cursor = target.cursor
+                        val start = cursor?.left ?: 0
+                        val end = cursor?.right ?: start
+                        val all = target.text.toString()
+                        val safeStart = start.coerceIn(0, all.length)
+                        val safeEnd = end.coerceIn(safeStart, all.length)
+                        agentContext = AgentEditContext(
+                            path = activePath,
+                            code = all,
+                            start = safeStart,
+                            end = safeEnd,
+                            selectedText = if (safeEnd > safeStart) all.substring(safeStart, safeEnd) else "",
+                        )
+                    }
+                },
                 splitAvailable = secondaryPath != null,
                 split = split,
                 onSplit = { split = !split },
@@ -229,6 +257,34 @@ fun EditorPane(
                 onReplace = { editor?.searcher?.replaceThis(replaceText) },
                 onReplaceAll = { editor?.searcher?.replaceAll(replaceText) },
                 onClose = { searchOpen = false },
+            )
+        }
+        agentContext?.let { context ->
+            AgentEditDialog(
+                context = context,
+                onRequest = { mode, instruction, result ->
+                    onAgentSuggest(mode, context.code, context.selectedText, instruction, result)
+                },
+                onApply = { text, replaceSelection ->
+                    val target = editor
+                    if (target != null) {
+                        val currentLength = target.text.length
+                        val start = context.start.coerceIn(0, currentLength)
+                        val end = context.end.coerceIn(start, currentLength)
+                        if (replaceSelection && end > start) {
+                            target.text.replace(start, end, text)
+                        } else {
+                            target.text.replace(start, start, text)
+                        }
+                        target.setSelection(start, start + text.length)
+                        target.ensureSelectionVisible()
+                    }
+                    agentContext = null
+                },
+                onDismiss = {
+                    onAgentCancel()
+                    agentContext = null
+                },
             )
         }
         if (snippetsOpen) {
@@ -473,6 +529,7 @@ private fun EditorTools(
     onOutline: () -> Unit,
     onProblems: () -> Unit,
     onSnippets: () -> Unit,
+    onAgent: () -> Unit,
     splitAvailable: Boolean,
     split: Boolean,
     onSplit: () -> Unit,
@@ -491,6 +548,7 @@ private fun EditorTools(
         ToolButton(Icons.Default.FormatListBulleted, "Outline", onOutline)
         ToolButton(Icons.Default.Warning, "Problems", onProblems)
         ToolButton(Icons.Default.DataObject, "Insert snippet", onSnippets)
+        ToolButton(Icons.Default.AutoAwesome, "Agent edit", onAgent)
         ToolButton(Icons.Default.AccountTree, "Git", onGit)
         ToolButton(
             Icons.Default.VerticalSplit,
