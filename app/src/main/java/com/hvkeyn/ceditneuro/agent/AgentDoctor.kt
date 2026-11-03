@@ -163,6 +163,17 @@ object AgentDoctor {
             "cannot link" in first -> "binary will not start"
             "timed out" in first || first.trim() == "timeout" || first.trim().startsWith("timeout") ||
                 "sockettimeout" in first -> "timed out"
+            first.startsWith("search failed on duckduckgo") -> "search failed"
+            first.contains("locator is a url") || first.contains("that sentence is not in the draft") ||
+                first.startsWith("critic needs text") -> "research input invalid"
+            first.contains("data is required") || first.contains("could not read the numbers") -> "chart input invalid"
+            first.contains("reel does not cover its timeline") || first.contains("fix the html") -> "video timeline invalid"
+            first.contains("http 404") -> "page not found"
+            first.contains("connection reset") || first.contains("software caused connection abort") ||
+                first.startsWith("failed to connect") -> "connection failed"
+            first.contains("this exact http_request call already failed") -> "duplicate failed call"
+            first.contains("not a git repository") -> "not a git repository"
+            first.startsWith("team is off") -> "team unavailable"
             "tool_calls" in first && "400" in first -> "tool call rejected"
             "chain validation" in first || "certificate chain was rejected" in first -> "certificate rejected"
             "incorrect user data" in first || "do not repeat this login" in first -> "login rejected"
@@ -220,6 +231,33 @@ object AgentDoctor {
         }
         if ("unanswered" in kinds) {
             lines += "An empty or busy reply is a stall. Say that once and stop. Do not retry the same call."
+        }
+        if ("search failed" in kinds) {
+            lines += "The same search failed across providers. Change the query or source; do not retry the unchanged search."
+        }
+        if ("research input invalid" in kinds) {
+            lines += "research_run needs a locator printed by a tool, a quoted sentence from the draft, and non-empty critic text. Fix the input; do not repeat the same call."
+        }
+        if ("chart input invalid" in kinds) {
+            lines += "chart needs measured rows of numbers. Send named series or points; do not hand it prose or an empty list."
+        }
+        if ("video timeline invalid" in kinds) {
+            lines += "The reel does not fill its declared timeline. Fix the composition or duration before rendering again."
+        }
+        if ("page not found" in kinds) {
+            lines += "HTTP 404 is final for that URL. Do not retry it unchanged; pick a URL the page or feed printed."
+        }
+        if ("connection failed" in kinds) {
+            lines += "A reset or refused connection is not proof of a bad URL. Check the proxy/network and do not loop the same call."
+        }
+        if ("duplicate failed call" in kinds) {
+            lines += "The exact http_request call already failed. Change the URL or inputs instead of repeating it."
+        }
+        if ("not a git repository" in kinds) {
+            lines += "The project has no .git directory. Do not retry git_status/git_diff for this project; use files directly."
+        }
+        if ("team unavailable" in kinds) {
+            lines += "Team is off in Settings. Solve alone or ask the user to turn Team on; do not call team again."
         }
         if ("error" in kinds) {
             lines += "One-off generic errors are not a rule. Read the exact tool result, change one input, and retry only that step."
