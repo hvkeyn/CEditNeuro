@@ -8,17 +8,20 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
@@ -39,6 +42,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -96,10 +100,11 @@ fun EditorPane(
     var searchOpen by rememberSaveable(activePath) { mutableStateOf(false) }
     var searchText by rememberSaveable(activePath) { mutableStateOf("") }
     var replaceText by rememberSaveable(activePath) { mutableStateOf("") }
-    var wrapped by remember(activePath) { mutableStateOf(true) }
-    var lineNumbers by remember(activePath) { mutableStateOf(true) }
+    var wrapped by rememberSaveable { mutableStateOf(true) }
+    var lineNumbers by rememberSaveable { mutableStateOf(true) }
     var outlineOpen by rememberSaveable(activePath) { mutableStateOf(false) }
     var split by rememberSaveable(activePath) { mutableStateOf(false) }
+    var fontScale by rememberSaveable { mutableFloatStateOf(1f) }
     val secondaryPath = state.openFiles.firstOrNull {
         it.path != activePath && previewKind(it.path) !in setOf("image", "video")
     }?.path
@@ -149,6 +154,14 @@ fun EditorPane(
                 splitAvailable = secondaryPath != null,
                 split = split,
                 onSplit = { split = !split },
+                onFontSmaller = {
+                    fontScale = (fontScale - 0.1f).coerceAtLeast(0.75f)
+                    editor?.let { fitEditorText(it, EditorHolder(), activePath, fontScale) }
+                },
+                onFontLarger = {
+                    fontScale = (fontScale + 0.1f).coerceAtMost(1.6f)
+                    editor?.let { fitEditorText(it, EditorHolder(), activePath, fontScale) }
+                },
             )
         }
         if (searchOpen && codeVisible) {
@@ -209,30 +222,63 @@ fun EditorPane(
                 }
             }
             else -> if (split && secondaryPath != null) {
-                Row(modifier = body) {
-                    CodeEditorHost(
-                        activePath = activePath,
-                        projectRoot = state.projectRoot,
-                        contentProvider = contentProvider,
-                        reloadCounter = state.reloadCounter,
-                        onContentChanged = onContentChanged,
-                        onEditorReady = { editor = it },
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                    )
-                    Box(
-                        modifier = Modifier
-                            .width(1.dp)
-                            .fillMaxHeight()
-                            .background(MaterialTheme.colorScheme.outlineVariant),
-                    )
-                    CodeEditorHost(
-                        activePath = secondaryPath,
-                        projectRoot = state.projectRoot,
-                        contentProvider = contentProvider,
-                        reloadCounter = state.reloadCounter,
-                        onContentChanged = onContentChanged,
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                    )
+                BoxWithConstraints(modifier = body) {
+                    val sideBySide = maxWidth >= 600.dp
+                    if (sideBySide) {
+                        Row(modifier = Modifier.fillMaxSize()) {
+                            CodeEditorHost(
+                                activePath = activePath,
+                                projectRoot = state.projectRoot,
+                                contentProvider = contentProvider,
+                                reloadCounter = state.reloadCounter,
+                                onContentChanged = onContentChanged,
+                                onEditorReady = { editor = it },
+                                modifier = Modifier.weight(1f).fillMaxHeight(),
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .width(1.dp)
+                                    .fillMaxHeight()
+                                    .background(MaterialTheme.colorScheme.outlineVariant),
+                            )
+                            CodeEditorHost(
+                                activePath = secondaryPath,
+                                projectRoot = state.projectRoot,
+                                contentProvider = contentProvider,
+                                reloadCounter = state.reloadCounter,
+                                onContentChanged = onContentChanged,
+                                modifier = Modifier.weight(1f).fillMaxHeight(),
+                            )
+                        }
+                    } else {
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            CodeEditorHost(
+                                activePath = activePath,
+                                projectRoot = state.projectRoot,
+                                contentProvider = contentProvider,
+                                reloadCounter = state.reloadCounter,
+                                onContentChanged = onContentChanged,
+                                onEditorReady = { editor = it },
+                                fontScale = fontScale,
+                                modifier = Modifier.weight(1f).fillMaxWidth(),
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(1.dp)
+                                    .background(MaterialTheme.colorScheme.outlineVariant),
+                            )
+                            CodeEditorHost(
+                                activePath = secondaryPath,
+                                projectRoot = state.projectRoot,
+                                contentProvider = contentProvider,
+                                reloadCounter = state.reloadCounter,
+                                onContentChanged = onContentChanged,
+                                fontScale = fontScale,
+                                modifier = Modifier.weight(1f).fillMaxWidth(),
+                            )
+                        }
+                    }
                 }
             } else {
                 CodeEditorHost(
@@ -242,6 +288,7 @@ fun EditorPane(
                     reloadCounter = state.reloadCounter,
                     onContentChanged = onContentChanged,
                     onEditorReady = { editor = it },
+                    fontScale = fontScale,
                     modifier = body,
                 )
             }
@@ -319,6 +366,8 @@ private fun EditorTools(
     splitAvailable: Boolean,
     split: Boolean,
     onSplit: () -> Unit,
+    onFontSmaller: () -> Unit,
+    onFontLarger: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -333,6 +382,8 @@ private fun EditorTools(
             "Outline" to onOutline,
             "Git" to onGit,
             (if (split) "Unsplit" else "Split") to { if (splitAvailable) onSplit() },
+            "A-" to onFontSmaller,
+            "A+" to onFontLarger,
             "Find" to onFind,
             "Undo" to onUndo,
             "Redo" to onRedo,
@@ -416,7 +467,13 @@ private fun EditorTabs(
     onSelect: (String) -> Unit,
     onClose: (String) -> Unit,
 ) {
+    val listState = rememberLazyListState()
+    LaunchedEffect(state.activePath, state.openFiles.size) {
+        val index = state.openFiles.indexOfFirst { it.path == state.activePath }
+        if (index >= 0) listState.animateScrollToItem(index)
+    }
     LazyRow(
+        state = listState,
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface),
@@ -470,6 +527,7 @@ private fun CodeEditorHost(
     reloadCounter: Long,
     onContentChanged: (String, String) -> Unit,
     onEditorReady: (CodeEditor) -> Unit = {},
+    fontScale: Float = 1f,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -494,7 +552,7 @@ private fun CodeEditorHost(
 
                 setText(contentProvider(currentPath))
                 addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
-                    fitEditorText(view as CodeEditor, holder, currentPath)
+                    fitEditorText(view as CodeEditor, holder, currentPath, fontScale)
                 }
                 subscribeEvent(ContentChangeEvent::class.java) { _, _ ->
                     currentListener(currentPath, text.toString())
@@ -564,7 +622,7 @@ private fun CodeEditorHost(
             }
         }
         lastPath = activePath
-        fitEditorText(editor, holder, activePath)
+        fitEditorText(editor, holder, activePath, fontScale)
     }
 }
 
@@ -574,17 +632,25 @@ private fun CodeEditorHost(
  * through [CodeEditor.setTextSizePx]. A later pinch is left alone until the pane
  * width actually changes.
  */
-private fun fitEditorText(editor: CodeEditor, holder: EditorHolder, path: String) {
+private fun fitEditorText(editor: CodeEditor, holder: EditorHolder, path: String, scale: Float = 1f) {
     val width = editor.width
     if (width <= 0) return
     if (holder.fittedPath == path && abs(holder.fittedWidth - width) < 80) return
     holder.fittedPath = path
     holder.fittedWidth = width
     val metrics = editor.resources.displayMetrics
-    val minPx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 9f, metrics)
-    val maxPx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 14f, metrics)
+    val widthDp = width / metrics.density
+    val minSp = if (widthDp < 360f) 11f else 10f
+    val maxSp = if (widthDp >= 700f) 16f else 14f
+    val columns = when {
+        widthDp >= 900f -> 48f
+        widthDp >= 600f -> 44f
+        widthDp >= 400f -> 36f
+        else -> 32f
+    }
+    val minPx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, minSp, metrics)
+    val maxPx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, maxSp, metrics)
     val gutter = 36f * metrics.density
-    val columns = 40f
-    val size = ((width - gutter) / columns).coerceIn(minPx, maxPx)
+    val size = (((width - gutter) / columns) * scale).coerceIn(minPx * scale, maxPx * scale)
     editor.setTextSizePx(size)
 }
