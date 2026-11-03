@@ -168,7 +168,7 @@ Ask the agent for a film or a clip, paste a video page, or send the page from th
 
 ## Skills
 
-The `unbrowse` starter covers calling a site's first-party API through the hosted Unbrowse service, with explicit authorization and verified outcomes. Support texts: [dist/unbrowse-support/README.md](dist/unbrowse-support/README.md). The agent loads Markdown procedures from `CEditNeuro/skills` on this phone and from `.ceditneuro/skills` in the project. It can also search a public catalog, check a downloaded file, and save only the adapted procedure. **[SKILLS.md](SKILLS.md)** is the complete catalog: all 43 skills, their triggers and tools, the file contract, the activation path, and how to move one to another agent.
+The `unbrowse` starter covers calling a site's first-party API through the hosted Unbrowse service, with explicit authorization and verified outcomes. Support texts: [unbrowse-support/README.md](unbrowse-support/README.md). The agent loads Markdown procedures from `CEditNeuro/skills` on this phone and from `.ceditneuro/skills` in the project. It can also search a public catalog, check a downloaded file, and save only the adapted procedure. **[SKILLS.md](SKILLS.md)** is the complete catalog: all 43 skills, their triggers and tools, the file contract, the activation path, and how to move one to another agent.
 
 One of the 39 is **`spec-kit`**: it writes a constitution, a specification, a plan, and a task list, freezes the plan, and refuses code before the analysis gate. Every task has an ID, a file path, a check, and a status; a plan change is explicit and approved. It is a local Markdown adaptation of GitHub's Spec Kit, not its CLI.
 
