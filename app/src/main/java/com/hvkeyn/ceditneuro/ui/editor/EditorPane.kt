@@ -435,6 +435,8 @@ private fun CodeEditorHost(
     val holder = remember { EditorHolder() }
     val currentPath by rememberUpdatedState(activePath)
     val currentListener by rememberUpdatedState(onContentChanged)
+    val cursors = remember { mutableMapOf<String, Pair<Int, Int>>() }
+    var lastPath by remember { mutableStateOf(activePath) }
 
     AndroidView(
         modifier = modifier,
@@ -503,10 +505,24 @@ private fun CodeEditorHost(
     // Pull the file in when the tab changes, or when the agent rewrote the open file.
     LaunchedEffect(activePath, reloadCounter) {
         val editor = holder.editor ?: return@LaunchedEffect
+        if (lastPath != activePath) {
+            runCatching {
+                editor.cursor?.let { cursors[lastPath] = it.leftLine to it.leftColumn }
+            }
+        }
         val expected = contentProvider(activePath)
         if (editor.text.toString() != expected) {
             editor.setText(expected)
         }
+        if (lastPath != activePath) {
+            cursors[activePath]?.let { (line, column) ->
+                if (line in 0 until editor.text.lineCount) {
+                    val offset = editor.text.getCharIndex(line, column.coerceAtMost(editor.text.getColumnCount(line)))
+                    editor.setSelection(offset, offset)
+                }
+            }
+        }
+        lastPath = activePath
         fitEditorText(editor, holder, activePath)
     }
 }

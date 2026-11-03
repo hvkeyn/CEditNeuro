@@ -119,6 +119,51 @@ private fun commitEverything(root: File, message: String): String? {
     }
 }
 
+private fun pullOrigin(root: File, token: String): String {
+    val repo = repositoryOf(root) ?: return "Not a git repository."
+    repo.use {
+        Git.wrap(repo).use { git ->
+            return runCatching {
+                val branch = repo.branch ?: return "Detached HEAD; checkout a branch first."
+                val command = git.pull().setRemote("origin").setRemoteBranchName(branch)
+                if (token.isNotBlank()) {
+                    command.setCredentialsProvider(
+                        org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider(
+                            "x-access-token",
+                            token.trim(),
+                        ),
+                    )
+                }
+                command.call()
+                "Pulled origin/$branch."
+            }.getOrElse { error -> error.message ?: "Pull failed." }
+        }
+    }
+}
+
+private fun pushOrigin(root: File, token: String): String {
+    val repo = repositoryOf(root) ?: return "Not a git repository."
+    repo.use {
+        Git.wrap(repo).use { git ->
+            return runCatching {
+                val remote = repo.config.getString("remote", "origin", "url")
+                if (remote.isNullOrBlank()) return "No origin remote configured."
+                val command = git.push().setRemote("origin")
+                if (token.isNotBlank()) {
+                    command.setCredentialsProvider(
+                        org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider(
+                            "x-access-token",
+                            token.trim(),
+                        ),
+                    )
+                }
+                val results = command.call()
+                if (results.any { it.remoteUpdates.isNotEmpty() }) "Pushed to origin." else "Nothing to push."
+            }.getOrElse { error -> error.message ?: "Push failed." }
+        }
+    }
+}
+
 @Composable
 fun GitPanel(
     root: String?,
@@ -138,6 +183,7 @@ fun GitPanel(
     var reload by remember { mutableIntStateOf(0) }
     var snapshot by remember { mutableStateOf<GitSnapshot?>(null) }
     var message by remember { mutableStateOf("") }
+    var token by remember { mutableStateOf("") }
     var notice by remember { mutableStateOf("") }
     var working by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -207,6 +253,13 @@ fun GitPanel(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    OutlinedTextField(
+                        value = token,
+                        onValueChange = { token = it },
+                        label = { Text("GitHub token (optional, not saved)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                         TextButton(
                             enabled = !working && !current.clean,
@@ -235,6 +288,28 @@ fun GitPanel(
                                 }
                             },
                         ) { Text("Commit") }
+                        TextButton(
+                            enabled = !working,
+                            onClick = {
+                                working = true
+                                scope.launch {
+                                    notice = withContext(Dispatchers.IO) { pullOrigin(rootFile, token) }
+                                    working = false
+                                    reload++
+                                }
+                            },
+                        ) { Text("Pull") }
+                        TextButton(
+                            enabled = !working,
+                            onClick = {
+                                working = true
+                                scope.launch {
+                                    notice = withContext(Dispatchers.IO) { pushOrigin(rootFile, token) }
+                                    working = false
+                                    reload++
+                                }
+                            },
+                        ) { Text("Push") }
                         TextButton(onClick = { reload++ }) { Text("Refresh") }
                     }
                     if (notice.isNotBlank()) {

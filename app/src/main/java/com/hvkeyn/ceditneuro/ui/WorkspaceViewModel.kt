@@ -3291,7 +3291,7 @@ class WorkspaceViewModel(
         return runCatching {
             root.walkTopDown()
                 .onEnter { dir -> dir.name !in skip }
-                .filter { it.isFile }
+                .filter { it.isFile && it.extension.lowercase() !in QUICK_OPEN_BINARY }
                 .take(MAX_QUICK_FILES)
                 .map { it.relativeTo(root).invariantSeparatorsPath }
                 .sorted()
@@ -3947,3 +3947,8 @@ class WorkspaceViewModel(
 
 
 private const val MAX_QUICK_FILES = 2_000
+
+private val QUICK_OPEN_BINARY = setOf(
+    "ttf", "otf", "woff", "woff2", "wav", "mp3", "ogg", "m4a", "flac",
+    "zip", "jar", "apk", "so", "class", "dex", "a", "o", "pyc",
+)
