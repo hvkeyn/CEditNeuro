@@ -39,6 +39,12 @@ class SkillWiringTest {
         "model_unavailable",
         "no_capability",
         "run_timeout",
+        "clear_first",
+        "long_click",
+        "scroll_backward",
+        "scroll_forward",
+        "clear_text",
+        "set_text",
     )
 
     @Test

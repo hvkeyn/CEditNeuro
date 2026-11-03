@@ -516,6 +516,49 @@ object StarterSkills {
             2. For a video: `render_video` result with path and duration.
             3. One caption and one next step (loop longer, change ink, or add a title).
         """.trimIndent() + "\n",
+        "mobile-control" to """
+            # Mobile control: observe, act on a ref, observe again
+
+            Use this when the user asks the agent to operate another Android app, tap through a screen, fill a field, scroll a list, open an app, or check what an app shows. It is the phone equivalent of desktop computer-use, built on Android's accessibility tree rather than pixel guessing.
+
+            ## Permission and privacy
+
+            `ui_snapshot` and `ui_act` need Shizuku or root. If `device_status` says both are off, report the limit and stop; do not pretend the screen was checked. Ask before an action that sends a message, posts, purchases, deletes, changes an account, or reveals private content. Never type a password, OTP, recovery code, or payment detail unless the user explicitly asks for that exact field. Do not bypass a login, CAPTCHA, MFA, parental control, or another app's security boundary. A snapshot can contain private screen text: keep it out of reports and public logs.
+
+            ## The loop
+
+            1. `load_tools group=device`.
+            2. `ui_snapshot`. The header gives `snapshot=<id>`, screen size, package, and count. Each line has a ref like `@s1a2b3:e4`, role, label, bounds, center, and actions.
+            3. Choose a ref from **this** snapshot. Read the label and actions; do not guess a ref or a coordinate.
+            4. `ui_act` with `ref` and an action: `tap`, `long_click`, `set_text`, `clear_text`, `scroll_forward`, `scroll_backward`, `check`, `uncheck`. Use `set_text` with `text`; set `clear_first=true` only when replacing the field is intended.
+            5. The tool returns a **new** snapshot. Read it and verify the expected change. Refs from the old snapshot are stale and must not be reused.
+            6. For a global action use `ui_act action=back|home|recents|wait`. To open an app, `list_apps` to find the package, then `ui_act action=launch package=<id>`.
+            7. If the ref is stale or missing, call `ui_snapshot` again. Do not retry the same stale ref in a loop.
+
+            ## Choosing an element
+
+            Prefer an element with a clear label and the needed action. An EditText has `set_text`; a scrollable list has `scroll_forward`; a checkbox has `check`/`uncheck`; a button has `tap`. If two elements share a label, use the one inside the visible dialog or window, not a hidden duplicate. Use the package and bounds to disambiguate. Do not tap a system permission dialog for the user unless the requested flow explicitly needs that grant.
+
+            ## Text and keyboard
+
+            `set_text` taps the field and uses Android's input command. Prefer `clear_first=true` for a replacement. After typing, take the new snapshot and check the field's text before submitting. If the keyboard covers the button, press `back` once to close the keyboard, then snapshot again. Never put a password in the report.
+
+            ## Scrolling and lists
+
+            Use `scroll_forward` to move toward the end of a list and `scroll_backward` toward the start. Snapshot after each scroll; stop when the target appears or the list stops changing. Do not send many scrolls without observing.
+
+            ## Verification
+
+            A tap is not success. Success is the new snapshot showing the requested state: the dialog opened, the field contains the value, the row is checked, the message is sent, or the expected screen is present. If the action produces an `outcome_unknown`-like ambiguity, inspect the current screen before repeating it. Report the exact element label and the observed result.
+
+            ## Fallback
+
+            If the accessibility snapshot is unavailable but `fetch_system_layout` works, use its `tap=X,Y` rows with `execute_system_action`; that is a coordinate fallback, not the default. Do not use screenshots for coordinates when a ref exists. Do not use `run_command` to synthesize taps outside these tools.
+
+            ## Output
+
+            Say what was asked, the package/screen, the ref and label used, the verified new state, and any permission or privacy limit. If the app or permission blocks the task, stop and say so instead of inventing a tap.
+        """.trimIndent() + "\n",
         "agent-team" to """
             # Agent Team: decide the smallest helpful team
 

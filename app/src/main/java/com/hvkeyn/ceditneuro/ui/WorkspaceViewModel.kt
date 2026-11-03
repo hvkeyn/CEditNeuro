@@ -91,6 +91,9 @@ import com.hvkeyn.ceditneuro.tools.ReaderSketchTool
 import com.hvkeyn.ceditneuro.tools.ToolGroups
 import com.hvkeyn.ceditneuro.tools.ToolSession
 import com.hvkeyn.ceditneuro.tools.ExecuteSystemActionTool
+import com.hvkeyn.ceditneuro.tools.MobileUiStore
+import com.hvkeyn.ceditneuro.tools.UiActTool
+import com.hvkeyn.ceditneuro.tools.UiSnapshotTool
 import com.hvkeyn.ceditneuro.tools.FetchSystemLayoutTool
 import com.hvkeyn.ceditneuro.tools.ShizukuExecTool
 import com.hvkeyn.ceditneuro.tools.ZipPathsTool
@@ -3512,6 +3515,8 @@ class WorkspaceViewModel(
         }
 
         val shizukuCommands = ShizukuCommandRunner(shizukuShell)
+        val mobileUiStore = MobileUiStore()
+        val mobileDump = File(appContext.getExternalFilesDir(null) ?: appContext.cacheDir, "ui-mobile-state.xml")
         val loadedGroups = ToolGroups.forFocus(settingsStore.current.workFocus).toMutableSet()
         if (_state.value.linkActive > 1) loadedGroups += "crew"
         val toolSession = ToolSession(loadedGroups)
@@ -3563,6 +3568,8 @@ class WorkspaceViewModel(
                 File(appContext.getExternalFilesDir(null) ?: appContext.cacheDir, "ui-state.xml"),
             ),
             ExecuteSystemActionTool(shizukuCommands, this::prepareShizuku),
+            UiSnapshotTool(shizukuCommands, this::prepareShizuku, mobileDump, mobileUiStore),
+            UiActTool(shizukuCommands, this::prepareShizuku, mobileDump, mobileUiStore),
             NetInfoTool(appContext),
             InstallApkTool(appContext, ws),
             WebToAppTool(appContext, ws),

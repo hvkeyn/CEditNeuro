@@ -2,7 +2,7 @@
 
 A complete snapshot of every skill available in CEditNeuro **0.99.31 (versionCode 147)**, taken on **2026-10-22**, updated **2026-10-24**, from the phone's app-scope folder and the built-in source.
 
-**43 skills:** 41 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
+**44 skills:** 42 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
 
 This file is a catalog and a porting guide. The app does not load `SKILLS.md`; it loads the `.md` files in the two skill folders described below. The JSON at the end is the same inventory in a machine-readable form.
 
@@ -208,30 +208,31 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 | 17 | [genealogy](#genealogy) | starter | family history, ancestors, or archive records in the former USSR | remote | 11,976 |
 | 18 | [hyperframes](#hyperframes) | starter | a video, animation, title card, or HyperFrames composition | video | 11,930 |
 | 19 | [learn](#learn) | starter | learn a subject, be taught, or practice | learn | 2,501 |
-| 20 | [net-map](#net-map) | starter | a network must be drawn from packets | study | 5,603 |
-| 21 | [network-study](#network-study) | starter | a network concept or topology must be taught with a drawing | study, device | 6,531 |
-| 22 | [photo-ocr](#photo-ocr) | user | a photo arrived and the message has only paths | — | 1,491 |
-| 23 | [research](#research) | builtin | a study question, a claim to check, a measured build | study | 4,340 |
-| 24 | [rea](#rea) | starter | a software system must be understood with REA 6.8.0 on a PC | remote | 6,675 |
-| 25 | [reanimate](#reanimate) | starter | an animation from a GIF, video, or site must be rebuilt | — | 9,462 |
-| 26 | [reverse-engineering](#reverse-engineering) | starter | a program must be understood to its real algorithm or a backdoor | build, device, study, remote | 10,747 |
-| 27 | [review](#review) | starter | before saying a code change works | — | 364 |
-| 28 | [rrsi](#rrsi) | starter | improve the agent's own harness | harness | 1,749 |
-| 29 | [ru-translate](#ru-translate) | starter | translate into Russian or polish Russian | — | 4,809 |
-| 30 | [second-monitor](#second-monitor) | starter | the phone becomes an extra monitor | remote | 1,556 |
-| 31 | [security](#security) | starter | the task touches keys, logins, accounts, or another app | — | 415 |
-| 32 | [skill-security](#skill-security) | starter | a skill must be checked for vulnerabilities before install | skills | 6,001 |
-| 33 | [spec-kit](#spec-kit) | starter | a feature needs a spec and a plan before code | — | 10,108 |
-| 34 | [systematic-debugging](#systematic-debugging) | starter | a failure needs a cause before a fix | debug | 2,095 |
-| 35 | [unbrowse](#unbrowse) | starter | call a website's own API through Unbrowse, or learn a missing route | study | 6,332 |
-| 36 | [ub-mode](#ub-mode) | starter | a feature must be written cleanly and tested | — | 6,683 |
-| 37 | [understand-anything](#understand-anything) | starter | a repository or docs tree must be understood as a whole | device | 11,086 |
-| 38 | [video-download](#video-download) | starter | a film, clip, stream, or video page must be saved | video | 1,615 |
-| 39 | [video-notes](#video-notes) | starter | the point of a YouTube/RuTube/Yandex/Dzen video | study | 1,679 |
-| 40 | [visualize](#visualize) | starter | a picture, process, architecture, or schema must be drawn in chat | — | 10,907 |
-| 41 | [visual-explainer](#visual-explainer) | starter | a system, diff, plan, or concept needs a designed explanation | design | 7,448 |
-| 42 | [web-reach](#web-reach) | starter | read a link, page, article, repo, thread, or feed | study | 3,454 |
-| 43 | [web-to-app](#web-to-app) | starter | a website or HTML file must become an Android app | device | 793 |
+| 20 | [mobile-control](#mobile-control) | starter | operate another Android app through accessibility refs | device | 5,227 |
+| 21 | [net-map](#net-map) | starter | a network must be drawn from packets | study | 5,603 |
+| 22 | [network-study](#network-study) | starter | a network concept or topology must be taught with a drawing | study, device | 6,531 |
+| 23 | [photo-ocr](#photo-ocr) | user | a photo arrived and the message has only paths | — | 1,491 |
+| 24 | [research](#research) | builtin | a study question, a claim to check, a measured build | study | 4,340 |
+| 25 | [rea](#rea) | starter | a software system must be understood with REA 6.8.0 on a PC | remote | 6,675 |
+| 26 | [reanimate](#reanimate) | starter | an animation from a GIF, video, or site must be rebuilt | — | 9,462 |
+| 27 | [reverse-engineering](#reverse-engineering) | starter | a program must be understood to its real algorithm or a backdoor | build, device, study, remote | 10,747 |
+| 28 | [review](#review) | starter | before saying a code change works | — | 364 |
+| 29 | [rrsi](#rrsi) | starter | improve the agent's own harness | harness | 1,749 |
+| 30 | [ru-translate](#ru-translate) | starter | translate into Russian or polish Russian | — | 4,809 |
+| 31 | [second-monitor](#second-monitor) | starter | the phone becomes an extra monitor | remote | 1,556 |
+| 32 | [security](#security) | starter | the task touches keys, logins, accounts, or another app | — | 415 |
+| 33 | [skill-security](#skill-security) | starter | a skill must be checked for vulnerabilities before install | skills | 6,001 |
+| 34 | [spec-kit](#spec-kit) | starter | a feature needs a spec and a plan before code | — | 10,108 |
+| 35 | [systematic-debugging](#systematic-debugging) | starter | a failure needs a cause before a fix | debug | 2,095 |
+| 36 | [unbrowse](#unbrowse) | starter | call a website's own API through Unbrowse, or learn a missing route | study | 6,332 |
+| 37 | [ub-mode](#ub-mode) | starter | a feature must be written cleanly and tested | — | 6,683 |
+| 38 | [understand-anything](#understand-anything) | starter | a repository or docs tree must be understood as a whole | device | 11,086 |
+| 39 | [video-download](#video-download) | starter | a film, clip, stream, or video page must be saved | video | 1,615 |
+| 40 | [video-notes](#video-notes) | starter | the point of a YouTube/RuTube/Yandex/Dzen video | study | 1,679 |
+| 41 | [visualize](#visualize) | starter | a picture, process, architecture, or schema must be drawn in chat | — | 10,907 |
+| 42 | [visual-explainer](#visual-explainer) | starter | a system, diff, plan, or concept needs a designed explanation | design | 7,448 |
+| 43 | [web-reach](#web-reach) | starter | read a link, page, article, repo, thread, or feed | study | 3,454 |
+| 44 | [web-to-app](#web-to-app) | starter | a website or HTML file must become an Android app | device | 793 |
 
 ## Every skill
 
@@ -424,6 +425,20 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 **Tools:** `learn` (group `learn`), `http_request`, `web_search`.
 
 **Shape:** Locate → Weave → Build; `learn action=save` before teaching; one link at a time; a check is `action=frame`; the learner answers before `action=assess`; choice or open verdict (`accurate`, `needs-repair`, `knowledge-gap`); confidence optional; `action=load` on resume; `action=due` before the notebook; notebook/notes/diagrams; verify an uncertain fact with a page. Write in the user's language.
+
+### mobile-control
+
+**Scope:** app · **Origin:** starter · **File:** `mobile-control.md` · **Size:** 3,855 chars
+
+**Trigger:** another Android app must be operated through its real UI: tap, type, scroll, open an app, or verify a screen.
+
+**Shape:** `ui_snapshot` returns accessibility refs with role, label, bounds, and actions. Act on one ref with `ui_act`; the tool returns a fresh snapshot. Reuse of a stale ref is refused, so the loop is observe → act → observe. Requires Shizuku or root. Passwords, OTP, private screen text, destructive writes, and security boundaries are guarded; coordinates from `fetch_system_layout` are only a fallback.
+
+**Group(s):** device · **Tool(s):** `ui_snapshot`, `ui_act`, `list_apps`, `device_status`, `shizuku_exec`, `fetch_system_layout`, `execute_system_action`, `clipboard`
+
+**Use:** `use_skill name=mobile-control scope=app`
+
+**Source:** `ResearchSkill.kt#StarterSkills`, original for CEdiNeuro's mobile control loop. Inspired by Vercel Labs Agent Desktop (Apache-2.0) but no Rust, accessibility, or desktop code is copied.
 
 ### net-map
 
@@ -725,7 +740,8 @@ The JSON below is the same inventory. `origin` is `starter`, `builtin`, or `user
     {"name": "health", "scope": "app", "origin": "starter", "trigger": "a lab sheet, scan report, or family health record", "groups": ["health"], "tools": ["health_log", "health_panel", "health_trend", "health_index"], "chars": 1361, "file": "health.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "hyperframes", "scope": "app", "origin": "starter", "trigger": "a video, animation, title card, or HyperFrames composition", "groups": [], "tools": ["render_video", "edit_video", "sound_effect", "make_music", "voiceover", "web_search", "http_request", "write_file", "edit_file"], "chars": 11930, "file": "hyperframes.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "learn", "scope": "app", "origin": "starter", "trigger": "learn a subject, be taught, or practice", "groups": ["learn"], "tools": ["learn", "http_request", "web_search"], "chars": 2501, "file": "learn.md", "source": "ResearchSkill.kt#StarterSkills"},
-    {"name": "net-map", "scope": "app", "origin": "starter", "trigger": "a network must be drawn from packets", "groups": ["study"], "tools": ["net_audit", "capture_dump", "read_dump", "research_figure"], "chars": 5603, "file": "net-map.md", "source": "ResearchSkill.kt#StarterSkills"},
+    {"name": "mobile-control", "scope": "app", "origin": "starter", "trigger": "operate another Android app through accessibility refs", "groups": ["device"], "tools": ["ui_snapshot", "ui_act", "list_apps", "device_status", "shizuku_exec", "fetch_system_layout", "execute_system_action", "clipboard"], "chars": 3855, "file": "mobile-control.md", "source": "ResearchSkill.kt#StarterSkills"}
+{"name": "net-map", "scope": "app", "origin": "starter", "trigger": "a network must be drawn from packets", "groups": ["study"], "tools": ["net_audit", "capture_dump", "read_dump", "research_figure"], "chars": 5603, "file": "net-map.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "network-study", "scope": "app", "origin": "starter", "trigger": "a network concept or topology must be taught with a drawing", "groups": ["study", "device"], "tools": ["net_audit", "capture_dump", "read_dump", "write_file", "network_card", "open_file", "load_tools"], "chars": 6531, "file": "network-study.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "photo-ocr", "scope": "app", "origin": "user", "trigger": "a photo arrived and the message has only paths", "groups": [], "tools": ["run_command", "read_file", "remote_delete"], "chars": 1491, "file": "photo-ocr.md", "source": "phone:CEditNeuro/skills/photo-ocr.md"},
     {"name": "rea", "scope": "app", "origin": "starter", "trigger": "a software system must be understood with REA 6.8.0 on a PC", "groups": ["remote"], "tools": ["remote_put", "ssh_exec", "run_command", "read_file", "write_file", "http_request", "load_tools"], "chars": 6675, "file": "rea.md", "source": "ResearchSkill.kt#StarterSkills"},

@@ -57,6 +57,8 @@ object ToolGroups {
             "shizuku_exec",
             "fetch_system_layout",
             "execute_system_action",
+            "ui_snapshot",
+            "ui_act",
             "device_status",
             "list_apps",
             "open_settings",
