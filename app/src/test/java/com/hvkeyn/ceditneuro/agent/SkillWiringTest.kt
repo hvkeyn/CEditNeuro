@@ -32,6 +32,13 @@ class SkillWiringTest {
         "inspect_analysis_view",
         "normalized_result",
         "raw_result",
+        "needs_sign_in",
+        "input_required",
+        "outcome_unknown",
+        "tool_quarantined",
+        "model_unavailable",
+        "no_capability",
+        "run_timeout",
     )
 
     @Test

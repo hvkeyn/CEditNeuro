@@ -2,7 +2,7 @@
 
 A complete snapshot of every skill available in CEditNeuro **0.99.31 (versionCode 147)**, taken on **2026-10-22**, updated **2026-10-24**, from the phone's app-scope folder and the built-in source.
 
-**42 skills:** 40 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
+**43 skills:** 41 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
 
 This file is a catalog and a porting guide. The app does not load `SKILLS.md`; it loads the `.md` files in the two skill folders described below. The JSON at the end is the same inventory in a machine-readable form.
 
@@ -223,14 +223,15 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 | 32 | [skill-security](#skill-security) | starter | a skill must be checked for vulnerabilities before install | skills | 6,001 |
 | 33 | [spec-kit](#spec-kit) | starter | a feature needs a spec and a plan before code | — | 10,108 |
 | 34 | [systematic-debugging](#systematic-debugging) | starter | a failure needs a cause before a fix | debug | 2,095 |
-| 35 | [ub-mode](#ub-mode) | starter | a feature must be written cleanly and tested | — | 6,683 |
-| 36 | [understand-anything](#understand-anything) | starter | a repository or docs tree must be understood as a whole | device | 11,086 |
-| 37 | [video-download](#video-download) | starter | a film, clip, stream, or video page must be saved | video | 1,615 |
-| 38 | [video-notes](#video-notes) | starter | the point of a YouTube/RuTube/Yandex/Dzen video | study | 1,679 |
-| 39 | [visualize](#visualize) | starter | a picture, process, architecture, or schema must be drawn in chat | — | 10,907 |
-| 40 | [visual-explainer](#visual-explainer) | starter | a system, diff, plan, or concept needs a designed explanation | design | 7,448 |
-| 41 | [web-reach](#web-reach) | starter | read a link, page, article, repo, thread, or feed | study | 3,454 |
-| 42 | [web-to-app](#web-to-app) | starter | a website or HTML file must become an Android app | device | 793 |
+| 35 | [unbrowse](#unbrowse) | starter | call a website's own API through Unbrowse, or learn a missing route | study | 6,332 |
+| 36 | [ub-mode](#ub-mode) | starter | a feature must be written cleanly and tested | — | 6,683 |
+| 37 | [understand-anything](#understand-anything) | starter | a repository or docs tree must be understood as a whole | device | 11,086 |
+| 38 | [video-download](#video-download) | starter | a film, clip, stream, or video page must be saved | video | 1,615 |
+| 39 | [video-notes](#video-notes) | starter | the point of a YouTube/RuTube/Yandex/Dzen video | study | 1,679 |
+| 40 | [visualize](#visualize) | starter | a picture, process, architecture, or schema must be drawn in chat | — | 10,907 |
+| 41 | [visual-explainer](#visual-explainer) | starter | a system, diff, plan, or concept needs a designed explanation | design | 7,448 |
+| 42 | [web-reach](#web-reach) | starter | read a link, page, article, repo, thread, or feed | study | 3,454 |
+| 43 | [web-to-app](#web-to-app) | starter | a website or HTML file must become an Android app | device | 793 |
 
 ## Every skill
 
@@ -586,6 +587,20 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 
 **Shape:** First make it work: one behavior, a failing test, the smallest green edit. Then make it right: root cause, behavior test, remove duplication/complexity, refactor with the same test. Practice: log, small commits, review. Use existing project checks; do not install crapper, dryer, mutator, a test framework, or a package. This is the local adaptation of Uncle Bob's ub-mode; the original quality tools stay external.
 
+### unbrowse
+
+**Scope:** app · **Origin:** starter · **File:** `unbrowse.md` · **Size:** 6,332 chars
+
+**Trigger:** a website should be called through its own API instead of driving a browser, or a missing route must be learned.
+
+**Shape:** Check the CLI with `npx unbrowse whoami`; OAuth or site login is a link, never a password in chat. Discover a capability, run it with the listed schema and a stable idempotency key, and report only a verified result. `input_required` resumes the same run; `no_capability` uses scrape/index/learn only with authorization; exit 4 is not success. Never ask for an API key in chat or write one to a file, prompt, command, URL, or log.
+
+**Group(s):** study · **Tool(s):** `run_command`, `http_request`, `write_file`, `read_file`, `load_tools`, `open_file`
+
+**Use:** `use_skill name=unbrowse scope=app`
+
+**Source:** `ResearchSkill.kt#StarterSkills`, adapted from the MIT Unbrowse client and skill (https://github.com/unbrowse-ai/unbrowse). It is guidance, not an Unbrowse account, key, MCP client, or permission.
+
 ### understand-anything
 
 **Scope:** app · **Origin:** starter · **File:** `understand-anything.md` · **Size:** 11,086 chars
@@ -726,7 +741,8 @@ The JSON below is the same inventory. `origin` is `starter`, `builtin`, or `user
     {"name": "spec-kit", "scope": "app", "origin": "starter", "trigger": "a feature needs a spec and a plan before code", "groups": [], "tools": ["write_file", "read_file", "edit_file", "run_command", "grep", "glob", "git_diff", "review"], "chars": 10108, "file": "spec-kit.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "systematic-debugging", "scope": "app", "origin": "starter", "trigger": "a failure needs a cause before a fix", "groups": ["debug"], "tools": ["debug_case", "run_command", "read_file", "grep", "git_diff"], "requires_skills": ["review", "android-debug"], "chars": 2095, "file": "systematic-debugging.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "ub-mode", "scope": "app", "origin": "starter", "trigger": "a feature must be written cleanly and tested", "groups": [], "tools": ["write_file", "edit_file", "read_file", "run_command", "grep", "git_status", "git_diff", "review", "systematic-debugging"], "chars": 6683, "file": "ub-mode.md", "source": "ResearchSkill.kt#StarterSkills"},
-    {"name": "understand-anything", "scope": "app", "origin": "starter", "trigger": "a repository or docs tree must be understood as a whole", "groups": ["device"], "tools": ["list_dir", "glob", "read_file", "grep", "run_command", "git_status", "git_diff", "write_file", "open_file", "layout", "load_tools"], "chars": 11086, "file": "understand-anything.md", "source": "ResearchSkill.kt#StarterSkills"},
+    {"name": "unbrowse", "scope": "app", "origin": "starter", "trigger": "call a website's own API through Unbrowse, or learn a missing route", "groups": ["study"], "tools": ["run_command", "http_request", "write_file", "read_file", "load_tools", "open_file"], "chars": 6332, "file": "unbrowse.md", "source": "ResearchSkill.kt#StarterSkills"}
+{"name": "understand-anything", "scope": "app", "origin": "starter", "trigger": "a repository or docs tree must be understood as a whole", "groups": ["device"], "tools": ["list_dir", "glob", "read_file", "grep", "run_command", "git_status", "git_diff", "write_file", "open_file", "layout", "load_tools"], "chars": 11086, "file": "understand-anything.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "video-download", "scope": "app", "origin": "starter", "trigger": "a film, clip, stream, or video page must be saved", "groups": ["video"], "tools": ["download_video"], "chars": 1615, "file": "video-download.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "video-notes", "scope": "app", "origin": "starter", "trigger": "the point of a YouTube or RuTube or Yandex or Dzen video", "groups": ["study"], "tools": ["video_brief", "calculate"], "chars": 1679, "file": "video-notes.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "visual-explainer", "scope": "app", "origin": "starter", "trigger": "a system, diff, plan, or concept needs a designed explanation", "groups": [], "tools": ["write_file", "read_file", "edit_file", "open_file", "layout", "visual_card"], "chars": 7448, "file": "visual-explainer.md", "source": "ResearchSkill.kt#StarterSkills"},
