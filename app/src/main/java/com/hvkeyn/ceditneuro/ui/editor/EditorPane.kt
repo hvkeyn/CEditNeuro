@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
@@ -97,6 +99,10 @@ fun EditorPane(
     var wrapped by remember(activePath) { mutableStateOf(true) }
     var lineNumbers by remember(activePath) { mutableStateOf(true) }
     var outlineOpen by rememberSaveable(activePath) { mutableStateOf(false) }
+    var split by rememberSaveable(activePath) { mutableStateOf(false) }
+    val secondaryPath = state.openFiles.firstOrNull {
+        it.path != activePath && previewKind(it.path) !in setOf("image", "video")
+    }?.path
     val file = state.projectRoot?.let { File(it, activePath) }
 
     Column(modifier) {
@@ -140,6 +146,9 @@ fun EditorPane(
                 onQuickOpen = onQuickOpen,
                 onGit = onGit,
                 onOutline = { outlineOpen = true },
+                splitAvailable = secondaryPath != null,
+                split = split,
+                onSplit = { split = !split },
             )
         }
         if (searchOpen && codeVisible) {
@@ -199,15 +208,43 @@ fun EditorPane(
                     ExpandableMarkup(kind, markup, file?.parentFile, body)
                 }
             }
-            else -> CodeEditorHost(
-                activePath = activePath,
-                projectRoot = state.projectRoot,
-                contentProvider = contentProvider,
-                reloadCounter = state.reloadCounter,
-                onContentChanged = onContentChanged,
-                onEditorReady = { editor = it },
-                modifier = body,
-            )
+            else -> if (split && secondaryPath != null) {
+                Row(modifier = body) {
+                    CodeEditorHost(
+                        activePath = activePath,
+                        projectRoot = state.projectRoot,
+                        contentProvider = contentProvider,
+                        reloadCounter = state.reloadCounter,
+                        onContentChanged = onContentChanged,
+                        onEditorReady = { editor = it },
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .fillMaxHeight()
+                            .background(MaterialTheme.colorScheme.outlineVariant),
+                    )
+                    CodeEditorHost(
+                        activePath = secondaryPath,
+                        projectRoot = state.projectRoot,
+                        contentProvider = contentProvider,
+                        reloadCounter = state.reloadCounter,
+                        onContentChanged = onContentChanged,
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    )
+                }
+            } else {
+                CodeEditorHost(
+                    activePath = activePath,
+                    projectRoot = state.projectRoot,
+                    contentProvider = contentProvider,
+                    reloadCounter = state.reloadCounter,
+                    onContentChanged = onContentChanged,
+                    onEditorReady = { editor = it },
+                    modifier = body,
+                )
+            }
         }
     }
 }
@@ -279,6 +316,9 @@ private fun EditorTools(
     onQuickOpen: () -> Unit,
     onGit: () -> Unit,
     onOutline: () -> Unit,
+    splitAvailable: Boolean,
+    split: Boolean,
+    onSplit: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -292,6 +332,7 @@ private fun EditorTools(
             "Open" to onQuickOpen,
             "Outline" to onOutline,
             "Git" to onGit,
+            (if (split) "Unsplit" else "Split") to { if (splitAvailable) onSplit() },
             "Find" to onFind,
             "Undo" to onUndo,
             "Redo" to onRedo,
