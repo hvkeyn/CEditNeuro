@@ -22,6 +22,8 @@ data class AgentSettings(
     val reasoningEffort: String = "high",
     val thinkingEnabled: Boolean = true,
     val autoApproveEdits: Boolean = false,
+    /** Save an edited file shortly after typing stops. */
+    val autoSave: Boolean = false,
     /** Agent may download files and install modules. On until the user turns it off. */
     val networkEnabled: Boolean = true,
     /** A local note above the message when a reply hides a failure. On until the user turns it off. */
@@ -133,6 +135,7 @@ class SettingsStore(context: Context) {
             reasoningEffort = prefs.getString(KEY_REASONING, null) ?: "high",
             thinkingEnabled = if (prefs.contains(KEY_THINKING)) prefs.getBoolean(KEY_THINKING, true) else true,
             autoApproveEdits = prefs.getBoolean(KEY_AUTO_APPROVE, false),
+            autoSave = prefs.getBoolean(KEY_AUTO_SAVE, false),
             networkEnabled = prefs.getBoolean(KEY_NETWORK, true),
             youShouldKnow = prefs.getBoolean(KEY_KNOW, true),
             teamEnabled = prefs.getBoolean(KEY_TEAM, true),
@@ -212,6 +215,7 @@ class SettingsStore(context: Context) {
             .putString(KEY_REASONING, settings.reasoningEffort)
             .putBoolean(KEY_THINKING, settings.thinkingEnabled)
             .putBoolean(KEY_AUTO_APPROVE, settings.autoApproveEdits)
+            .putBoolean(KEY_AUTO_SAVE, settings.autoSave)
             .putBoolean(KEY_NETWORK, settings.networkEnabled)
             .putBoolean(KEY_KNOW, settings.youShouldKnow)
             .putBoolean(KEY_TEAM, settings.teamEnabled)
@@ -262,6 +266,7 @@ class SettingsStore(context: Context) {
         const val KEY_REASONING = "reasoning_effort"
         const val KEY_THINKING = "thinking_enabled"
         const val KEY_AUTO_APPROVE = "auto_approve_edits"
+        const val KEY_AUTO_SAVE = "auto_save"
         const val KEY_NETWORK = "agent_network"
         const val KEY_KNOW = "you_should_know"
         const val KEY_TEAM = "team_enabled"

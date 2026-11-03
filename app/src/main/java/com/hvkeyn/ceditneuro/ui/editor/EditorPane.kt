@@ -79,6 +79,8 @@ fun EditorPane(
     onRenderReel: (String) -> Unit = {},
     onExportReel: (String) -> Unit = {},
     onImportReel: (String, String) -> Unit = { _, _ -> },
+    onQuickOpen: () -> Unit = {},
+    onGit: () -> Unit = {},
 ) {
     val activePath = state.activePath
     if (activePath == null || state.openFiles.isEmpty()) {
@@ -94,6 +96,7 @@ fun EditorPane(
     var replaceText by rememberSaveable(activePath) { mutableStateOf("") }
     var wrapped by remember(activePath) { mutableStateOf(true) }
     var lineNumbers by remember(activePath) { mutableStateOf(true) }
+    var outlineOpen by rememberSaveable(activePath) { mutableStateOf(false) }
     val file = state.projectRoot?.let { File(it, activePath) }
 
     Column(modifier) {
@@ -134,6 +137,9 @@ fun EditorPane(
                     lineNumbers = !lineNumbers
                     editor?.setLineNumberEnabled(lineNumbers)
                 },
+                onQuickOpen = onQuickOpen,
+                onGit = onGit,
+                onOutline = { outlineOpen = true },
             )
         }
         if (searchOpen && codeVisible) {
@@ -152,6 +158,22 @@ fun EditorPane(
                 onReplace = { editor?.searcher?.replaceThis(replaceText) },
                 onReplaceAll = { editor?.searcher?.replaceAll(replaceText) },
                 onClose = { searchOpen = false },
+            )
+        }
+        if (outlineOpen) {
+            OutlineDialog(
+                text = contentProvider(activePath),
+                onSelectLine = { line ->
+                    outlineOpen = false
+                    val target = editor ?: return@OutlineDialog
+                    val text = target.text
+                    if (line in 0 until text.lineCount) {
+                        val offset = text.getCharIndex(line, 0)
+                        target.setSelection(offset, offset)
+                        target.ensureSelectionVisible()
+                    }
+                },
+                onDismiss = { outlineOpen = false },
             )
         }
         val body = Modifier
@@ -254,6 +276,9 @@ private fun EditorTools(
     onWrap: () -> Unit,
     lineNumbers: Boolean,
     onLineNumbers: () -> Unit,
+    onQuickOpen: () -> Unit,
+    onGit: () -> Unit,
+    onOutline: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -264,6 +289,9 @@ private fun EditorTools(
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         listOf(
+            "Open" to onQuickOpen,
+            "Outline" to onOutline,
+            "Git" to onGit,
             "Find" to onFind,
             "Undo" to onUndo,
             "Redo" to onRedo,

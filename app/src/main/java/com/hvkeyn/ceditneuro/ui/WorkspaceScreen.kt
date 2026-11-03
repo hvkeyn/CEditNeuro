@@ -922,6 +922,8 @@ private fun EditorSurface(
     state: WorkspaceUiState,
     modifier: Modifier = Modifier,
 ) {
+    var quickOpen by rememberSaveable { mutableStateOf(false) }
+    var gitOpen by rememberSaveable { mutableStateOf(false) }
     EditorPane(
         state = state,
         contentProvider = viewModel::contentFor,
@@ -937,7 +939,33 @@ private fun EditorSurface(
         onRenderReel = viewModel::renderReel,
         onExportReel = viewModel::exportReel,
         onImportReel = viewModel::importEdit,
+        onQuickOpen = { quickOpen = true },
+        onGit = { gitOpen = true },
     )
+    if (quickOpen) {
+        QuickOpenDialog(
+            files = state.projectFiles,
+            commands = listOf(
+                QuickCommand("Save all", "write dirty files") { viewModel.saveDirtyFiles() },
+                QuickCommand("Git", "status and commit") { gitOpen = true },
+            ),
+            onOpenFile = { path ->
+                quickOpen = false
+                viewModel.openFile(path)
+            },
+            onDismiss = { quickOpen = false },
+        )
+    }
+    if (gitOpen) {
+        GitPanel(
+            root = state.projectRoot,
+            onOpenFile = { path ->
+                gitOpen = false
+                viewModel.openFile(path)
+            },
+            onDismiss = { gitOpen = false },
+        )
+    }
 }
 
 @Composable

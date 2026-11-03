@@ -236,6 +236,8 @@ data class WorkspaceUiState(
     val recentProjects: List<String> = emptyList(),
     val rootEntries: List<FileEntry> = emptyList(),
     val dirContents: Map<String, List<FileEntry>> = emptyMap(),
+    /** Workspace-relative files for quick open, capped to keep the dialog responsive. */
+    val projectFiles: List<String> = emptyList(),
     val expandedDirs: Set<String> = emptySet(),
     val openFiles: List<OpenFile> = emptyList(),
     val activePath: String? = null,
@@ -357,6 +359,7 @@ class WorkspaceViewModel(
     private val projects = linkedMapOf<String, LiveProject>()
     private var current: LiveProject? = null
     private val usageLedger by lazy { UsageLedger(UsageLedger.file(appContext.filesDir)) }
+    private val autoSaveJobs = mutableMapOf<String, Job>()
     private val deviceShell = DeviceShell(appContext, { settingsStore.current.networkEnabled }) { settingsStore.current.proxy }
     private val shizukuShell = ShizukuShell(appContext)
     private val webBackend by lazy {
@@ -662,6 +665,7 @@ class WorkspaceViewModel(
             ui = WorkspaceUiState(
                 projectRoot = canonical.path,
                 rootEntries = opened.children(),
+                projectFiles = scanProjectFiles(opened.root),
                 chat = session.chat.map { entry ->
                     ChatEntry(
                         id = entry.id,
@@ -1453,6 +1457,16 @@ class WorkspaceViewModel(
         buffers[path] = text
         if (path !in _state.value.dirtyPaths) {
             _state.update { it.copy(dirtyPaths = it.dirtyPaths + path) }
+        }
+        if (settingsStore.current.autoSave) {
+            autoSaveJobs.remove(path)?.cancel()
+            autoSaveJobs[path] = viewModelScope.launch {
+                delay(1_100)
+                if (current?.buffers?.get(path) == text && path in _state.value.dirtyPaths) {
+                    saveFile(path)
+                }
+                autoSaveJobs.remove(path)
+            }
         }
     }
 
@@ -3256,6 +3270,7 @@ class WorkspaceViewModel(
             val expandedSource = if (current === project) _state.value.expandedDirs else project.ui.expandedDirs
             val expandedNow = expandedSource + parents
             val rootEntries = runCatching { ws.children() }.getOrDefault(emptyList())
+            val projectFiles = scanProjectFiles(ws.root)
             val contents = expandedNow.associateWith { dir ->
                 runCatching { ws.children(dir) }.getOrDefault(emptyList())
             }
@@ -3263,11 +3278,25 @@ class WorkspaceViewModel(
             editProject(project) { shown ->
                 shown.copy(
                     rootEntries = rootEntries,
+                    projectFiles = projectFiles,
                     expandedDirs = shown.expandedDirs + parents,
                     dirContents = shown.dirContents + contents,
                 )
             }
         }
+    }
+
+    private fun scanProjectFiles(root: File): List<String> {
+        val skip = setOf(".git", ".ceditneuro", "node_modules", "build", ".gradle")
+        return runCatching {
+            root.walkTopDown()
+                .onEnter { dir -> dir.name !in skip }
+                .filter { it.isFile }
+                .take(MAX_QUICK_FILES)
+                .map { it.relativeTo(root).invariantSeparatorsPath }
+                .sorted()
+                .toList()
+        }.getOrDefault(emptyList())
     }
 
     private fun ancestorDirs(relativePath: String?): Set<String> {
@@ -3915,3 +3944,6 @@ class WorkspaceViewModel(
         }
     }
 }
+
+
+private const val MAX_QUICK_FILES = 2_000

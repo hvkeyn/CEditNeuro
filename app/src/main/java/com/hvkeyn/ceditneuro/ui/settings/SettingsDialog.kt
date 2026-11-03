@@ -267,6 +267,12 @@ fun SettingsDialog(
                             checked = draft.autoApproveEdits,
                             onCheckedChange = { draft = draft.copy(autoApproveEdits = it) },
                         )
+                        ToggleRow(
+                            title = "Auto-save",
+                            detail = "Write the active file about a second after typing stops. Save-all remains available.",
+                            checked = draft.autoSave,
+                            onCheckedChange = { draft = draft.copy(autoSave = it) },
+                        )
                     }
                     SettingsSection(
                         title = "Companion",
