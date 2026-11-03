@@ -523,7 +523,7 @@ object StarterSkills {
 
             ## Permission and privacy
 
-            `ui_snapshot` and `ui_act` need Shizuku or root. If `device_status` says both are off, report the limit and stop; do not pretend the screen was checked. Ask before an action that sends a message, posts, purchases, deletes, changes an account, or reveals private content. Never type a password, OTP, recovery code, or payment detail unless the user explicitly asks for that exact field. Do not bypass a login, CAPTCHA, MFA, parental control, or another app's security boundary. A snapshot can contain private screen text: keep it out of reports and public logs.
+            `ui_snapshot` and `ui_act` prefer the user-enabled CEdiNeuro Accessibility service, which needs no Shizuku or root. If accessibility is off, they fall back to Shizuku/root; if all three are unavailable, report the limit and stop. Do not pretend the screen was checked. Ask before an action that sends a message, posts, purchases, deletes, changes an account, or reveals private content. Never type a password, OTP, recovery code, or payment detail unless the user explicitly asks for that exact field. Do not bypass a login, CAPTCHA, MFA, parental control, or another app's security boundary. A snapshot can contain private screen text: keep it out of reports and public logs.
 
             ## The loop
 
@@ -2422,6 +2422,20 @@ object StarterSkills {
         extendSystematic(appDir)
         extendRrsi(appDir)
         extendSecondMonitor(appDir)
+        extendMobileControl(appDir)
+    }
+
+    /** Phones that saved mobile-control before accessibility support gain the service path. */
+    private fun extendMobileControl(appDir: File) {
+        val file = File(appDir, "mobile-control.md")
+        if (!file.isFile) return
+        var current = file.readText(Charsets.UTF_8)
+        if (current.contains("user-enabled CEdiNeuro Accessibility service")) return
+        val old = "`ui_snapshot` and `ui_act` need Shizuku or root. If `device_status` says both are off, report the limit and stop; do not pretend the screen was checked."
+        val new = "`ui_snapshot` and `ui_act` prefer the user-enabled CEdiNeuro Accessibility service, which needs no Shizuku or root. If accessibility is off, they fall back to Shizuku/root; if all three are unavailable, report the limit and stop. Do not pretend the screen was checked."
+        current = if (current.contains(old)) current.replace(old, new)
+        else current.trimEnd() + "\n\n" + new + "\n"
+        file.writeText(current, Charsets.UTF_8)
     }
 
     /** Phones that saved an older second-monitor skill learn the adb tunnel. */

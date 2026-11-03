@@ -66,6 +66,7 @@ import com.hvkeyn.ceditneuro.data.ModelCatalog
 import com.hvkeyn.ceditneuro.data.ModelProvider
 import com.hvkeyn.ceditneuro.data.RemoteServer
 import com.hvkeyn.ceditneuro.net.ProviderBalance
+import com.hvkeyn.ceditneuro.access.MobileAccessibilityService
 import com.hvkeyn.ceditneuro.ui.CompanionMood
 import com.hvkeyn.ceditneuro.ui.CompanionRoster
 import com.hvkeyn.ceditneuro.ui.chat.CompanionAvatar
@@ -283,6 +284,24 @@ fun SettingsDialog(
                             onCheckedChange = { draft = draft.copy(autoSave = it) },
                         )
                         Text("Editor theme", style = MaterialTheme.typography.labelLarge)
+                        Text("Phone control", style = MaterialTheme.typography.labelLarge)
+                        Text(
+                            text = if (MobileAccessibilityService.connected) {
+                                "Accessibility control is on. No Shizuku or root is needed."
+                            } else {
+                                "Enable CEdiNeuro in Android Accessibility to control another app without Shizuku or root."
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        TextButton(onClick = {
+                            runCatching {
+                                settingsContext.startActivity(
+                                    Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                )
+                            }
+                        }) { Text("Open accessibility settings") }
                         Row(
                             modifier = Modifier.horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),

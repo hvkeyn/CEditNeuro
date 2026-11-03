@@ -2818,12 +2818,14 @@ class WorkspaceViewModel(
         if (!runCatching { Shizuku.pingBinder() }.getOrDefault(false)) {
             if (com.hvkeyn.ceditneuro.shizuku.SuShell.available()) return null
             return "Shell access is not available. Shizuku's server is not running and root is not present. " +
-                "Do not call shizuku_exec, fetch_system_layout, or execute_system_action again. " +
-                "Do not open the Shizuku app. Install with install_apk and remove with uninstall_apk."
+                "Do not call shizuku_exec, fetch_system_layout, execute_system_action, ui_snapshot, or ui_act again until shell access exists. " +
+                "Enable CEdiNeuro in Android Accessibility for mobile control without Shizuku, or start Shizuku/root. " +
+                "Install with install_apk and remove with uninstall_apk."
         }
         if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) return null
         if (shizukuDenied) {
-            return "Shizuku permission was not granted. Do not call shizuku_exec, fetch_system_layout, or execute_system_action again. " +
+            return "Shizuku permission was not granted. Do not call shizuku_exec, fetch_system_layout, execute_system_action, ui_snapshot, or ui_act again. " +
+                "Enable CEdiNeuro in Android Accessibility for mobile control without Shizuku. " +
                 "Install with install_apk and remove with uninstall_apk. Do not open the app and tap through it."
         }
         return withContext(Dispatchers.Main) {

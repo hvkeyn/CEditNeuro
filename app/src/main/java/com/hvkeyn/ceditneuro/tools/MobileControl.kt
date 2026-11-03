@@ -1,5 +1,6 @@
 package com.hvkeyn.ceditneuro.tools
 
+import com.hvkeyn.ceditneuro.access.MobileAccessibilityService
 import com.hvkeyn.ceditneuro.shizuku.ShizukuCommandRunner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -210,10 +211,14 @@ class UiSnapshotTool(
     override val description =
         "Read the current phone screen as accessibility elements with snapshot-scoped refs. " +
             "Returns role, label, bounds, center, and available actions for each element. " +
-            "Use a ref with ui_act, then read the returned new snapshot. Requires Shizuku or root."
+            "Use a ref with ui_act, then read the returned new snapshot. Prefers the user-enabled CEdiNeuro accessibility service; falls back to Shizuku or root."
     override val parameters = objectSchema(emptyMap())
 
     override suspend fun execute(args: JsonObject): ToolResult = withContext(Dispatchers.IO) {
+        MobileAccessibilityService.snapshotNow()?.let { snapshot ->
+            store.store(snapshot)
+            return@withContext ToolResult.ok("source=accessibility\n" + snapshot.render())
+        }
         val xml = dumpMobileUi(runner, prepare, dumpFile).getOrElse {
             return@withContext ToolResult.error(it.message ?: "UI snapshot failed.")
         }
@@ -235,6 +240,7 @@ class UiActTool(
     override val description =
         "Act on a ref from the latest ui_snapshot, then return a fresh snapshot. " +
             "action: tap, long_click, set_text, clear_text, scroll_forward, scroll_backward, check, uncheck, launch, back, home, recents, wait. " +
+            "Prefers the user-enabled accessibility service; falls back to Shizuku/root. " +
             "ref is required for element actions. set_text uses text. " +
             "Refs are snapshot-scoped; stale refs are refused. Never type a password unless the user asked and the field is focused."
     override val parameters = objectSchema(
@@ -251,6 +257,32 @@ class UiActTool(
     override suspend fun execute(args: JsonObject): ToolResult = withContext(Dispatchers.IO) {
         val action = args.stringArg("action")?.trim()?.lowercase().orEmpty()
         if (action.isBlank()) return@withContext ToolResult.error("action is required.")
+        val accessibility = MobileAccessibilityService.connected
+        if (accessibility) {
+            val ref = args.stringArg("ref")?.trim().orEmpty()
+            val text = args.stringArg("text").orEmpty()
+            val error = when (action) {
+                "back", "home", "recents" -> MobileAccessibilityService.globalNow(action)
+                "wait" -> { delay(800); null }
+                "launch" -> {
+                    val pkg = args.stringArg("package")?.trim().orEmpty()
+                    if (!Regex("^[A-Za-z][\\w]*(\\.[A-Za-z][\\w]*)+$").matches(pkg)) {
+                        return@withContext ToolResult.error("launch requires a valid package id.")
+                    }
+                    MobileAccessibilityService.launchNow(pkg)
+                }
+                else -> {
+                    if (ref.isBlank()) return@withContext ToolResult.error("ref is required for $action.")
+                    MobileAccessibilityService.actNow(ref, action, text)
+                }
+            }
+            if (error != null) return@withContext ToolResult.error(error)
+            delay(300)
+            val fresh = MobileAccessibilityService.snapshotNow()
+                ?: return@withContext ToolResult.ok("$action completed; the fresh snapshot is empty.")
+            store.store(fresh)
+            return@withContext ToolResult.ok("source=accessibility $action\n\n" + fresh.render(4_500))
+        }
         val command: String
         val detail: String
         if (action in setOf("back", "home", "recents", "wait", "launch")) {

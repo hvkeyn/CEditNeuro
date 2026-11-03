@@ -147,25 +147,30 @@ object AgentDoctor {
             ?: text.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty().take(160)
 
     private fun kindOf(text: String): String? {
-        val line = text.lowercase()
-        if (line.isBlank() || line.startsWith("exit=0")) return null
+        val first = text.lineSequence().firstOrNull { it.isNotBlank() }?.lowercase().orEmpty()
+        if (first.isBlank() || first.startsWith("exit=0")) return null
+        if (first.startsWith("duckduckgo html") || first.contains("a result is a page")) return null
+        if (first.startsWith("switched on ") || first.startsWith("applied ")) return null
+        if (first.startsWith("# ")) return null
         return when {
-            "securityexception" in line -> "SecurityException"
-            "permission denied" in line -> "Permission denied"
-            "unable to resolve host" in line || "no address associated" in line -> "host did not resolve"
-            "shizuku is not running" in line || "cannot grant itself" in line ||
-                "shell access is not available" in line || "shizuku permission was not granted" in line ->
+            "securityexception" in first -> "SecurityException"
+            "permission denied" in first -> "Permission denied"
+            "unable to resolve host" in first || "no address associated" in first -> "host did not resolve"
+            "shizuku is not running" in first || "cannot grant itself" in first ||
+                "shell access is not available" in first || "shizuku permission was not granted" in first ->
                 "shell access missing"
-            "ui dump was killed" in line -> "ui dump held"
-            "cannot link" in line -> "binary will not start"
-            "timed out" in line || line.trim() == "timeout" || line.trim().startsWith("timeout\n") ||
-                "sockettimeout" in line -> "timed out"
-            "tool_calls" in line && "400" in line -> "tool call rejected"
-            "chain validation" in line || "certificate chain was rejected" in line -> "certificate rejected"
-            "incorrect user data" in line || "do not repeat this login" in line -> "login rejected"
-            line.startsWith("exit=") && !line.startsWith("exit=0") -> "command failed"
-            "not a file" in line || "no such file" in line -> "missing file"
-            "stopped:" in line -> "run stopped"
+            "ui dump was killed" in first -> "ui dump held"
+            "cannot link" in first -> "binary will not start"
+            "timed out" in first || first.trim() == "timeout" || first.trim().startsWith("timeout") ||
+                "sockettimeout" in first -> "timed out"
+            "tool_calls" in first && "400" in first -> "tool call rejected"
+            "chain validation" in first || "certificate chain was rejected" in first -> "certificate rejected"
+            "incorrect user data" in first || "do not repeat this login" in first -> "login rejected"
+            first.startsWith("exit=") && !first.startsWith("exit=0") -> "command failed"
+            first.startsWith("not a file") || first.startsWith("no such file") ||
+                first.startsWith("cannot find") || first.contains("no such file or directory") ->
+                "missing file"
+            first.startsWith("stopped:") -> "run stopped"
             else -> null
         }
     }
@@ -176,7 +181,9 @@ object AgentDoctor {
             lines += "Do not call fetch_system_layout again. Install with install_apk and remove with uninstall_apk. Do not tap through the app."
         }
         if ("shell access missing" in kinds || "SecurityException" in kinds) {
-            lines += "Do not call shizuku_exec, fetch_system_layout, or execute_system_action again. They cannot run until the user starts Shizuku or roots the phone. Use run_command, net_info, and install_apk."
+            lines += "Do not call shizuku_exec, fetch_system_layout, execute_system_action, ui_snapshot, or ui_act again. " +
+                "They need Shizuku/root; mobile control can instead use the user-enabled CEdiNeuro Accessibility service. " +
+                "Use run_command, net_info, and install_apk meanwhile."
         }
         if ("host did not resolve" in kinds) {
             lines += "That hostname did not resolve. Do not fetch it again. Choose a different URL."
@@ -213,6 +220,9 @@ object AgentDoctor {
         }
         if ("unanswered" in kinds) {
             lines += "An empty or busy reply is a stall. Say that once and stop. Do not retry the same call."
+        }
+        if ("error" in kinds) {
+            lines += "One-off generic errors are not a rule. Read the exact tool result, change one input, and retry only that step."
         }
         if (lines.isEmpty()) lines += "No setup change suggested. Fix the single failure in the project that produced it."
         return lines

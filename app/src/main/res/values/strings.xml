@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">CEditNeuro</string>
+    <string name="mobile_accessibility_description">CEditNeuro mobile control reads the active app window and performs only the taps, text, scrolling, and checks the agent asks for. It does not run in the background unless the person enables it.</string>
 </resources>
