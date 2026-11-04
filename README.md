@@ -26,7 +26,9 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ---
 
-## New in 0.99.78
+## New in 0.99.79
+
+- **Regression release**: mobile-control docs now state clearly that normal app control uses Accessibility only; the VirtualDisplay background helper is an optional early prototype. Tests cover `ui_find` and the Android doctor classifier.
 
 - **Mobile control status**: normal app control uses the user-enabled Accessibility service and needs **no Shizuku/root**. `ui_snapshot` / `ui_act` / `ui_find` / `ui_collect` are the production path. The background VirtualDisplay is an **early optional prototype** and is the only part that needs Shizuku/root.
 
