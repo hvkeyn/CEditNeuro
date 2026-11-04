@@ -20,6 +20,14 @@ class ReverseSkillTest {
     }
 
     @Test
+    fun autoloopIsExplainedAsAPcDaemonNotAPhoneSkill() {
+        val text = StarterSkills.skills.getValue("agent-autoloop")
+        listOf("not a skill", "Node 24", "Windows port is pending", "agent-autoloop", "approval", "team", "Do not install")
+            .forEach { assertTrue("agent-autoloop lacks $it", text.contains(it, ignoreCase = true)) }
+        assertTrue(text.length <= 12_000)
+    }
+
+    @Test
     fun stageshowKeepsTheFauxUiRulesOnPlainHtml() {
         val text = StarterSkills.skills.getValue("stageshow")
         listOf("faux product UI", "3–7", "stage_review", "render_video", "one hero", "bento", "React")

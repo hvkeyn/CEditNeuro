@@ -26,7 +26,10 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ---
 
-## New in 0.99.86
+## New in 0.99.87
+
+- **HTML browser mode**: an HTML tab has a browser button that opens a real WebView with JavaScript, forms, links, storage, media, and relative project assets. Toolbar: back, forward, reload, close. The inline preview stays safe with scripts off.
+- **Agent Autoloop clarified**: the new skill explains that it is a Node 24 kernel/daemon for a Linux/macOS PC, not a phone skill; Windows is pending. Destructive actions require a human card. The phone uses `team`/`crew` in-session and `remote_put`/`ssh_exec` only when a PC is connected.
 
 - **Stageshow for faux product UI**: a new `stageshow` skill adapts the Stageshow rules to one plain HTML/CSS file — one hero, 3–7 real strings, a hard crop, mixed bento tiles, and causal motion. `frontend-design`/`visual-explainer` route mockups here. New `stage_review` catches purple gradients, glass on every card, emoji icons, tiny type, dead controls, and missing focus states; it is a static check, not a frame review.
 

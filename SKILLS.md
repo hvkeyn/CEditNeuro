@@ -2,7 +2,7 @@
 
 A complete snapshot of every skill available in CEditNeuro **0.99.31 (versionCode 147)**, taken on **2026-10-22**, updated **2026-10-24**, from the phone's app-scope folder and the built-in source.
 
-**46 skills:** 44 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
+**47 skills:** 45 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
 
 This file is a catalog and a porting guide. The app does not load `SKILLS.md`; it loads the `.md` files in the two skill folders described below. The JSON at the end is the same inventory in a machine-readable form.
 
@@ -235,8 +235,21 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 | 44 | [web-to-app](#web-to-app) | starter | a website or HTML file must become an Android app | device | 793 |
 | 45 | [rea-video](#rea-video) | starter | a reference video must be taken apart shot by shot and remade | video, remote | 4,304 |
 | 46 | [stageshow](#stageshow) | starter | a faux product UI, feature card, bento, or cursor demo must look real | design, video | 5,183 |
+| 47 | [agent-autoloop](#agent-autoloop) | starter | a background agent loop needs rules, approvals, and durable events on a PC | remote | 4,729 |
 
 ## Every skill
+
+### agent-autoloop
+
+**Scope:** app · **Origin:** starter · **File:** `agent-autoloop.md` · **Size:** 4,729 chars
+
+**Trigger:** a background agent loop needs rules, approvals, and durable events on a PC.
+
+**Use:** `use_skill name=agent-autoloop scope=app`
+
+**Shape:** clarification and safe route for KKKKhazix/agent-autoloop (MIT). It is a Node 24 kernel/daemon, not a skill or a phone feature; Linux/macOS only, Windows pending. Use `team`/`crew` in-session; `remote_put`/`ssh_exec` only on the user's own PC. Destructive actions need an approval card.
+
+**Group(s):** remote · **Tool(s):** `remote_put`, `ssh_exec`, `run_command`, `read_file`, `write_file`, `set_timer`, `team`, `crew`
 
 ### agent-team
 
@@ -747,7 +760,8 @@ The JSON below is the same inventory. `origin` is `starter`, `builtin`, or `user
     "harness": ["harness_rrsi"]
   },
   "skills": [
-    {"name": "agent-team", "scope": "app", "origin": "starter", "trigger": "decide whether to use a team, how many helpers, and their roles", "groups": [], "tools": ["team", "read_file", "grep", "glob", "write_file", "edit_file"], "chars": 4449, "file": "agent-team.md", "source": "ResearchSkill.kt#StarterSkills"},
+    {"name": "agent-autoloop", "scope": "app", "origin": "starter", "trigger": "a background agent loop needs rules, approvals, and durable events on a PC", "groups": ["remote"], "tools": ["remote_put", "ssh_exec", "run_command", "read_file", "write_file", "set_timer", "team", "crew"], "chars": 4729, "file": "agent-autoloop.md", "source": "ResearchSkill.kt#StarterSkills"},
+{"name": "agent-team", "scope": "app", "origin": "starter", "trigger": "decide whether to use a team, how many helpers, and their roles", "groups": [], "tools": ["team", "read_file", "grep", "glob", "write_file", "edit_file"], "chars": 4449, "file": "agent-team.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "android-apk", "scope": "app", "origin": "starter", "trigger": "read an APK before it is trusted", "groups": ["build"], "tools": ["install_android_sdk", "install_jdk", "install_module", "install_program", "run_command", "grep", "http_request"], "chars": 6665, "file": "android-apk.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "android-app", "scope": "app", "origin": "starter", "trigger": "a new Android or Kotlin Multiplatform app, a feature, or its architecture", "groups": ["build"], "tools": ["install_jdk", "install_android_sdk", "run_command", "install_apk", "http_request"], "requires_skills": ["android-debug", "android-apk"], "chars": 3077, "file": "android-app.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "android-compose", "scope": "app", "origin": "starter", "trigger": "Jetpack Compose, a screen, Navigation 3, XML migration, edge-to-edge", "groups": [], "tools": ["http_request"], "chars": 1715, "file": "android-compose.md", "source": "ResearchSkill.kt#StarterSkills"},

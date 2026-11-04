@@ -50,6 +50,7 @@ import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -127,6 +128,7 @@ fun EditorPane(
     val kind = previewKind(activePath)
     val runnable = com.hvkeyn.ceditneuro.ui.isRunnable(activePath)
     var previewing by remember(activePath) { mutableStateOf(kind != null) }
+    var browserOpen by remember(activePath) { mutableStateOf(false) }
     var editor by remember { mutableStateOf<CodeEditor?>(null) }
     var searchOpen by rememberSaveable(activePath) { mutableStateOf(false) }
     var searchText by rememberSaveable(activePath) { mutableStateOf("") }
@@ -183,6 +185,8 @@ fun EditorPane(
                 onRun = onRun,
                 onStop = onStop,
                 onTogglePreview = { previewing = !previewing },
+                canBrowse = kind == "html",
+                onBrowse = { browserOpen = true },
                 canRender = composition,
                 rendering = rendering != null,
                 onRender = { onRender(activePath) },
@@ -337,6 +341,13 @@ fun EditorPane(
                 onDismiss = { outlineOpen = false },
             )
         }
+        if (browserOpen) {
+            HtmlBrowser(
+                file = file,
+                markup = contentProvider(activePath),
+                onClose = { browserOpen = false },
+            )
+        }
         val body = Modifier
             .fillMaxWidth()
             .weight(1f)
@@ -447,6 +458,8 @@ private fun FileActions(
     onRun: () -> Unit,
     onStop: () -> Unit,
     onTogglePreview: () -> Unit,
+    canBrowse: Boolean = false,
+    onBrowse: () -> Unit = {},
     canRender: Boolean = false,
     rendering: Boolean = false,
     onRender: () -> Unit = {},
@@ -487,6 +500,11 @@ private fun FileActions(
                     contentDescription = if (previewing) "Show code" else "Preview",
                     modifier = Modifier.size(20.dp),
                 )
+            }
+        }
+        if (canBrowse) {
+            IconButton(onClick = onBrowse, modifier = Modifier.size(40.dp)) {
+                Icon(Icons.Default.Language, contentDescription = "Open in browser", modifier = Modifier.size(20.dp))
             }
         }
         if (canRender) {
