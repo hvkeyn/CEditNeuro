@@ -527,14 +527,16 @@ object StarterSkills {
 
             ## The loop
 
-            1. `load_tools group=device`.
+            1. `load_tools group=device`, then `ui_status`.
+               - If `accessibility=off`, ask the person to enable CEdiNeuro in Android Accessibility. The app cannot grant it itself. Do **not** require Shizuku or root for ordinary foreground control.
+               - If `accessibility=on`, everything below works without Shizuku: snapshot, tap, type, scroll, launch, and collect.
             2. `ui_snapshot`. The header gives `snapshot=<id>`, screen size, package, and count. Each line has a ref like `@s1a2b3:e4`, role, label, bounds, center, and actions.
             3. To locate one control in a long screen, `ui_find text="Save"` (or `resourceId`/`role`) instead of re-reading every line. Use a ref from the same snapshot.
             4. Choose a ref from **this** snapshot. Read the label and actions; do not guess a ref or a coordinate.
             5. `ui_act` with `ref` and an action: `tap`, `long_click`, `set_text`, `clear_text`, `scroll_forward`, `scroll_backward`, `check`, `uncheck`. Use `set_text` with `text`; set `clear_first=true` only when replacing the field is intended.
             6. The tool returns a **new** snapshot. Read it and verify the expected change. Refs from the old snapshot are stale and must not be reused.
             7. For a long chat or list, `ui_collect direction=down pages=8 maxItems=300`. It scrolls, merges overlapping text, and stops when the app changes or two pages add nothing. Use `up` for older messages.
-            8. For a global action use `ui_act action=back|home|recents|wait`. To open an app, `list_apps` to find the package, then `ui_act action=launch package=<id>`.
+            8. For a global action use `ui_act action=back|home|recents|wait`. To start an app in the foreground, `list_apps` to find the package, then `ui_act action=launch package=<id>`; this uses the accessibility service, not Shizuku. Use `ui_display` only when the person explicitly wants the optional off-screen display.
             9. If the ref is stale or missing, call `ui_snapshot` again. Do not retry the same stale ref in a loop.
 
             ## Choosing an element
@@ -2471,7 +2473,7 @@ object StarterSkills {
             file.writeText(current, Charsets.UTF_8)
         }
         current = file.readText(Charsets.UTF_8)
-        if (!current.contains("ui_collect") || !current.contains("ui_display") || !current.contains("ui_frame")) {
+        if (!current.contains("ui_collect") || !current.contains("ui_display") || !current.contains("ui_frame") || !current.contains("ui_status")) {
             file.writeText(skills.getValue("mobile-control"), Charsets.UTF_8)
         }
     }

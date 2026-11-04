@@ -237,6 +237,33 @@ internal object MobileTextCollector {
     }
 }
 
+class UiStatusTool : Tool {
+    override val name = "ui_status"
+    override val description =
+        "Report whether foreground mobile control is ready without Shizuku: accessibility service, " +
+            "background display id, and the preferred next action. Call it before mobile-control work."
+    override val parameters = objectSchema(emptyMap())
+
+    override suspend fun execute(args: JsonObject): ToolResult {
+        val accessibility = MobileAccessibilityService.connected
+        val background = AgentDisplayController.displayId
+        return ToolResult.ok(
+            buildString {
+                appendLine("accessibility=${if (accessibility) "on" else "off"}")
+                appendLine("foreground=${if (accessibility) "ready" else "needs user enable in Android Accessibility"}")
+                appendLine("background=${background?.let { "display $it" } ?: "off"}")
+                appendLine(
+                    if (accessibility) {
+                        "No Shizuku or root is required for snapshot, tap, type, scroll, launch, and collect."
+                    } else {
+                        "Ask the person to enable CEdiNeuro in Settings > Accessibility. The app cannot grant it itself. Do not request Shizuku for ordinary foreground control."
+                    },
+                )
+            },
+        )
+    }
+}
+
 class UiDisplayTool(
     private val context: android.content.Context,
     private val runner: ShizukuCommandRunner,

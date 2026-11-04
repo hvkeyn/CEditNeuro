@@ -58,6 +58,7 @@ object ToolGroups {
             "fetch_system_layout",
             "execute_system_action",
             "ui_snapshot",
+            "ui_status",
             "ui_act",
             "ui_find",
             "ui_collect",

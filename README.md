@@ -26,7 +26,9 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ---
 
-## New in 0.99.81
+## New in 0.99.82
+
+- **No-Shizuku foreground control verified**: `ui_status` reports accessibility ready; `ui_act action=launch` opened Settings and `ui_snapshot` read it with Shizuku stopped. The app can operate visible apps without root/Shizuku. Only the optional background VirtualDisplay needs Shizuku. Enabling Accessibility still requires the person to toggle it in Android settings.
 
 - **Live background frame + OCR**: the display helper writes PNG frames; `ui_frame ocr=true` returns the local image and ML Kit Latin text. `ui_display` gained a sequential package queue and main-screen spill detection.
 
