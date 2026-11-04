@@ -61,6 +61,7 @@ object ToolGroups {
             "ui_act",
             "ui_find",
             "ui_collect",
+            "ui_display",
             "device_status",
             "list_apps",
             "open_settings",

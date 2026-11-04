@@ -94,6 +94,7 @@ import com.hvkeyn.ceditneuro.tools.ExecuteSystemActionTool
 import com.hvkeyn.ceditneuro.tools.MobileUiStore
 import com.hvkeyn.ceditneuro.tools.UiActTool
 import com.hvkeyn.ceditneuro.tools.UiCollectTool
+import com.hvkeyn.ceditneuro.tools.UiDisplayTool
 import com.hvkeyn.ceditneuro.tools.UiFindTool
 import com.hvkeyn.ceditneuro.tools.UiSnapshotTool
 import com.hvkeyn.ceditneuro.tools.FetchSystemLayoutTool
@@ -3576,6 +3577,7 @@ class WorkspaceViewModel(
             UiActTool(shizukuCommands, this::prepareShizuku, mobileDump, mobileUiStore),
             UiFindTool(mobileUiStore),
             UiCollectTool(mobileUiStore),
+            UiDisplayTool(appContext, shizukuCommands, this::prepareShizuku),
             NetInfoTool(appContext),
             InstallApkTool(appContext, ws),
             WebToAppTool(appContext, ws),

@@ -1,6 +1,7 @@
 package com.hvkeyn.ceditneuro.tools
 
 import com.hvkeyn.ceditneuro.access.MobileAccessibilityService
+import com.hvkeyn.ceditneuro.background.AgentDisplayController
 import com.hvkeyn.ceditneuro.shizuku.ShizukuCommandRunner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -230,6 +231,59 @@ internal object MobileTextCollector {
     }
 }
 
+class UiDisplayTool(
+    private val context: android.content.Context,
+    private val runner: ShizukuCommandRunner,
+    private val prepare: suspend () -> String?,
+) : Tool {
+    override val name = "ui_display"
+    override val description =
+        "Start or stop a prototype off-screen display and launch an app on it. " +
+            "Requires Shizuku or root. After launch call ui_snapshot display=background. " +
+            "action: start, stop, status, launch (package), attach (displayId)."
+    override val parameters = objectSchema(
+        properties = mapOf(
+            "action" to stringProp("start, stop, status, launch, or attach."),
+            "package" to stringProp("Application id for launch."),
+            "displayId" to intProp("Display id for attach."),
+        ),
+        required = listOf("action"),
+    )
+
+    override suspend fun execute(args: JsonObject): ToolResult = withContext(Dispatchers.IO) {
+        val action = args.stringArg("action")?.trim()?.lowercase().orEmpty()
+        when (action) {
+            "start" -> {
+                AgentDisplayController.start(context, runner, prepare).fold(
+                    onSuccess = { id -> ToolResult.ok("Background display $id is running. Use ui_snapshot display=background.") },
+                    onFailure = { ToolResult.error(it.message ?: "Background display failed.") },
+                )
+            }
+            "stop" -> {
+                AgentDisplayController.stop(runner)
+                ToolResult.ok("Background display stopped.")
+            }
+            "status" -> ToolResult.ok(
+                AgentDisplayController.displayId?.let { "Background display $it is running." }
+                    ?: "No background display is running.",
+            )
+            "attach" -> {
+                val id = args.intArg("displayId")
+                    ?: return@withContext ToolResult.error("displayId is required for attach.")
+                AgentDisplayController.attach(id)
+                ToolResult.ok("Attached to display $id.")
+            }
+            "launch" -> {
+                val pkg = args.stringArg("package")?.trim().orEmpty()
+                val error = AgentDisplayController.launch(runner, prepare, pkg)
+                if (error != null) ToolResult.error(error)
+                else ToolResult.ok("Launched $pkg on display ${AgentDisplayController.displayId}. Call ui_snapshot display=background.")
+            }
+            else -> ToolResult.error("action is start, stop, status, launch, or attach.")
+        }
+    }
+}
+
 class UiFindTool(private val store: MobileUiStore) : Tool {
     override val name = "ui_find"
     override val description =
@@ -363,10 +417,19 @@ class UiSnapshotTool(
         "Read the current phone screen as accessibility elements with snapshot-scoped refs. " +
             "Returns role, label, bounds, center, and available actions for each element. " +
             "Use a ref with ui_act, then read the returned new snapshot. Prefers the user-enabled CEdiNeuro accessibility service; falls back to Shizuku or root."
-    override val parameters = objectSchema(emptyMap())
+    override val parameters = objectSchema(
+        properties = mapOf(
+            "display" to stringProp("main (default) or background."),
+        ),
+    )
 
     override suspend fun execute(args: JsonObject): ToolResult = withContext(Dispatchers.IO) {
-        MobileAccessibilityService.snapshotNow()?.let { snapshot ->
+        val requested = args.stringArg("display")?.trim()?.lowercase().orEmpty()
+        val displayId = if (requested == "background") {
+            AgentDisplayController.displayId
+                ?: return@withContext ToolResult.error("Start the background display first with ui_display action=start.")
+        } else android.view.Display.DEFAULT_DISPLAY
+        MobileAccessibilityService.snapshotNow(displayId)?.let { snapshot ->
             store.store(snapshot)
             return@withContext ToolResult.ok("source=accessibility\n" + snapshot.render())
         }
@@ -401,6 +464,7 @@ class UiActTool(
             "text" to stringProp("Text for set_text."),
             "clear_first" to boolProp("Clear the field before set_text. Default false."),
             "package" to stringProp("Application id for launch."),
+            "display" to stringProp("main or background; used for documentation. Refs identify the window."),
         ),
         required = listOf("action"),
     )

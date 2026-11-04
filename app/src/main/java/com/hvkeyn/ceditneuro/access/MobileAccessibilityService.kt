@@ -3,6 +3,7 @@ package com.hvkeyn.ceditneuro.access
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
 import android.graphics.Rect
+import android.view.Display
 import android.os.Bundle
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -44,8 +45,14 @@ class MobileAccessibilityService : AccessibilityService() {
         nodes.clear()
     }
 
-    fun snapshot(): MobileSnapshot? {
-        val root = rootInActiveWindow ?: return null
+    fun snapshot(displayId: Int = Display.DEFAULT_DISPLAY): MobileSnapshot? {
+        val roots = if (displayId == Display.DEFAULT_DISPLAY) {
+            listOfNotNull(rootInActiveWindow)
+        } else {
+            windowsOnAllDisplays.get(displayId)?.mapNotNull { runCatching { it.root }.getOrNull() }.orEmpty()
+        }
+        if (roots.isEmpty()) return null
+        val root = roots.first()
         recycle()
         val id = "a" + Integer.toHexString(System.identityHashCode(root)) +
             System.currentTimeMillis().toString(36).takeLast(4)
@@ -96,7 +103,7 @@ class MobileAccessibilityService : AccessibilityService() {
                 visit(node.getChild(index), depth + 1)
             }
         }
-        visit(root, 0)
+        roots.forEach { visit(it, 0) }
         val pkg = root.packageName?.toString().orEmpty()
         if (result.isEmpty()) return null
         return MobileSnapshot(
@@ -160,7 +167,7 @@ class MobileAccessibilityService : AccessibilityService() {
 
         val connected: Boolean get() = instance != null
 
-        fun snapshotNow(): MobileSnapshot? = instance?.snapshot()
+        fun snapshotNow(displayId: Int = Display.DEFAULT_DISPLAY): MobileSnapshot? = instance?.snapshot(displayId)
 
         suspend fun actNow(ref: String, action: String, text: String): String? =
             instance?.act(ref, action, text) ?: "Accessibility control is not enabled."

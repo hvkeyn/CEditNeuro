@@ -557,6 +557,18 @@ object StarterSkills {
 
             If the accessibility snapshot is unavailable but `fetch_system_layout` works, use its `tap=X,Y` rows with `execute_system_action`; that is a coordinate fallback, not the default. Do not use screenshots for coordinates when a ref exists. Do not use `run_command` to synthesize taps outside these tools.
 
+            ## Background display prototype
+
+            When the person explicitly asks to keep using the phone while the agent works in an app, background display is opt-in and requires Shizuku or root:
+
+            1. `ui_display action=start`. This starts a shell-side virtual display and returns its id. If it fails, report the exact error and continue on the main display.
+            2. `ui_display action=launch package=<id>` (use `list_apps` to find it). Do not use `ui_act launch` for the background display.
+            3. `ui_snapshot display=background`. The refs belong to that display.
+            4. `ui_act` the refs, then `ui_snapshot display=background` again. `ui_collect` still reads the last snapshot.
+            5. `ui_display action=stop` when done. Never leave a display running after the task.
+
+            The prototype has no live image or OCR; it reads the accessibility tree only. Apps that do not support secondary displays, protected windows, startup choosers, logins, payments, and permissions may still appear on the main screen or need the person. If the background snapshot is empty, stop and fall back to the main display instead of guessing.
+
             ## Common app patterns
 
             These are starting points, never fixed coordinates; labels and layouts differ by version and language.
@@ -571,7 +583,7 @@ object StarterSkills {
 
             ## Output
 
-            Say what was asked, the package/screen, the ref and label used, the verified new state, and any permission or privacy limit. If the app or permission blocks the task, stop and say so instead of inventing a tap.
+            Say what was asked, the package/screen, the ref and label used, the verified new state, and any permission or privacy limit. `ui_display` is the background-display prototype; it is not required for normal foreground work. If the app or permission blocks the task, stop and say so instead of inventing a tap.
         """.trimIndent() + "\n",
         "agent-team" to """
             # Agent Team: decide the smallest helpful team
@@ -2452,7 +2464,7 @@ object StarterSkills {
             file.writeText(current, Charsets.UTF_8)
         }
         current = file.readText(Charsets.UTF_8)
-        if (!current.contains("ui_collect")) {
+        if (!current.contains("ui_collect") || !current.contains("ui_display")) {
             file.writeText(skills.getValue("mobile-control"), Charsets.UTF_8)
         }
     }

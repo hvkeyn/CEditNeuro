@@ -428,13 +428,13 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 
 ### mobile-control
 
-**Scope:** app · **Origin:** starter · **File:** `mobile-control.md` · **Size:** 5,589 chars
+**Scope:** app · **Origin:** starter · **File:** `mobile-control.md` · **Size:** 6,772 chars
 
 **Trigger:** another Android app must be operated through its real UI: tap, type, scroll, open an app, or verify a screen.
 
 **Shape:** `ui_snapshot` returns accessibility refs with role, label, bounds, and actions. Act on one ref with `ui_act`; the tool returns a fresh snapshot. Reuse of a stale ref is refused, so the loop is observe → act → observe. Requires Shizuku or root. Passwords, OTP, private screen text, destructive writes, and security boundaries are guarded; coordinates from `fetch_system_layout` are only a fallback.
 
-**Group(s):** device · **Tool(s):** `ui_snapshot`, `ui_act`, `ui_find`, `ui_collect`, `list_apps`, `device_status`, `shizuku_exec`, `fetch_system_layout`, `execute_system_action`, `clipboard`
+**Group(s):** device · **Tool(s):** `ui_snapshot`, `ui_act`, `ui_find`, `ui_collect`, `ui_display`, `list_apps`, `device_status`, `shizuku_exec`, `fetch_system_layout`, `execute_system_action`, `clipboard`
 
 **Use:** `use_skill name=mobile-control scope=app`
 
@@ -740,7 +740,7 @@ The JSON below is the same inventory. `origin` is `starter`, `builtin`, or `user
     {"name": "health", "scope": "app", "origin": "starter", "trigger": "a lab sheet, scan report, or family health record", "groups": ["health"], "tools": ["health_log", "health_panel", "health_trend", "health_index"], "chars": 1361, "file": "health.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "hyperframes", "scope": "app", "origin": "starter", "trigger": "a video, animation, title card, or HyperFrames composition", "groups": [], "tools": ["render_video", "edit_video", "sound_effect", "make_music", "voiceover", "web_search", "http_request", "write_file", "edit_file"], "chars": 11930, "file": "hyperframes.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "learn", "scope": "app", "origin": "starter", "trigger": "learn a subject, be taught, or practice", "groups": ["learn"], "tools": ["learn", "http_request", "web_search"], "chars": 2501, "file": "learn.md", "source": "ResearchSkill.kt#StarterSkills"},
-    {"name": "mobile-control", "scope": "app", "origin": "starter", "trigger": "operate another Android app through accessibility refs", "groups": ["device"], "tools": ["ui_snapshot", "ui_act", "ui_find", "ui_collect", "list_apps", "device_status", "shizuku_exec", "fetch_system_layout", "execute_system_action", "clipboard"], "chars": 5589, "file": "mobile-control.md", "source": "ResearchSkill.kt#StarterSkills"}
+    {"name": "mobile-control", "scope": "app", "origin": "starter", "trigger": "operate another Android app through accessibility refs", "groups": ["device"], "tools": ["ui_snapshot", "ui_act", "ui_find", "ui_collect", "ui_display", "list_apps", "device_status", "shizuku_exec", "fetch_system_layout", "execute_system_action", "clipboard"], "chars": 6772, "file": "mobile-control.md", "source": "ResearchSkill.kt#StarterSkills"}
 {"name": "net-map", "scope": "app", "origin": "starter", "trigger": "a network must be drawn from packets", "groups": ["study"], "tools": ["net_audit", "capture_dump", "read_dump", "research_figure"], "chars": 5603, "file": "net-map.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "network-study", "scope": "app", "origin": "starter", "trigger": "a network concept or topology must be taught with a drawing", "groups": ["study", "device"], "tools": ["net_audit", "capture_dump", "read_dump", "write_file", "network_card", "open_file", "load_tools"], "chars": 6531, "file": "network-study.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "photo-ocr", "scope": "app", "origin": "user", "trigger": "a photo arrived and the message has only paths", "groups": [], "tools": ["run_command", "read_file", "remote_delete"], "chars": 1491, "file": "photo-ocr.md", "source": "phone:CEditNeuro/skills/photo-ocr.md"},
