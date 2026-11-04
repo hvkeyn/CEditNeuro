@@ -939,7 +939,9 @@ object StarterSkills {
             rea_video path=downloads/reference.mp4
             ```
 
-            It writes `rea-video/<name>/storyboard.jpg`, `shots/`, `breakdown.json`, `report.md`, and `report.html`, and returns a shot table and remake plan. Read the storyboard and the shot table before answering. This offline pass measures cuts and exports frames; it **does not classify live/AI/3D** and does not read speech, music, OCR, or a prompt. Say that plainly.
+            It writes `rea-video/<name>/storyboard.jpg`, `shots/`, `breakdown.json`, `report.md`, `report.html`, and `remake.html` (an abstract animatic on the reference timing), and returns a shot table and remake plan. Read the storyboard and the shot table before answering. This offline pass measures cuts and exports frames; it **does not classify live/AI/3D** and does not read speech, music, OCR, or a prompt. Say that plainly.
+
+            **The connected model is the renderer.** Do not stop at the plan when the user asked for a clone. Read `remake.html` and rewrite its copy, palette, type, and scene motion with the model you are already using; keep the shot starts, durations, and root `data-duration`, and keep the `window.__timelines` contract. Then call `load_tools group=video`, `render_video path=rea-video/<name>/remake.html`, and report the real MP4 path, size, and frame count. This produces an HTML-rendered animatic from the reference structure, not AI-generated footage and not the original pixels. If the model is vision-capable, inspect `storyboard.jpg` and the shot frames before writing; if not, work from the shot table and do not invent what a frame shows.
 
             After the pass:
 

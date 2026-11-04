@@ -88,21 +88,24 @@ class ReaVideoTool(private val workspace: Workspace) : Tool {
             if (shots.isEmpty()) return@withContext ToolResult.error("No readable frames were decoded.")
             val shotJson = JSONArray()
             val rows = mutableListOf<File>()
+            val colors = mutableListOf<Int>()
             shots.forEach { shot ->
                 val bitmap = frame(retriever, shot.startMs * 1000L, 640, 360)
                 val name = "shot_%03d.jpg".format(shot.index)
                 val target = File(shotsDir, name)
                 if (bitmap != null) {
                     FileOutputStream(target).use { bitmap.compress(Bitmap.CompressFormat.JPEG, 86, it) }
+                    colors += averageColor(bitmap)
                     bitmap.recycle()
                     rows += target
-                }
+                } else colors += 0x202020
                 shotJson.put(JSONObject().apply {
                     put("index", shot.index)
                     put("start_ms", shot.startMs)
                     put("end_ms", shot.endMs)
                     put("duration_ms", shot.durationMs)
                     put("frame", "shots/$name")
+                    put("color", "#%06X".format(Locale.US, colors.last()))
                     put("method", "unknown")
                     put("evidence", JSONArray().put("offline frame change ${shot.score}; frame extracted"))
                 })
@@ -125,6 +128,7 @@ class ReaVideoTool(private val workspace: Workspace) : Tool {
                 })
             }
             File(outDir, "breakdown.json").writeText(breakdown.toString(2), Charsets.UTF_8)
+            File(outDir, "remake.html").writeText(remakeHtml(relative, durationMs, shots, colors), Charsets.UTF_8)
             val md = reportMarkdown(relative, durationMs, width, height, fps, shots, outArg)
             File(outDir, "report.md").writeText(md, Charsets.UTF_8)
             File(outDir, "report.html").writeText(reportHtml(relative, durationMs, width, height, shots, breakdown), Charsets.UTF_8)
@@ -135,6 +139,7 @@ class ReaVideoTool(private val workspace: Workspace) : Tool {
                     "storyboard: ${workspace.relativize(storyboard)}\n" +
                     "breakdown: ${workspace.relativize(File(outDir, "breakdown.json"))}\n" +
                     "report: ${workspace.relativize(File(outDir, "report.md"))} and report.html\n" +
+                    "animatic: ${workspace.relativize(File(outDir, "remake.html"))} — edit it, then render_video\n" +
                     "plan: keep the cut times and shot lengths, rebuild each shot with material you own.\n" +
                     "limit: this offline pass does not label live/AI/3D or read audio; use the full REA-Video CLI on a PC for that.",
             )
@@ -263,6 +268,71 @@ class ReaVideoTool(private val workspace: Workspace) : Tool {
 <h2>Remake plan</h2><ol><li>Keep the cut times and shot lengths.</li><li>Use footage you own, code animation, or generated clips; do not reuse the source footage or music.</li><li>Build a quiet animatic first, then replace one shot at a time.</li></ol>
 <p>Generated from <code>${escape(source)}</code>. Data: <code>breakdown.json</code>.</p>
 </html>"""
+    }
+
+    private fun averageColor(bitmap: Bitmap): Int {
+        val small = Bitmap.createScaledBitmap(bitmap, 8, 8, true)
+        var r = 0L; var g = 0L; var b = 0L
+        for (y in 0 until 8) for (x in 0 until 8) {
+            val p = small.getPixel(x, y)
+            r += Color.red(p); g += Color.green(p); b += Color.blue(p)
+        }
+        if (small !== bitmap) small.recycle()
+        return Color.rgb((r / 64).toInt(), (g / 64).toInt(), (b / 64).toInt())
+    }
+
+    private fun remakeHtml(
+        source: String,
+        durationMs: Long,
+        shots: List<com.hvkeyn.ceditneuro.video.ReaShot>,
+        colors: List<Int>,
+    ): String {
+        val total = (durationMs / 1000.0).coerceAtLeast(1.0)
+        val clips = shots.mapIndexed { index, shot ->
+            val start = shot.startMs / 1000.0
+            val length = (shot.durationMs / 1000.0).coerceAtLeast(0.4)
+            val c = colors.getOrElse(index) { 0x202020 }
+            val hex = "#%06X".format(Locale.US, c)
+            """<div class="clip" data-start="%.3f" data-duration="%.3f" data-track-index="0" style="--c:%s">
+                <div class="grain"></div>
+                <div class="no">SHOT %02d</div>
+                <div class="line"></div>
+                <div class="copy">%s<br><span>%s</span></div>
+                <div class="time">%.1fs</div>
+            </div>""".format(Locale.US, start, length, hex, index + 1, "REA / REMAKE", formatDuration(shot.durationMs), length)
+        }.joinToString("\n")
+        return """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101010}
+#rea-root{position:relative;width:100%;height:100%;overflow:hidden;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#fff}
+.clip{position:absolute;inset:0;opacity:0;overflow:hidden;background:radial-gradient(120% 90% at 20% 15%,var(--c),#0b0b0b 70%)}
+.grain{position:absolute;inset:0;opacity:.16;background-image:repeating-linear-gradient(0deg,rgba(255,255,255,.16) 0 1px,transparent 1px 4px);mix-blend-mode:overlay}
+.no{position:absolute;left:6%;top:8%;font:700 clamp(18px,4.4vw,54px)/1 ui-monospace,monospace;letter-spacing:.12em;opacity:.8}
+.line{position:absolute;left:6%;right:6%;top:24%;height:1px;background:rgba(255,255,255,.35);transform-origin:left}
+.copy{position:absolute;left:6%;right:6%;bottom:14%;font:800 clamp(42px,10vw,148px)/.9 ui-sans-serif,system-ui,sans-serif;letter-spacing:-.06em;text-transform:uppercase;text-shadow:0 8px 40px rgba(0,0,0,.35)}
+.copy span{display:block;margin-top:14px;font:500 clamp(14px,2.6vw,30px)/1.2 ui-monospace,monospace;letter-spacing:.08em;opacity:.8;text-transform:none}
+.time{position:absolute;right:6%;top:8%;font:500 clamp(12px,2.4vw,28px)/1 ui-monospace,monospace;opacity:.7}
+</style></head><body>
+<div id="rea-root" data-composition-id="rea-remake" data-start="0" data-width="1080" data-height="1920" data-duration="__DURATION__">
+__CLIPS__
+</div>
+<script>
+(function(){
+  var id='rea-remake';
+  var clips=[].slice.call(document.querySelectorAll('.clip'));
+  function frame(t){
+    clips.forEach(function(el){
+      var s=parseFloat(el.dataset.start), d=parseFloat(el.dataset.duration), p=(t-s)/d;
+      var on=p>=0&&p<=1;
+      el.style.opacity=on?1:0;
+      el.style.transform='scale('+(on?(1.02-0.02*Math.min(1,Math.max(0,p))):1.02)+')';
+    });
+  }
+  window.__timelines=window.__timelines||{};
+  window.__timelines[id]={duration:function(){return __DURATION__;},paused:function(){return true;},pause:function(){},seek:function(t){frame(t);}};
+  frame(0);
+})();
+</script></body></html>""".replace("__DURATION__", "%.3f".format(Locale.US, total)).replace("__CLIPS__", clips)
     }
 
     private fun formatDuration(ms: Long): String {

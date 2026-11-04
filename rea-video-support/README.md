@@ -11,7 +11,7 @@ load_tools group=video
 rea_video path=downloads/reference.mp4
 ```
 
-`rea_video` is an offline first pass. It samples frames, splits visible cuts, exports `storyboard.jpg`, `shots/`, `breakdown.json`, `report.md`, and `report.html`, and returns a remake plan.
+`rea_video` is an offline first pass. It samples frames, splits visible cuts, exports `storyboard.jpg`, `shots/`, `breakdown.json`, `report.md`, `report.html`, and `remake.html`, and returns a remake plan. The connected model rewrites `remake.html`; `render_video` then turns it into an MP4 on the phone.
 
 It does **not** claim whether a shot is live action, AI, 3D, 2D, code, or a screen recording. It does not read speech, music, BPM, OCR, or generate prompts. Those need the full Python CLI.
 

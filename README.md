@@ -26,7 +26,9 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ---
 
-## New in 0.99.84
+## New in 0.99.85
+
+- **The connected model renders the remake**: `rea_video` now also writes `remake.html`, an abstract animatic on the reference timing. The connected model rewrites its copy, palette, and motion; `render_video` makes the MP4 on the phone. Tested: 24 fps, 73 frames, 3.0 s, silent by design.
 
 - **REA-Video**: `rea_video` splits a project video into shots, writes `storyboard.jpg`, `shots/`, `breakdown.json`, `report.md`/`report.html`, and returns a remake plan. The `rea-video` skill also documents the full Apache-2.0 Python CLI for live/AI/3D classification, audio, OCR, and review on a PC. The local pass deliberately does not claim an AI film or a generated clone.
 
