@@ -36,6 +36,13 @@ class MobileControlTest {
     }
 
     @Test
+    fun collectorMergesOverlappingPagesWithoutDuplicating() {
+        assertEquals(listOf("a", "b", "c"), MobileTextCollector.appendPage(listOf("a", "b"), listOf("b", "c")))
+        assertEquals(listOf("a", "b", "c"), MobileTextCollector.prependPage(listOf("b", "c"), listOf("a", "b")))
+        assertEquals(listOf("a", "b"), MobileTextCollector.appendPage(listOf("a", "b"), emptyList()))
+    }
+
+    @Test
     fun staleRefsAreRejected() {
         val store = MobileUiStore()
         val snapshot = MobileUiParser.parse(xml, "abc")

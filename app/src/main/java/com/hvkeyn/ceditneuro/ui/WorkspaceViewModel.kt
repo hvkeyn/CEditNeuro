@@ -93,6 +93,8 @@ import com.hvkeyn.ceditneuro.tools.ToolSession
 import com.hvkeyn.ceditneuro.tools.ExecuteSystemActionTool
 import com.hvkeyn.ceditneuro.tools.MobileUiStore
 import com.hvkeyn.ceditneuro.tools.UiActTool
+import com.hvkeyn.ceditneuro.tools.UiCollectTool
+import com.hvkeyn.ceditneuro.tools.UiFindTool
 import com.hvkeyn.ceditneuro.tools.UiSnapshotTool
 import com.hvkeyn.ceditneuro.tools.FetchSystemLayoutTool
 import com.hvkeyn.ceditneuro.tools.ShizukuExecTool
@@ -3572,6 +3574,8 @@ class WorkspaceViewModel(
             ExecuteSystemActionTool(shizukuCommands, this::prepareShizuku),
             UiSnapshotTool(shizukuCommands, this::prepareShizuku, mobileDump, mobileUiStore),
             UiActTool(shizukuCommands, this::prepareShizuku, mobileDump, mobileUiStore),
+            UiFindTool(mobileUiStore),
+            UiCollectTool(mobileUiStore),
             NetInfoTool(appContext),
             InstallApkTool(appContext, ws),
             WebToAppTool(appContext, ws),

@@ -201,6 +201,157 @@ private suspend fun dumpMobileUi(
     return Result.success(xml)
 }
 
+internal object MobileTextCollector {
+    fun page(snapshot: MobileSnapshot): List<String> =
+        snapshot.nodes.asSequence()
+            .filter { !it.password }
+            .mapNotNull { node ->
+                val label = node.label.trim().replace(Regex("\\s+"), " ")
+                if (label.isBlank()) null else (node.y1 to node.x1) to label
+            }
+            .sortedWith(compareBy({ it.first.first }, { it.first.second }))
+            .map { it.second }
+            .distinct()
+            .take(300)
+            .toList()
+
+    fun appendPage(accumulated: List<String>, page: List<String>): List<String> {
+        if (page.isEmpty()) return accumulated
+        val overlap = (minOf(accumulated.size, page.size) downTo 1)
+            .firstOrNull { accumulated.takeLast(it) == page.take(it) } ?: 0
+        return accumulated + page.drop(overlap)
+    }
+
+    fun prependPage(accumulated: List<String>, page: List<String>): List<String> {
+        if (page.isEmpty()) return accumulated
+        val overlap = (minOf(accumulated.size, page.size) downTo 1)
+            .firstOrNull { page.takeLast(it) == accumulated.take(it) } ?: 0
+        return page.dropLast(overlap) + accumulated
+    }
+}
+
+class UiFindTool(private val store: MobileUiStore) : Tool {
+    override val name = "ui_find"
+    override val description =
+        "Find elements in the latest ui_snapshot by text, resource id, or role. " +
+            "Returns refs that ui_act can use; call ui_snapshot first. No shell or screen dump."
+    override val parameters = objectSchema(
+        properties = mapOf(
+            "text" to stringProp("Case-insensitive text or accessibility description."),
+            "resourceId" to stringProp("Full or partial Android resource id."),
+            "role" to stringProp("Full or partial class/role."),
+            "limit" to intProp("Maximum matches, 1-50 (default 20)."),
+        ),
+    )
+
+    override suspend fun execute(args: JsonObject): ToolResult = withContext(Dispatchers.IO) {
+        val snapshot = store.last ?: return@withContext ToolResult.error("Call ui_snapshot first.")
+        val text = args.stringArg("text")?.trim().orEmpty()
+        val id = args.stringArg("resourceId")?.trim().orEmpty()
+        val role = args.stringArg("role")?.trim().orEmpty()
+        val limit = (args.intArg("limit") ?: 20).coerceIn(1, 50)
+        val matches = snapshot.nodes.filter { node ->
+            (text.isEmpty() || node.label.contains(text, ignoreCase = true)) &&
+                (id.isEmpty() || node.id.contains(id, ignoreCase = true)) &&
+                (role.isEmpty() || node.role.contains(role, ignoreCase = true))
+        }
+        if (matches.isEmpty()) return@withContext ToolResult.ok("No match in snapshot ${snapshot.id}.")
+        ToolResult.ok(
+            buildString {
+                appendLine("snapshot=${snapshot.id} matches=${matches.size} (${matches.size.coerceAtMost(limit)})")
+                matches.take(limit).forEach { node ->
+                    append(node.ref).append(' ').append(node.role)
+                    if (node.label.isNotBlank()) append(" \"").append(node.label.take(100)).append('"')
+                    append(" center=").append(node.cx).append(',').append(node.cy)
+                    if (node.actions.isNotEmpty()) append(" actions=").append(node.actions.joinToString(","))
+                    appendLine()
+                }
+            },
+        )
+    }
+}
+
+class UiCollectTool(
+    private val store: MobileUiStore,
+) : Tool {
+    override val name = "ui_collect"
+    override val description =
+        "Collect text from several screens by scrolling in the current app, merging overlapping pages. " +
+            "Uses the user-enabled accessibility service. direction up/down, pages 1-20, maxItems 1-500. " +
+            "Stops when the app changes or two pages add nothing. Call ui_snapshot first."
+    override val parameters = objectSchema(
+        properties = mapOf(
+            "direction" to stringProp("down for newer/lower content, up for older/upper content."),
+            "pages" to intProp("Maximum screens to inspect, 1-20 (default 8)."),
+            "maxItems" to intProp("Maximum lines to return, 1-500 (default 300)."),
+        ),
+    )
+
+    override suspend fun execute(args: JsonObject): ToolResult = withContext(Dispatchers.IO) {
+        if (!MobileAccessibilityService.connected) {
+            return@withContext ToolResult.error(
+                "ui_collect needs the user-enabled CEdiNeuro Accessibility service. Enable it in Settings > Accessibility, then take ui_snapshot first.",
+            )
+        }
+        val direction = args.stringArg("direction")?.trim()?.lowercase().orEmpty()
+        if (direction !in setOf("up", "down")) return@withContext ToolResult.error("direction is up or down.")
+        val pages = (args.intArg("pages") ?: 8).coerceIn(1, 20)
+        val maxItems = (args.intArg("maxItems") ?: 300).coerceIn(1, 500)
+        var snapshot = store.last ?: MobileAccessibilityService.snapshotNow()
+            ?: return@withContext ToolResult.error("Call ui_snapshot first.")
+        store.store(snapshot)
+        val app = snapshot.packageName
+        var collected = MobileTextCollector.page(snapshot)
+        var inspected = 1
+        var scrolls = 0
+        var noNew = 0
+        var stopped = "page_limit"
+        while (inspected < pages && collected.size < maxItems) {
+            val scrollNode = snapshot.nodes.firstOrNull { it.scrollable }
+            if (scrollNode == null) {
+                stopped = "no_scrollable"
+                break
+            }
+            val forward = direction == "down"
+            val error = MobileAccessibilityService.actNow(
+                scrollNode.ref,
+                if (forward) "scroll_forward" else "scroll_backward",
+                "",
+            )
+            if (error != null) { stopped = "scroll_failed"; break }
+            delay(450)
+            val next = MobileAccessibilityService.snapshotNow()
+            if (next == null) {
+                stopped = "snapshot_failed"
+                break
+            }
+            store.store(next)
+            if (next.packageName != app) { stopped = "app_switched"; break }
+            val pageText = MobileTextCollector.page(next)
+            val before = collected.size
+            collected = if (forward) {
+                MobileTextCollector.appendPage(collected, pageText)
+            } else {
+                MobileTextCollector.prependPage(collected, pageText)
+            }
+            inspected++
+            scrolls++
+            snapshot = next
+            noNew = if (collected.size == before) noNew + 1 else 0
+            if (noNew >= 2) { stopped = "no_new_content"; break }
+            if (collected.size >= maxItems) { stopped = "item_limit"; break }
+        }
+        val output = collected.take(maxItems)
+        ToolResult.ok(
+            buildString {
+                appendLine("snapshot=${snapshot.id} app=${app.ifBlank { "?" }} pages=$inspected scrolls=$scrolls")
+                appendLine("stoppedBecause=$stopped items=${output.size} truncated=${collected.size > maxItems}")
+                append(output.joinToString("\n").take(24_000))
+            },
+        )
+    }
+}
+
 class UiSnapshotTool(
     private val runner: ShizukuCommandRunner,
     private val prepare: suspend () -> String?,

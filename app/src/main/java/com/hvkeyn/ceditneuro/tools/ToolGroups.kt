@@ -59,6 +59,8 @@ object ToolGroups {
             "execute_system_action",
             "ui_snapshot",
             "ui_act",
+            "ui_find",
+            "ui_collect",
             "device_status",
             "list_apps",
             "open_settings",
