@@ -129,6 +129,7 @@ object ToolGroups {
             "edit_video",
             "download_video",
             "compress_media",
+            "rea_video",
             "sound_effect",
             "make_music",
             "voiceover",

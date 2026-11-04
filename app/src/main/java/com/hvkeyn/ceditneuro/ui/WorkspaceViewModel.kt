@@ -3700,6 +3700,7 @@ class WorkspaceViewModel(
                 },
             ),
             com.hvkeyn.ceditneuro.tools.CompressMediaTool(ws),
+            com.hvkeyn.ceditneuro.tools.ReaVideoTool(ws),
             com.hvkeyn.ceditneuro.tools.RenderVideoTool(ws) { path ->
                 if (project.epoch.get() != epochAtBuild) return@RenderVideoTool
                 refreshProjectTree(project, path)

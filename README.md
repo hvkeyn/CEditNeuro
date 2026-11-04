@@ -26,7 +26,9 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ---
 
-## New in 0.99.83
+## New in 0.99.84
+
+- **REA-Video**: `rea_video` splits a project video into shots, writes `storyboard.jpg`, `shots/`, `breakdown.json`, `report.md`/`report.html`, and returns a remake plan. The `rea-video` skill also documents the full Apache-2.0 Python CLI for live/AI/3D classification, audio, OCR, and review on a PC. The local pass deliberately does not claim an AI film or a generated clone.
 
 - **REA corrected for the lean path**: the `rea` skill now treats REA 6.8.0 as an optional desktop MCP toolkit, notes LeanREA's smaller/faster local-CLI benchmark, and sends normal work to `reverse-engineering`. That skill now starts with a 2–4-call batched inventory, `rg -uu`, and seen/inferred/unknown evidence labels. Existing old `rea.md`/`reverse-engineering.md` files are migrated.
 

@@ -2,7 +2,7 @@
 
 A complete snapshot of every skill available in CEditNeuro **0.99.31 (versionCode 147)**, taken on **2026-10-22**, updated **2026-10-24**, from the phone's app-scope folder and the built-in source.
 
-**44 skills:** 42 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
+**45 skills:** 43 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
 
 This file is a catalog and a porting guide. The app does not load `SKILLS.md`; it loads the `.md` files in the two skill folders described below. The JSON at the end is the same inventory in a machine-readable form.
 
@@ -233,6 +233,7 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 | 42 | [visual-explainer](#visual-explainer) | starter | a system, diff, plan, or concept needs a designed explanation | design | 7,448 |
 | 43 | [web-reach](#web-reach) | starter | read a link, page, article, repo, thread, or feed | study | 3,454 |
 | 44 | [web-to-app](#web-to-app) | starter | a website or HTML file must become an Android app | device | 793 |
+| 45 | [rea-video](#rea-video) | starter | a reference video must be taken apart shot by shot and remade | video, remote | 3,502 |
 
 ## Every skill
 
@@ -481,6 +482,18 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 **Tools:** `remote_put`, `ssh_exec`, `run_command`, `read_file`, `write_file`, `http_request`, `load_tools`.
 
 **Shape:** adapted from the named external project; it is a local procedure, not a bundled program. It keeps the evidence, stops, and privacy rules in the file.
+
+### rea-video
+
+**Scope:** app · **Origin:** starter · **File:** `rea-video.md` · **Size:** 3,502 chars
+
+**Trigger:** a reference video must be taken apart shot by shot and remade.
+
+**Use:** `use_skill name=rea-video scope=app`
+
+**Shape:** local offline `rea_video` pass writes a storyboard, shot table, JSON, and plan; full Apache-2.0 REA-Video CLI on a PC adds live/AI/3D, OCR, audio, and review. No paid generation without consent.
+
+**Group(s):** video, remote · **Tool(s):** `rea_video`, `download_video`, `render_video`, `read_file`, `write_file`, `open_file`, `run_command`, `remote_put`, `ssh_exec`
 
 ### reanimate
 
@@ -745,7 +758,8 @@ The JSON below is the same inventory. `origin` is `starter`, `builtin`, or `user
     {"name": "network-study", "scope": "app", "origin": "starter", "trigger": "a network concept or topology must be taught with a drawing", "groups": ["study", "device"], "tools": ["net_audit", "capture_dump", "read_dump", "write_file", "network_card", "open_file", "load_tools"], "chars": 6531, "file": "network-study.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "photo-ocr", "scope": "app", "origin": "user", "trigger": "a photo arrived and the message has only paths", "groups": [], "tools": ["run_command", "read_file", "remote_delete"], "chars": 1491, "file": "photo-ocr.md", "source": "phone:CEditNeuro/skills/photo-ocr.md"},
     {"name": "rea", "scope": "app", "origin": "starter", "trigger": "a software system needs REA or a lean local path", "groups": ["remote"], "tools": ["remote_put", "ssh_exec", "run_command", "read_file", "write_file", "http_request", "load_tools"], "chars": 4836, "file": "rea.md", "source": "ResearchSkill.kt#StarterSkills"},
-    {"name": "reanimate", "scope": "app", "origin": "starter", "trigger": "an animation from a GIF, video, or site must be rebuilt", "groups": [], "tools": ["http_request", "read_file", "write_file", "edit_file", "open_file", "layout", "visual_card"], "chars": 9462, "file": "reanimate.md", "source": "ResearchSkill.kt#StarterSkills"},
+    {"name": "rea-video", "scope": "app", "origin": "starter", "trigger": "a reference video must be taken apart shot by shot and remade", "groups": ["video", "remote"], "tools": ["rea_video", "download_video", "render_video", "read_file", "write_file", "open_file", "run_command", "remote_put", "ssh_exec"], "chars": 3502, "file": "rea-video.md", "source": "ResearchSkill.kt#StarterSkills"},
+{"name": "reanimate", "scope": "app", "origin": "starter", "trigger": "an animation from a GIF, video, or site must be rebuilt", "groups": [], "tools": ["http_request", "read_file", "write_file", "edit_file", "open_file", "layout", "visual_card"], "chars": 9462, "file": "reanimate.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "research", "scope": "app", "origin": "builtin", "trigger": "a study question, a claim to check, a measured build", "groups": ["study"], "tools": ["research_log", "research_report", "research_figure", "research_plot", "research_run", "reference", "calculate", "chart", "open_file", "http_request", "grep"], "requires_skills": ["deep-read", "review", "debug", "security"], "chars": 4340, "file": "research.md", "source": "ResearchSkill.kt#TEXT"},
     {"name": "reverse-engineering", "scope": "app", "origin": "starter", "trigger": "a program must be understood to its real algorithm or a backdoor", "groups": ["build", "device", "study", "remote"], "tools": ["install_android_sdk", "install_jdk", "install_module", "install_program", "shizuku_exec", "install_apk", "open_file", "capture_dump", "read_dump", "net_audit", "remote_put", "ssh_exec", "run_command", "read_file", "write_file", "edit_file", "grep", "http_request"], "requires_skills": ["android-apk"], "chars": 11965, "file": "reverse-engineering.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "review", "scope": "app", "origin": "starter", "trigger": "before saying a code change works", "groups": [], "tools": ["git_diff", "read_file", "run_command"], "chars": 364, "file": "review.md", "source": "ResearchSkill.kt#StarterSkills"},

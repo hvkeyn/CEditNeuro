@@ -20,6 +20,14 @@ class ReverseSkillTest {
     }
 
     @Test
+    fun reaVideoHasALocalPassAndAPcRoute() {
+        val text = StarterSkills.skills.getValue("rea-video")
+        listOf("rea_video", "storyboard", "does not classify", "REA-Video", "download_video", "No paid generation")
+            .forEach { assertTrue("rea-video lacks $it", text.contains(it, ignoreCase = true)) }
+        assertTrue(text.length <= 12_000)
+    }
+
+    @Test
     fun oldReaSkillsAreMigrated() {
         val dir = Files.createTempDirectory("rea-migration").toFile()
         java.io.File(dir, "rea.md").writeText("# REA\nREA 6.8.0 is the reference toolkit.\n")

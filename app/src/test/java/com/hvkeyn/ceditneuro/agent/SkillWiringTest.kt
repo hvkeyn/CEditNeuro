@@ -46,6 +46,7 @@ class SkillWiringTest {
         "clear_text",
         "set_text",
         "dyld_info",
+        "review_answers",
     )
 
     @Test

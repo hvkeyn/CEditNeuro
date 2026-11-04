@@ -920,6 +920,67 @@ object StarterSkills {
             4. Reconstruction and test vector.
             5. Unknowns, limitations, and one next probe.
 """.trimIndent() + "\n",
+        "rea-video" to """
+            # REA-Video: reverse-engineer a reference video
+
+            Use this when the user gives a video or a link and asks how it was made, what is AI, what is real material, how to clone its look, or for a shot-by-shot remake plan. It covers talking-head, tabletop, AI video, 3D/animation, code motion graphics, screen recordings, and mixed edits.
+
+            ## Rights and limits
+
+            - Work on material the user owns or may study. Do not reuse the source footage, music, a person's likeness, or a logo in the remake; rebuild the structure with material the user has rights to.
+            - Do not bypass DRM, a login, or a paywall, and do not upload a private video to a third-party service.
+            - No paid generation before the user confirms. A plan is not a generated film.
+
+            ## Route A: this phone, one pass
+
+            Call `load_tools group=video`. If the user sent a link, first call `download_video`; it saves a file in the project. Then:
+
+            ```text
+            rea_video path=downloads/reference.mp4
+            ```
+
+            It writes `rea-video/<name>/storyboard.jpg`, `shots/`, `breakdown.json`, `report.md`, and `report.html`, and returns a shot table and remake plan. Read the storyboard and the shot table before answering. This offline pass measures cuts and exports frames; it **does not classify live/AI/3D** and does not read speech, music, OCR, or a prompt. Say that plainly.
+
+            After the pass:
+
+            1. Report the duration, size, shot count, average shot, and the exact output paths.
+            2. Give a remake plan that keeps the cut times and shot lengths. For each shot, choose real footage the user owns, a code/HTML animation, or a generated clip.
+            3. Use `hyperframes` for a quiet animatic in HTML, then `render_video` only when the user asks for an MP4.
+            4. Mark live/AI/3D, audio source, and on-screen text as **unknown** unless a frame or the user proved it.
+
+            ## Route B: full REA-Video CLI on the user's PC
+
+            The full tool is Apache-2.0: https://github.com/JuneYaooo/rea-video. It needs Python 3.10+ and ffmpeg. Do not install it on the daily phone.
+
+            ```bash
+            git clone https://github.com/JuneYaooo/rea-video && cd rea-video
+            pip install -e ".[ocr]"
+            rea-video --help
+            rea-video decompose ref.mp4 -o out/ref
+            rea-video summary out/ref/breakdown.json
+            rea-video review out/ref
+            # fill review_answers.json from the frame images, then:
+            rea-video apply-review out/ref --by <name>
+            rea-video summary out/ref/breakdown.json
+            ```
+
+            - `--vlm` and an OpenAI-compatible vision endpoint are optional; without one, the tool still runs. The `VLM:` line in `summary` is the proof it worked.
+            - Always look at `storyboard.jpg`, `audio.png`, and the low-confidence shot images yourself. The agent's review is part of the method, not optional.
+            - The generated reports are in Chinese. Answer in the user's language and offer to translate `report.md` if needed.
+            - Use `rea-video correct` and `prefs` only for the user's own corrections and preferences.
+            - A remake can use capsule-cinema for AI shots, but run `remake-run --dry-run` and get consent before a paid call. Real shots are filmed from the plan; code shots are rebuilt, not generated.
+
+            ## Deliver
+
+            1. One-line verdict: what the video is made of, or what remains unknown.
+            2. Remake plan grouped by shooting setup / generation unit / code unit.
+            3. Shot table: start, length, visual, camera/lighting if known, evidence.
+            4. Captions, overlays, audio, and real assets only where evidenced.
+            5. Unknowns and the next probe.
+            6. Paths to the storyboard, report, and data.
+
+            Do not claim a clone or an AI film exists unless a render or generator actually produced it.
+        """.trimIndent() + "\n",
         "reanimate" to """
             # Reanimate: motion from a reference
 
