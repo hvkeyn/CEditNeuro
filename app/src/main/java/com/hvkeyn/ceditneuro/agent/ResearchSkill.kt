@@ -565,9 +565,16 @@ object StarterSkills {
             2. `ui_display action=launch package=<id>` (use `list_apps` to find it). Do not use `ui_act launch` for the background display.
             3. `ui_snapshot display=background`. The refs belong to that display.
             4. `ui_act` the refs, then `ui_snapshot display=background` again. `ui_collect` still reads the last snapshot.
-            5. `ui_display action=stop` when done. Never leave a display running after the task.
+            5. For a custom-drawn screen, `ui_frame ocr=true` returns the latest PNG path and ML Kit text. OCR is **Latin-only**; use accessibility labels for Cyrillic/other scripts. `open_file` the frame path when the person wants a preview.
+            6. `ui_display action=queue package=<id>` adds a package; `action=next` launches the next queued package after the current task. This is a sequential queue, not parallel apps.
+            7. `ui_display action=check package=<id>` detects the app appearing on the main display. If it reports a spill, stop and hand that screen to the person.
+            8. `ui_display action=stop` when done. Never leave a display running after the task.
 
-            The prototype has no live image or OCR; it reads the accessibility tree only. Apps that do not support secondary displays, protected windows, startup choosers, logins, payments, and permissions may still appear on the main screen or need the person. If the background snapshot is empty, stop and fall back to the main display instead of guessing.
+            Apps that do not support secondary displays, protected windows, startup choosers, logins, payments, and permissions may still appear on the main screen or need the person. If the background snapshot is empty, stop and fall back to the main display instead of guessing.
+
+            ## Save a successful task as a skill
+
+            After a verified, repeatable UI task, call `save_skill` or `append_skill` with a short Markdown procedure: app/package, starting screen, ordered labels and actions, what proves each step, and the stop conditions (login, payment, chooser). Use a name such as `<app>-<task>` and app scope. Do not save a task from a single unverified attempt; do not include private text, credentials, or a hardcoded coordinate when a label works.
 
             ## Common app patterns
 
@@ -2464,7 +2471,7 @@ object StarterSkills {
             file.writeText(current, Charsets.UTF_8)
         }
         current = file.readText(Charsets.UTF_8)
-        if (!current.contains("ui_collect") || !current.contains("ui_display")) {
+        if (!current.contains("ui_collect") || !current.contains("ui_display") || !current.contains("ui_frame")) {
             file.writeText(skills.getValue("mobile-control"), Charsets.UTF_8)
         }
     }

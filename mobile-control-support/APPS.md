@@ -47,3 +47,7 @@ Stop. Give the person the screen or a handoff link, and resume only after they c
 ## Verification
 
 A tap is not success. Check the next snapshot for the changed field, opened dialog, selected row, or sent-message state. If the app changed or the ref is stale, take a fresh `ui_snapshot`.
+
+## Save a verified task as a skill
+
+After a repeatable flow succeeds and is verified, use `save_skill`/`append_skill` with app/package, starting screen, ordered labels/actions, evidence for each step, and stop conditions. Do not save a single unverified attempt or private text.

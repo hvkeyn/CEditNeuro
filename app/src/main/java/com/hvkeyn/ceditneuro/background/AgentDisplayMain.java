@@ -5,7 +5,9 @@ import android.hardware.display.DisplayManager;
 import android.hardware.display.VirtualDisplay;
 import android.media.Image;
 import android.media.ImageReader;
+import android.graphics.Bitmap;
 import android.graphics.PixelFormat;
+import java.io.FileOutputStream;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -24,6 +26,8 @@ public final class AgentDisplayMain {
         int dpi = clamp(parse(args, 2, 420), 120, 640);
         File out = new File("/data/local/tmp/ceditneuro-agent-display.id");
         File log = new File("/data/local/tmp/ceditneuro-agent-display.log");
+        File frame = new File("/data/local/tmp/ceditneuro-agent-frame.png");
+        File frameTmp = new File("/data/local/tmp/ceditneuro-agent-frame.tmp");
         VirtualDisplay display = null;
         ImageReader reader = null;
         try {
@@ -46,8 +50,24 @@ public final class AgentDisplayMain {
                 while (true) {
                     try {
                         Image image = frameReader.acquireLatestImage();
-                        if (image != null) image.close();
-                        Thread.sleep(500L);
+                        if (image != null) {
+                            try {
+                                int stride = image.getPlanes()[0].getRowStride()
+                                        / image.getPlanes()[0].getPixelStride();
+                                Bitmap padded = Bitmap.createBitmap(stride, height, Bitmap.Config.ARGB_8888);
+                                padded.copyPixelsFromBuffer(image.getPlanes()[0].getBuffer().rewind());
+                                Bitmap upright = Bitmap.createBitmap(padded, 0, 0, width, height);
+                                try (FileOutputStream stream = new FileOutputStream(frameTmp)) {
+                                    upright.compress(Bitmap.CompressFormat.PNG, 90, stream);
+                                }
+                                frameTmp.renameTo(frame);
+                                upright.recycle();
+                                padded.recycle();
+                            } finally {
+                                image.close();
+                            }
+                        }
+                        Thread.sleep(700L);
                     } catch (Throwable ignored) { }
                 }
             }, "agent-display-drain");

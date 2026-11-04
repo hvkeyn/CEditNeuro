@@ -26,7 +26,9 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ---
 
-## New in 0.99.80
+## New in 0.99.81
+
+- **Live background frame + OCR**: the display helper writes PNG frames; `ui_frame ocr=true` returns the local image and ML Kit Latin text. `ui_display` gained a sequential package queue and main-screen spill detection.
 
 - **Background display loop verified**: Shizuku `ui_display start` created display 9, `launch` opened Settings on it, `ui_snapshot display=background` returned nodes, `ui_act` scrolled with a fresh snapshot, and `stop` cleaned up. The main CEdiNeuro screen stayed usable. Fixed the stale `shizukuDenied` flag that kept reporting “permission not granted” after the user granted it.
 

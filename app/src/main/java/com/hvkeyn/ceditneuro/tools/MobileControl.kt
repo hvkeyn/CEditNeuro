@@ -2,6 +2,12 @@ package com.hvkeyn.ceditneuro.tools
 
 import com.hvkeyn.ceditneuro.access.MobileAccessibilityService
 import com.hvkeyn.ceditneuro.background.AgentDisplayController
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import com.hvkeyn.ceditneuro.shizuku.ShizukuCommandRunner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -240,10 +246,10 @@ class UiDisplayTool(
     override val description =
         "Start or stop a prototype off-screen display and launch an app on it. " +
             "Requires Shizuku or root. After launch call ui_snapshot display=background. " +
-            "action: start, stop, status, launch (package), attach (displayId)."
+            "action: start, stop, status, launch (package), queue (package), next, check (package), attach (displayId)."
     override val parameters = objectSchema(
         properties = mapOf(
-            "action" to stringProp("start, stop, status, launch, or attach."),
+            "action" to stringProp("start, stop, status, launch, queue, next, check, or attach."),
             "package" to stringProp("Application id for launch."),
             "displayId" to intProp("Display id for attach."),
         ),
@@ -263,10 +269,25 @@ class UiDisplayTool(
                 AgentDisplayController.stop(runner)
                 ToolResult.ok("Background display stopped.")
             }
-            "status" -> ToolResult.ok(
-                AgentDisplayController.displayId?.let { "Background display $it is running." }
-                    ?: "No background display is running.",
-            )
+            "status" -> {
+                val running = AgentDisplayController.displayId?.let { "Background display $it is running." }
+                    ?: "No background display is running."
+                ToolResult.ok("$running Queue=${AgentDisplayController.queued().joinToString(",")}")
+            }
+            "queue" -> {
+                val pkg = args.stringArg("package")?.trim().orEmpty()
+                if (!Regex("^[A-Za-z][\\w]*(\\.[A-Za-z][\\w]*)+$").matches(pkg)) {
+                    return@withContext ToolResult.error("queue requires a valid package id.")
+                }
+                val size = AgentDisplayController.enqueue(pkg)
+                ToolResult.ok("Queued $pkg. Queue size=$size.")
+            }
+            "next" -> ToolResult.ok(AgentDisplayController.next(runner, prepare) ?: "Queue empty.")
+            "check" -> {
+                val pkg = args.stringArg("package")?.trim().orEmpty()
+                AgentDisplayController.mainScreenSpill(runner, prepare, pkg)?.let { ToolResult.ok(it) }
+                    ?: ToolResult.ok("No main-screen spill detected for ${pkg.ifBlank { "that package" }}.")
+            }
             "attach" -> {
                 val id = args.intArg("displayId")
                     ?: return@withContext ToolResult.error("displayId is required for attach.")
@@ -277,11 +298,69 @@ class UiDisplayTool(
                 val pkg = args.stringArg("package")?.trim().orEmpty()
                 val error = AgentDisplayController.launch(runner, prepare, pkg)
                 if (error != null) ToolResult.error(error)
-                else ToolResult.ok("Launched $pkg on display ${AgentDisplayController.displayId}. Call ui_snapshot display=background.")
+                else {
+                    delay(800)
+                    val spill = AgentDisplayController.mainScreenSpill(runner, prepare, pkg)
+                    ToolResult.ok(
+                        "Launched $pkg on display ${AgentDisplayController.displayId}. Call ui_snapshot display=background." +
+                            (spill?.let { "\nWARNING: $it" } ?: ""),
+                    )
+                }
             }
             else -> ToolResult.error("action is start, stop, status, launch, or attach.")
         }
     }
+}
+
+class UiFrameTool(
+    private val context: android.content.Context,
+    private val runner: ShizukuCommandRunner,
+    private val prepare: suspend () -> String?,
+) : Tool {
+    override val name = "ui_frame"
+    override val description =
+        "Capture the latest frame of the background display and optionally OCR it. " +
+            "Requires the background display to be running. Returns the local frame path, size, and OCR text. " +
+            "Falls back to accessibility refs for normal work; use this only for custom-drawn UI."
+    override val parameters = objectSchema(
+        properties = mapOf(
+            "ocr" to boolProp("Recognize text with the bundled ML Kit Latin recognizer."),
+        ),
+    )
+
+    override suspend fun execute(args: JsonObject): ToolResult = withContext(Dispatchers.IO) {
+        val file = AgentDisplayController.captureFrame(context, runner, prepare)
+            ?: return@withContext ToolResult.error("No background frame. Start ui_display and launch an app first.")
+        val bitmap = android.graphics.BitmapFactory.decodeFile(file.absolutePath)
+            ?: return@withContext ToolResult.error("Frame was written but could not be decoded.")
+        val ocr = args.boolArg("ocr") == true
+        val text = if (ocr) recognize(bitmap) else ""
+        val result = buildString {
+            appendLine("frame=${file.absolutePath} ${bitmap.width}x${bitmap.height}")
+            if (ocr) {
+                appendLine("ocr=mlkit-latin")
+                append(text.take(12_000))
+            } else {
+                append("ocr=false; pass ocr=true to read text")
+            }
+        }
+        bitmap.recycle()
+        ToolResult.ok(result)
+    }
+
+    private suspend fun recognize(bitmap: android.graphics.Bitmap): String =
+        suspendCancellableCoroutine { continuation ->
+            val client = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+            client.process(InputImage.fromBitmap(bitmap, 0))
+                .addOnSuccessListener { result ->
+                    client.close()
+                    if (continuation.isActive) continuation.resume(result.text)
+                }
+                .addOnFailureListener { error ->
+                    client.close()
+                    if (continuation.isActive) continuation.resumeWithException(error)
+                }
+        }
 }
 
 class UiFindTool(private val store: MobileUiStore) : Tool {

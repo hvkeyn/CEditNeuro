@@ -18,8 +18,8 @@ android {
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
         }
-        versionCode = 196
-        versionName = "0.99.80"
+        versionCode = 197
+        versionName = "0.99.81"
     }
 
     buildTypes {
@@ -133,6 +133,7 @@ dependencies {
     }
     implementation("com.googlecode.javaewah:JavaEWAH:1.2.3")
     implementation(libs.apksig)
+    implementation(libs.mlkit.text.recognition)
 }
 
 val packWebShell = tasks.register<Copy>("packWebShell") {
