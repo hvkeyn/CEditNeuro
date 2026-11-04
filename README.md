@@ -26,7 +26,9 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ---
 
-## New in 0.99.85
+## New in 0.99.86
+
+- **Stageshow for faux product UI**: a new `stageshow` skill adapts the Stageshow rules to one plain HTML/CSS file — one hero, 3–7 real strings, a hard crop, mixed bento tiles, and causal motion. `frontend-design`/`visual-explainer` route mockups here. New `stage_review` catches purple gradients, glass on every card, emoji icons, tiny type, dead controls, and missing focus states; it is a static check, not a frame review.
 
 - **The connected model renders the remake**: `rea_video` now also writes `remake.html`, an abstract animatic on the reference timing. The connected model rewrites its copy, palette, and motion; `render_video` makes the MP4 on the phone. Tested: 24 fps, 73 frames, 3.0 s, silent by design.
 

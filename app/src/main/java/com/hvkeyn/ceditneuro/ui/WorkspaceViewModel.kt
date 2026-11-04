@@ -3666,6 +3666,8 @@ class WorkspaceViewModel(
             com.hvkeyn.ceditneuro.tools.CalculateTool(),
             com.hvkeyn.ceditneuro.tools.ChartTool(),
             com.hvkeyn.ceditneuro.tools.LayoutTool(),
+            com.hvkeyn.ceditneuro.tools.DesignSystemTool(),
+            com.hvkeyn.ceditneuro.tools.StageReviewTool(ws),
             com.hvkeyn.ceditneuro.tools.NetworkCardTool(),
             com.hvkeyn.ceditneuro.tools.AsciiArtTool(),
             com.hvkeyn.ceditneuro.tools.VisualCardTool(),

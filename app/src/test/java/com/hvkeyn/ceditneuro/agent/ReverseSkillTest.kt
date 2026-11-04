@@ -20,6 +20,14 @@ class ReverseSkillTest {
     }
 
     @Test
+    fun stageshowKeepsTheFauxUiRulesOnPlainHtml() {
+        val text = StarterSkills.skills.getValue("stageshow")
+        listOf("faux product UI", "3–7", "stage_review", "render_video", "one hero", "bento", "React")
+            .forEach { assertTrue("stageshow lacks $it", text.contains(it, ignoreCase = true)) }
+        assertTrue(text.length <= 12_000)
+    }
+
+    @Test
     fun reaVideoHasALocalPassAndAPcRoute() {
         val text = StarterSkills.skills.getValue("rea-video")
         listOf("rea_video", "storyboard", "does not classify", "REA-Video", "download_video", "No paid generation")

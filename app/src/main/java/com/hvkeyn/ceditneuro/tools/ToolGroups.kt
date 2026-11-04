@@ -120,6 +120,7 @@ object ToolGroups {
         ),
         "design" to listOf(
             "design_system",
+            "stage_review",
         ),
         "debug" to listOf(
             "debug_case",

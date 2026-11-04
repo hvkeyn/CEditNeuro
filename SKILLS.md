@@ -2,7 +2,7 @@
 
 A complete snapshot of every skill available in CEditNeuro **0.99.31 (versionCode 147)**, taken on **2026-10-22**, updated **2026-10-24**, from the phone's app-scope folder and the built-in source.
 
-**45 skills:** 43 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
+**46 skills:** 44 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
 
 This file is a catalog and a porting guide. The app does not load `SKILLS.md`; it loads the `.md` files in the two skill folders described below. The JSON at the end is the same inventory in a machine-readable form.
 
@@ -234,6 +234,7 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 | 43 | [web-reach](#web-reach) | starter | read a link, page, article, repo, thread, or feed | study | 3,454 |
 | 44 | [web-to-app](#web-to-app) | starter | a website or HTML file must become an Android app | device | 793 |
 | 45 | [rea-video](#rea-video) | starter | a reference video must be taken apart shot by shot and remade | video, remote | 4,304 |
+| 46 | [stageshow](#stageshow) | starter | a faux product UI, feature card, bento, or cursor demo must look real | design, video | 5,183 |
 
 ## Every skill
 
@@ -376,6 +377,18 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 **Tools:** `find_skills`, `review_skill`, `save_skill` (group `skills`).
 
 **Shape:** `find_skills` with plain words → pick one → `review_skill` → only the adapted text may be `save_skill` → turn off. A blocked result is not saved and not switched on. No `npx`, `apt`, `sudo`, or downloaded program.
+
+### stageshow
+
+**Scope:** app · **Origin:** starter · **File:** `stageshow.md` · **Size:** 5,183 chars
+
+**Trigger:** a faux product UI, feature card, bento, phone mockup, or cursor demo must look real.
+
+**Use:** `use_skill name=stageshow scope=app`
+
+**Shape:** plain HTML/CSS adaptation of benjitaylor/skills Stageshow; one stage, one hero, 3–7 real strings, hard crop, one causal motion. `stage_review` catches mechanical faults; `open_file` and `render_video` are the frame check. No React, Node, or kit install.
+
+**Group(s):** design, video · **Tool(s):** `stage_review`, `open_file`, `layout`, `render_video`, `read_file`, `write_file`, `edit_file`
 
 ### frontend-design
 
@@ -748,7 +761,8 @@ The JSON below is the same inventory. `origin` is `starter`, `builtin`, or `user
     {"name": "diff-tour", "scope": "app", "origin": "starter", "trigger": "a diff must be explained visually or handed off", "groups": ["device"], "tools": ["git_status", "git_diff", "read_file", "grep", "run_command", "write_file", "open_file", "layout", "load_tools"], "chars": 8983, "file": "diff-tour.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "dreams", "scope": "app", "origin": "starter", "trigger": "a dream or nightmare is told and asks to be read", "groups": [], "tools": ["write_file", "edit_file"], "chars": 4404, "file": "dreams.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "find-skills", "scope": "app", "origin": "starter", "trigger": "find or install a skill for a task", "groups": ["skills"], "tools": ["find_skills", "review_skill", "save_skill"], "chars": 960, "file": "find-skills.md", "source": "ResearchSkill.kt#StarterSkills"},
-    {"name": "frontend-design", "scope": "app", "origin": "starter", "trigger": "a landing page, cabinet, form, or product screen", "groups": ["design"], "tools": ["http_request", "write_file", "design_system"], "requires_skills": ["hyperframes", "web-to-app"], "chars": 4804, "file": "frontend-design.md", "source": "ResearchSkill.kt#StarterSkills"},
+    {"name": "stageshow", "scope": "app", "origin": "starter", "trigger": "a faux product UI, feature card, bento, or cursor demo must look real", "groups": ["design", "video"], "tools": ["stage_review", "open_file", "layout", "render_video", "read_file", "write_file", "edit_file"], "chars": 5183, "file": "stageshow.md", "source": "ResearchSkill.kt#StarterSkills"},
+{"name": "frontend-design", "scope": "app", "origin": "starter", "trigger": "a landing page, cabinet, form, or product screen", "groups": ["design"], "tools": ["http_request", "write_file", "design_system"], "requires_skills": ["hyperframes", "web-to-app"], "chars": 4804, "file": "frontend-design.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "genealogy", "scope": "app", "origin": "starter", "trigger": "family history, ancestors, or archive records in the former USSR", "groups": ["remote"], "tools": ["write_file", "read_file", "run_command", "http_request", "browse_page", "load_tools"], "chars": 11976, "file": "genealogy.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "health", "scope": "app", "origin": "starter", "trigger": "a lab sheet, scan report, or family health record", "groups": ["health"], "tools": ["health_log", "health_panel", "health_trend", "health_index"], "chars": 1361, "file": "health.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "hyperframes", "scope": "app", "origin": "starter", "trigger": "a video, animation, title card, or HyperFrames composition", "groups": [], "tools": ["render_video", "edit_video", "sound_effect", "make_music", "voiceover", "web_search", "http_request", "write_file", "edit_file"], "chars": 11930, "file": "hyperframes.md", "source": "ResearchSkill.kt#StarterSkills"},

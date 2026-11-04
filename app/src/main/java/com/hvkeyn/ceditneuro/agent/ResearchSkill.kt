@@ -172,7 +172,7 @@ object StarterSkills {
 
             Use this when the user needs an explanation of a system, architecture, change, plan, comparison, data set, or technical concept — not a single drawing and not a talking answer. The deliverable is a short self-contained HTML page plus a readable card in the chat. Figures carry the explanation; prose is the caption.
 
-            Adapted from [nicobailon/visual-explainer](https://github.com/nicobailon/visual-explainer) (MIT). This is a local HTML/CSS adaptation, not its Node/MCP renderer. Do not install a browser, Node, a kit, or an external CDN.
+            Adapted from [nicobailon/visual-explainer](https://github.com/nicobailon/visual-explainer) (MIT). This is a local HTML/CSS adaptation, not its Node/MCP renderer. For a faux product screenshot, feature card, bento grid, or product mockup, use `stageshow`. Do not install a browser, Node, a kit, or an external CDN.
 
             ## What to make
 
@@ -1830,12 +1830,47 @@ object StarterSkills {
             6. Do not copy another installed app, change its package, or wrap a store app. Do not change TLS, hide the device, or add a proxy.
             7. A local folder is stored inside the APK and works offline. A url opens live and needs a network.
         """.trimIndent() + "\n",
+        "stageshow" to """
+            # Stageshow: faux product UI
+
+            Use this when the user wants a fake but believable product interface: a feature card, app-window mockup, phone screen, bento grid, hero illustration, or a short cursor demo that shows one thing happening. This is an illustration of a product, not the product's real frontend; use `frontend-design` for a page that must actually work.
+
+            Adapted from [benjitaylor/skills](https://github.com/benjitaylor/skills) Stageshow (MIT). That project is React/TypeScript with a component kit and a Node film harness. This phone cannot run Node or React, so the rules below are rewritten for **one plain HTML/CSS file**; do not install its npm kit. Read its `references/craft.md`, `framing.md`, `bento.md`, and `verify.md` only when a page is reachable and you need a rule this skill does not cover.
+
+            ## One idea
+
+            It reads as a real product, simplified to what the viewer needs, framed with intent, and every motion has a cause. Five failures: too much detail, a wireframe of two gray blobs, a whole window shrunk with even margins, every object at the same weight, and a bland gray screen with a cursor. Use a full, structured screen in quiet grays; real words only on the story; placeholder bars for the rest; room to breathe; a crop that puts the eye on the action.
+
+            ## Plan before code
+
+            1. **Medium and place.** Still or animation. A hero beside copy is about 720×340; a full-width hero 900–1100; a feature card 400×300; a bento tile may be smaller. A phone column is its own compact design at 390, not a squeezed wide one. Show at 1:1.
+            2. **Look.** One ground, one paper, one ink, one muted ink, one accent. Use the real product's tokens or a named theme (light, dark, blueprint, glass). No purple-to-blue gradient, glass on every card, blob background, emoji icon, or three identical cards. Pick one fidelity: bars, mixed, or realistic. Real words only where the story is.
+            3. **Story.** Three to five beats and a payoff, about 10–16 seconds when animated. One cursor action must have a cause. A still needs a poster frame that tells the story alone.
+            4. **Build the screen.** Count real strings: usually 3–7. The title, the thing acted on, what is typed, the result; bars are filler. Keep domain signature content (album art, a real row, a chart) when it makes the product recognizable. Name avatars get their own color; gray discs are filler only. No masthead for a fictional name, no sparkles, no made-up logo.
+            5. **Frame it.** One hero, at most one or two satellites. The window or phone fills at least two thirds of the stage and runs off an edge; crop 10–40%. Crop only filler; never cut a word, a button, a payoff, or the action. One gutter measured in the final crop; no dead corner. Satellites straddle the hero's edge, about half outside; never two cards of one width on one edge. A whole window with even air on four sides is a failed draft.
+            6. **Bento.** One set, one picture. One hero tile (two columns or two rows); about a third to a half of tiles show UI, the rest are a real number, an object, a diagram, or a short statement. One UI tile shows one component, not a whole window; chrome appears at most once. Alternate density and kind; neighbors contrast. A stat is one number and its unit on one line, with a short lead. Copy is outside the picture, 17–24px page type; UI inside stays at UI size. No repeated string, avatar, or chrome across tiles.
+            7. **Motion.** Build with CSS keyframes or a small JS timeline in the same file. One thing happens; the relationship moves, not just the object. An entrance is 0.6–1.2s and moves as well as fades; no pop, no cover, no two tweens on one property. Text changes in place, not a swap. A loop ends where it began or resets with a visible cause. No `Math.random` or `Date.now`; the film must be deterministic.
+            8. **Verify.** Call `load_tools group=design`, then `stage_review path=<file>` to catch mechanical faults. Open the file with `open_file` and look at 390px and the wide width; a static check is not a frame review. For motion, call `load_tools group=video`, `render_video path=<file>` and inspect the frames/story; do not claim a pass you did not see. If no frame can be inspected, say so.
+            9. **Hand over.** Report the file, the width, the real strings, the story beats, and what was not checked. Use `layout` only for a small chat card; a full page goes through `open_file`. Do not install React, Node, npm, Playwright, or the Stageshow kit.
+
+            ## Checks that catch a generated look
+
+            - A row with a real value beside a gray bar; both should be words or both bars.
+            - A list of six gray bars where the eye lands; put the subject's words there.
+            - A 9px label, a label touching a card edge, a button sitting on its field, a unit on its own line.
+            - A phone with a hand-drawn status bar or home indicator; omit the chrome unless it is drawn consistently.
+            - A popover shifting while open, an icon clipped by its box, an emoji where a glyph belongs.
+            - A terminal with each line's mark outside its grid cell.
+            - A still that only differs from the closest reference by its name.
+
+            Do not use another product's identity, logo, or copied assets. A real product study borrows an interaction, never its brand.
+        """.trimIndent() + "\n",
         "frontend-design" to """
             # Design a screen
 
             Use this for a new web page, a desktop window, an Android screen, or an iOS screen. Also use it when the user says the screen looks wrong, bland, or generic, or names Refero, a DESIGN.md, 21st.dev, component.gallery, Kinetics, designsystems.one, or the Google AI Studio design guide. A small edit stays a small edit: do that task and do not open this procedure.
 
-            The project's existing design and components win. An external page is only for a choice that is not made yet.
+            The project's existing design and components win. An external page is only for a choice that is not made yet. For a **faux product UI**, a feature card, a bento grid, a phone mockup, or a cursor demo, use `stageshow` instead of this real-screen procedure.
 
             Do not install a package, an MCP, or a command-line tool. This phone has no 21st.dev MCP. A video, an animation, or a motion graphic uses use_skill hyperframes. Do not pretend a renderer ran. If a page cannot be read, stop and ask the user to paste it. Do not fill a color, a type size, or a component from memory.
 
