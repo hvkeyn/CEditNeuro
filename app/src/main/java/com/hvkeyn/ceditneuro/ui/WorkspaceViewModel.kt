@@ -2825,7 +2825,10 @@ class WorkspaceViewModel(
                 "Enable CEdiNeuro in Android Accessibility for mobile control without Shizuku, or start Shizuku/root. " +
                 "Install with install_apk and remove with uninstall_apk."
         }
-        if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) return null
+        if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
+            shizukuDenied = false
+            return null
+        }
         if (shizukuDenied) {
             return "Shizuku permission was not granted. Do not call shizuku_exec, fetch_system_layout, execute_system_action, ui_snapshot, or ui_act again. " +
                 "Enable CEdiNeuro in Android Accessibility for mobile control without Shizuku. " +

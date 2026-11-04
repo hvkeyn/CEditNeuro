@@ -26,7 +26,9 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ---
 
-## New in 0.99.79
+## New in 0.99.80
+
+- **Background display loop verified**: Shizuku `ui_display start` created display 9, `launch` opened Settings on it, `ui_snapshot display=background` returned nodes, `ui_act` scrolled with a fresh snapshot, and `stop` cleaned up. The main CEdiNeuro screen stayed usable. Fixed the stale `shizukuDenied` flag that kept reporting “permission not granted” after the user granted it.
 
 - **Regression release**: mobile-control docs now state clearly that normal app control uses Accessibility only; the VirtualDisplay background helper is an optional early prototype. Tests cover `ui_find` and the Android doctor classifier.
 
