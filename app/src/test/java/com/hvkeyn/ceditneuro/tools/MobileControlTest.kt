@@ -1,5 +1,8 @@
 package com.hvkeyn.ceditneuro.tools
 
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -40,6 +43,36 @@ class MobileControlTest {
         assertEquals(listOf("a", "b", "c"), MobileTextCollector.appendPage(listOf("a", "b"), listOf("b", "c")))
         assertEquals(listOf("a", "b", "c"), MobileTextCollector.prependPage(listOf("b", "c"), listOf("a", "b")))
         assertEquals(listOf("a", "b"), MobileTextCollector.appendPage(listOf("a", "b"), emptyList()))
+    }
+
+    @Test
+    fun findReturnsOnlyMatchingSnapshotRefs() = runBlocking {
+        val store = MobileUiStore()
+        val node = MobileNode(
+            ref = "@find:e1",
+            role = "Button",
+            text = "Save changes",
+            desc = "",
+            id = "save",
+            x1 = 10,
+            y1 = 20,
+            x2 = 110,
+            y2 = 80,
+            clickable = true,
+            longClickable = false,
+            editable = false,
+            scrollable = false,
+            checkable = false,
+            checked = false,
+            enabled = true,
+            password = false,
+        )
+        store.store(MobileSnapshot("find", 1080, 2400, "com.example", listOf(node)))
+        val found = UiFindTool(store).execute(buildJsonObject { put("text", "save") })
+        assertTrue(found.content.contains("@find:e1"))
+        assertTrue(found.content.contains("matches=1"))
+        val none = UiFindTool(store).execute(buildJsonObject { put("text", "delete") })
+        assertTrue(none.content.contains("No match"))
     }
 
     @Test

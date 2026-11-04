@@ -432,7 +432,7 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 
 **Trigger:** another Android app must be operated through its real UI: tap, type, scroll, open an app, or verify a screen.
 
-**Shape:** `ui_snapshot` returns accessibility refs with role, label, bounds, and actions. Act on one ref with `ui_act`; the tool returns a fresh snapshot. Reuse of a stale ref is refused, so the loop is observe → act → observe. Requires Shizuku or root. Passwords, OTP, private screen text, destructive writes, and security boundaries are guarded; coordinates from `fetch_system_layout` are only a fallback.
+**Shape:** Normal control uses the user-enabled Accessibility service and needs no shell. `ui_snapshot` returns accessibility refs with role, label, bounds, and actions. Act on one ref with `ui_act`; the tool returns a fresh snapshot. Reuse of a stale ref is refused, so the loop is observe → act → observe. The optional background-display prototype needs Shizuku/root; normal foreground control does not. Passwords, OTP, private screen text, destructive writes, and security boundaries are guarded; coordinates from `fetch_system_layout` are only a fallback.
 
 **Group(s):** device · **Tool(s):** `ui_snapshot`, `ui_act`, `ui_find`, `ui_collect`, `ui_display`, `list_apps`, `device_status`, `shizuku_exec`, `fetch_system_layout`, `execute_system_action`, `clipboard`
 

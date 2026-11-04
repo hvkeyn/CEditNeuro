@@ -28,6 +28,8 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ## New in 0.99.78
 
+- **Mobile control status**: normal app control uses the user-enabled Accessibility service and needs **no Shizuku/root**. `ui_snapshot` / `ui_act` / `ui_find` / `ui_collect` are the production path. The background VirtualDisplay is an **early optional prototype** and is the only part that needs Shizuku/root.
+
 - **Spec Kit** as a local skill: constitution → spec → plan → tasks → analysis → implementation → convergence. The plan is frozen, every task has a check, and unknown requirements stay marked instead of invented.
 - **Visualize** and `visual_card`: process flows, architectures, sequences, timelines, comparisons, exploded views, and technical sheets are drawn as static paper cards in the chat.
 - **Animated ASCII**: `ascii_art` can play 2–8 shifted frames as a CSS loop in the card. No GIF encoder is installed; MP4 still goes through `render_video`.

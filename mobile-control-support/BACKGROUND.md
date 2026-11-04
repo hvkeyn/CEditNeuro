@@ -1,4 +1,6 @@
-# Background display prototype
+# Background display — early prototype
+
+> This is an early optional prototype. Normal CEdiNeuro mobile control uses Accessibility only and does not need Shizuku/root.
 
 `ui_display` starts a shell-side virtual display so an app can be launched away from the user's main screen.
 
