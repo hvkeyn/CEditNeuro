@@ -208,7 +208,7 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 | 17 | [genealogy](#genealogy) | starter | family history, ancestors, or archive records in the former USSR | remote | 11,976 |
 | 18 | [hyperframes](#hyperframes) | starter | a video, animation, title card, or HyperFrames composition | video | 11,930 |
 | 19 | [learn](#learn) | starter | learn a subject, be taught, or practice | learn | 2,501 |
-| 20 | [mobile-control](#mobile-control) | starter | operate another Android app through accessibility refs | device | 5,227 |
+| 20 | [mobile-control](#mobile-control) | starter | operate another Android app through accessibility refs | device | 6,772 |
 | 21 | [net-map](#net-map) | starter | a network must be drawn from packets | study | 5,603 |
 | 22 | [network-study](#network-study) | starter | a network concept or topology must be taught with a drawing | study, device | 6,531 |
 | 23 | [photo-ocr](#photo-ocr) | user | a photo arrived and the message has only paths | — | 1,491 |

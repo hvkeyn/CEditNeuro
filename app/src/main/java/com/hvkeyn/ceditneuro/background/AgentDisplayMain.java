@@ -3,9 +3,13 @@ package com.hvkeyn.ceditneuro.background;
 import android.content.Context;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.VirtualDisplay;
+import android.media.Image;
+import android.media.ImageReader;
+import android.graphics.PixelFormat;
 
 import java.io.File;
 import java.io.FileWriter;
+import java.io.PrintWriter;
 
 /**
  * Runs through app_process as the shell user. It creates a public, off-screen display
@@ -21,21 +25,45 @@ public final class AgentDisplayMain {
         File out = new File("/data/local/tmp/ceditneuro-agent-display.id");
         File log = new File("/data/local/tmp/ceditneuro-agent-display.log");
         VirtualDisplay display = null;
+        ImageReader reader = null;
         try {
+            android.os.Looper.prepareMainLooper();
             Class<?> at = Class.forName("android.app.ActivityThread");
             Object thread = at.getMethod("systemMain").invoke(null);
-            Context context = (Context) at.getMethod("getSystemContext").invoke(thread);
+            Context system = (Context) at.getMethod("getSystemContext").invoke(thread);
+            Context context = system;
+            try {
+                context = system.createPackageContext("com.android.shell", Context.CONTEXT_IGNORE_SECURITY);
+            } catch (Throwable ignored) { }
             DisplayManager manager = context.getSystemService(DisplayManager.class);
             int flags = DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC
                     | DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY;
+            reader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2);
             display = manager.createVirtualDisplay(
-                    "CEditNeuro Agent", width, height, dpi, null, flags);
+                    "CEditNeuro Agent", width, height, dpi, reader.getSurface(), flags);
+            ImageReader frameReader = reader;
+            Thread drain = new Thread(() -> {
+                while (true) {
+                    try {
+                        Image image = frameReader.acquireLatestImage();
+                        if (image != null) image.close();
+                        Thread.sleep(500L);
+                    } catch (Throwable ignored) { }
+                }
+            }, "agent-display-drain");
+            drain.setDaemon(true);
+            drain.start();
             int id = display.getDisplay().getDisplayId();
             write(out, Integer.toString(id));
             append(log, "display=" + id + " " + width + "x" + height + " dpi=" + dpi + "\n");
             while (true) Thread.sleep(1000L);
         } catch (Throwable error) {
             append(log, "error=" + error.getClass().getName() + ": " + error.getMessage() + "\n");
+            try (PrintWriter writer = new PrintWriter(new FileWriter(log, true))) {
+                error.printStackTrace(writer);
+                if (error.getCause() != null) error.getCause().printStackTrace(writer);
+                writer.flush();
+            } catch (Exception ignored) { }
             write(out, "-1");
             if (display != null) display.release();
         }

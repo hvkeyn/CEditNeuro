@@ -21,6 +21,12 @@ class MobileAccessibilityService : AccessibilityService() {
     private val nodes = LinkedHashMap<String, AccessibilityNodeInfo>()
 
     override fun onServiceConnected() {
+        serviceInfo?.let { info ->
+            info.flags = info.flags or
+                android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
+                android.accessibilityservice.AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
+            serviceInfo = info
+        }
         instance = this
     }
 
@@ -169,13 +175,19 @@ class MobileAccessibilityService : AccessibilityService() {
 
         fun snapshotNow(displayId: Int = Display.DEFAULT_DISPLAY): MobileSnapshot? = instance?.snapshot(displayId)
 
-        suspend fun actNow(ref: String, action: String, text: String): String? =
-            instance?.act(ref, action, text) ?: "Accessibility control is not enabled."
+        suspend fun actNow(ref: String, action: String, text: String): String? {
+            val service = instance ?: return "Accessibility control is not enabled."
+            return service.act(ref, action, text)
+        }
 
-        suspend fun globalNow(action: String): String? =
-            instance?.global(action) ?: "Accessibility control is not enabled."
+        suspend fun globalNow(action: String): String? {
+            val service = instance ?: return "Accessibility control is not enabled."
+            return service.global(action)
+        }
 
-        fun launchNow(packageName: String): String? =
-            instance?.launch(packageName) ?: "Accessibility control is not enabled."
+        fun launchNow(packageName: String): String? {
+            val service = instance ?: return "Accessibility control is not enabled."
+            return service.launch(packageName)
+        }
     }
 }
