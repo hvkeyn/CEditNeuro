@@ -30,7 +30,7 @@ class ReaVideoTool(private val workspace: Workspace) : Tool {
     override val description =
         "Reverse-engineer a reference video that is already in the project. Splits it into shots " +
             "from frame changes, writes storyboard.jpg, shots/, breakdown.json, report.md, and report.html, " +
-            "then returns a shot-by-shot remake plan. This offline pass does not classify live/AI/3D and " +
+            "then returns a shot-by-shot remake plan and, when change is set, changes.md. This offline pass does not classify live/AI/3D and " +
             "does not read speech or music; use the full REA-Video CLI on a PC for that. " +
             "Rights: rebuild the structure with material the user owns; do not reuse the source footage."
 
@@ -40,6 +40,7 @@ class ReaVideoTool(private val workspace: Workspace) : Tool {
             "out" to stringProp("Project folder. Defaults to rea-video/<video-name>."),
             "sensitivity" to intProp("1 to 100. Higher finds more cuts. Default 70."),
             "max_shots" to intProp("Maximum shots to keep. Default 20."),
+            "change" to stringProp("What to swap in the remake, e.g. 'replace the product with our bottle; keep timing'. Written into changes.md for the model."),
         ),
         required = listOf("path"),
     )
@@ -64,6 +65,7 @@ class ReaVideoTool(private val workspace: Workspace) : Tool {
         val sensitivity = (args.intArg("sensitivity") ?: 70).coerceIn(1, 100)
         val maxShots = (args.intArg("max_shots") ?: 20).coerceIn(1, 36)
         val threshold = (100 - sensitivity).coerceIn(8, 64)
+        val change = args.stringArg("change")?.trim()?.take(1200).orEmpty()
 
         val retriever = MediaMetadataRetriever()
         try {
@@ -74,13 +76,15 @@ class ReaVideoTool(private val workspace: Workspace) : Tool {
             val width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
             val height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
             val rotation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
+            val displayWidth = if (rotation == 90 || rotation == 270) height else width
+            val displayHeight = if (rotation == 90 || rotation == 270) width else height
             val fps = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_CAPTURE_FRAMERATE)?.toFloatOrNull()
-            val step = (durationMs / 32L).coerceAtLeast(250L)
+            val step = (durationMs / 160L).coerceAtLeast(250L)
             val samples = mutableListOf<ReaSample>()
             var t = 0L
-            while (t < durationMs && samples.size < 64) {
-                val frame = frame(retriever, t * 1000L, 160, 90) ?: break
-                samples += ReaSample(t, signature(frame))
+            while (t < durationMs && samples.size < 160) {
+                val frame = frame(retriever, t * 1000L, 160, 90, rotation, exact = true) ?: break
+                samples += ReaSample(t, signature(frame), frameHash(frame))
                 frame.recycle()
                 t += step
             }
@@ -90,7 +94,7 @@ class ReaVideoTool(private val workspace: Workspace) : Tool {
             val rows = mutableListOf<File>()
             val colors = mutableListOf<Int>()
             shots.forEach { shot ->
-                val bitmap = frame(retriever, shot.startMs * 1000L, 640, 360)
+                val bitmap = frame(retriever, shot.startMs * 1000L, 640, 360, rotation)
                 val name = "shot_%03d.jpg".format(shot.index)
                 val target = File(shotsDir, name)
                 if (bitmap != null) {
@@ -128,7 +132,8 @@ class ReaVideoTool(private val workspace: Workspace) : Tool {
                 })
             }
             File(outDir, "breakdown.json").writeText(breakdown.toString(2), Charsets.UTF_8)
-            File(outDir, "remake.html").writeText(remakeHtml(relative, durationMs, shots, colors), Charsets.UTF_8)
+            File(outDir, "remake.html").writeText(remakeHtml(relative, durationMs, displayWidth, displayHeight, shots, colors, change), Charsets.UTF_8)
+            File(outDir, "changes.md").writeText(changesMarkdown(relative, change, shots), Charsets.UTF_8)
             val md = reportMarkdown(relative, durationMs, width, height, fps, shots, outArg)
             File(outDir, "report.md").writeText(md, Charsets.UTF_8)
             File(outDir, "report.html").writeText(reportHtml(relative, durationMs, width, height, shots, breakdown), Charsets.UTF_8)
@@ -140,6 +145,7 @@ class ReaVideoTool(private val workspace: Workspace) : Tool {
                     "breakdown: ${workspace.relativize(File(outDir, "breakdown.json"))}\n" +
                     "report: ${workspace.relativize(File(outDir, "report.md"))} and report.html\n" +
                     "animatic: ${workspace.relativize(File(outDir, "remake.html"))} — edit it, then render_video\n" +
+                    "changes: ${workspace.relativize(File(outDir, "changes.md"))}\n" +
                     "plan: keep the cut times and shot lengths, rebuild each shot with material you own.\n" +
                     "limit: this offline pass does not label live/AI/3D or read audio; use the full REA-Video CLI on a PC for that.",
             )
@@ -150,17 +156,35 @@ class ReaVideoTool(private val workspace: Workspace) : Tool {
         }
     }
 
-    private fun frame(retriever: MediaMetadataRetriever, timeUs: Long, width: Int, height: Int): Bitmap? {
+    private fun frame(
+        retriever: MediaMetadataRetriever,
+        timeUs: Long,
+        width: Int,
+        height: Int,
+        rotation: Int = 0,
+        exact: Boolean = false,
+    ): Bitmap? {
+        val option = if (exact) MediaMetadataRetriever.OPTION_CLOSEST else MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+        val rotated = rotation == 90 || rotation == 270
+        val requestWidth = if (rotated) height else width
+        val requestHeight = if (rotated) width else height
         val raw = runCatching {
             if (android.os.Build.VERSION.SDK_INT >= 27) {
-                retriever.getScaledFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, width, height)
-            } else {
-                retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-            }
+                retriever.getScaledFrameAtTime(timeUs, option, requestWidth, requestHeight)
+            } else null
+        }.getOrNull() ?: runCatching {
+            // Some codecs and sync points return null for the scaled variant.
+            retriever.getFrameAtTime(timeUs, option)
         }.getOrNull() ?: return null
-        if (raw.width == width && raw.height == height) return raw
-        val scaled = Bitmap.createScaledBitmap(raw, width, height, true)
-        if (scaled !== raw) raw.recycle()
+        val upright = if (rotated) {
+            val matrix = Matrix().apply { postRotate(rotation.toFloat()) }
+            Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, matrix, true).also {
+                if (it !== raw) raw.recycle()
+            }
+        } else raw
+        if (upright.width == width && upright.height == height) return upright
+        val scaled = Bitmap.createScaledBitmap(upright, width, height, true)
+        if (scaled !== upright) upright.recycle()
         return scaled
     }
 
@@ -173,6 +197,27 @@ class ReaVideoTool(private val workspace: Workspace) : Tool {
         }
         if (small !== bitmap) small.recycle()
         return ((r / 64) shl 16) or ((g / 64) shl 8) or (b / 64)
+    }
+
+    private fun frameHash(bitmap: Bitmap): Int {
+        val small = Bitmap.createScaledBitmap(bitmap, 8, 8, true)
+        var sum = 0L
+        for (y in 0 until 8) for (x in 0 until 8) {
+            val p = small.getPixel(x, y)
+            sum += (Color.red(p) * 299 + Color.green(p) * 587 + Color.blue(p) * 114) / 1000
+        }
+        val mean = sum / 64
+        var hash = 0
+        for (y in 0 until 4) for (x in 0 until 8) {
+            var cell = 0L
+            for (dy in 0 until 2) for (dx in 0 until 1) {
+                val p = small.getPixel(x, y * 2 + dy)
+                cell = ((Color.red(p) * 299 + Color.green(p) * 587 + Color.blue(p) * 114) / 1000).toLong()
+            }
+            hash = (hash shl 1) or if (cell > mean) 1 else 0
+        }
+        if (small !== bitmap) small.recycle()
+        return hash
     }
 
     private fun writeStoryboard(rows: List<File>, target: File) {
@@ -284,9 +329,15 @@ class ReaVideoTool(private val workspace: Workspace) : Tool {
     private fun remakeHtml(
         source: String,
         durationMs: Long,
+        width: Int,
+        height: Int,
         shots: List<com.hvkeyn.ceditneuro.video.ReaShot>,
         colors: List<Int>,
+        change: String,
     ): String {
+        val safeW = width.coerceAtLeast(1)
+        val safeH = height.coerceAtLeast(1)
+        val changeAttr = escape(change).take(500)
         val total = (durationMs / 1000.0).coerceAtLeast(1.0)
         val clips = shots.mapIndexed { index, shot ->
             val start = shot.startMs / 1000.0
@@ -313,7 +364,7 @@ class ReaVideoTool(private val workspace: Workspace) : Tool {
 .copy span{display:block;margin-top:14px;font:500 clamp(14px,2.6vw,30px)/1.2 ui-monospace,monospace;letter-spacing:.08em;opacity:.8;text-transform:none}
 .time{position:absolute;right:6%;top:8%;font:500 clamp(12px,2.4vw,28px)/1 ui-monospace,monospace;opacity:.7}
 </style></head><body>
-<div id="rea-root" data-composition-id="rea-remake" data-start="0" data-width="1080" data-height="1920" data-duration="__DURATION__">
+<div id="rea-root" data-composition-id="rea-remake" data-start="0" data-width="__WIDTH__" data-height="__HEIGHT__" data-duration="__DURATION__" data-change="__CHANGE__">
 __CLIPS__
 </div>
 <script>
@@ -333,6 +384,38 @@ __CLIPS__
   frame(0);
 })();
 </script></body></html>""".replace("__DURATION__", "%.3f".format(Locale.US, total)).replace("__CLIPS__", clips)
+            .replace("__WIDTH__", safeW.toString()).replace("__HEIGHT__", safeH.toString())
+            .replace("__CHANGE__", changeAttr)
+    }
+
+    private fun changesMarkdown(
+        source: String,
+        change: String,
+        shots: List<com.hvkeyn.ceditneuro.video.ReaShot>,
+    ): String = buildString {
+        appendLine("# Remake brief: ${File(source).name}")
+        appendLine()
+        appendLine("Source: `$source`")
+        appendLine()
+        appendLine("## Change requested")
+        appendLine()
+        appendLine(change.ifBlank { "Replace the subject/content, keep the cut timing and camera rhythm. The model must ask what to swap if it is not stated." })
+        appendLine()
+        appendLine("## Preserve")
+        appendLine()
+        appendLine("- the order and duration of every shot;")
+        appendLine("- the position of the cut against the reference;")
+        appendLine("- the aspect and the opening/closing beat.")
+        appendLine()
+        appendLine("## Per-shot change table")
+        appendLine()
+        appendLine("| # | time | keep | change |")
+        appendLine("|---|---|---|---|")
+        shots.forEach { s ->
+            appendLine("| ${s.index} | ${formatDuration(s.startMs)}–${formatDuration(s.endMs)} | frame rhythm, length | subject, product, copy, or palette named above |")
+        }
+        appendLine()
+        appendLine("The HTML is an animatic, not the original footage. The connected model rewrites copy, palette, and motion; render_video makes the MP4.")
     }
 
     private fun formatDuration(ms: Long): String {

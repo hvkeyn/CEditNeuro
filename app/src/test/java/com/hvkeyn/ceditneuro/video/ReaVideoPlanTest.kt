@@ -31,6 +31,19 @@ class ReaVideoPlanTest {
     }
 
     @Test
+    fun aPerceptualHashStartsANewShotWhenAverageColorDoesNot() {
+        val samples = listOf(
+            ReaSample(0, 0x808080, 0x000000FF),
+            ReaSample(500, 0x808080, 0x000000FF),
+            ReaSample(1_000, 0x808080, 0xFFFF0000.toInt()),
+            ReaSample(1_500, 0x808080, 0xFFFF0000.toInt()),
+        )
+        val shots = ReaVideoPlanner.plan(2_000, samples, threshold = 30)
+        assertEquals(2, shots.size)
+        assertEquals(1_000L, shots[1].startMs)
+    }
+
+    @Test
     fun tinyCutsAreIgnoredAndTheCapHolds() {
         val samples = (0..40).map { ReaSample(it * 100L, if (it % 2 == 0) 0x000000 else 0xFFFFFF) }
         val shots = ReaVideoPlanner.plan(4_100, samples, threshold = 20, maxShots = 4)

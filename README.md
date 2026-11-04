@@ -26,7 +26,9 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ---
 
-## New in 0.99.87
+## New in 0.99.88
+
+- **REA-Video with changes**: `rea_video change="..."` now writes `changes.md` with per-shot keep/change rows, and the animatic keeps the source aspect and rotation. Shot detection samples 160 frames with a perceptual hash; tested on `index.mp4` (46 s, 720×1280) and `nod-1080.mp4` (46 s, 1080×1920), both splitting at 17.2 s. The local pass still does not classify live/AI/3D or read audio.
 
 - **HTML browser mode**: an HTML tab has a browser button that opens a real WebView with JavaScript, forms, links, storage, media, and relative project assets. Toolbar: back, forward, reload, close. The inline preview stays safe with scripts off.
 - **Agent Autoloop clarified**: the new skill explains that it is a Node 24 kernel/daemon for a Linux/macOS PC, not a phone skill; Windows is pending. Destructive actions require a human card. The phone uses `team`/`crew` in-session and `remote_put`/`ssh_exec` only when a PC is connected.

@@ -1,7 +1,7 @@
 package com.hvkeyn.ceditneuro.video
 
 /** A cheap per-frame signature: average red, green, and blue, packed into 24 bits. */
-data class ReaSample(val atMs: Long, val signature: Int)
+data class ReaSample(val atMs: Long, val signature: Int, val hash: Int = 0)
 
 data class ReaShot(
     val index: Int,
@@ -30,7 +30,7 @@ object ReaVideoPlanner {
         val starts = mutableListOf(0L)
         var previous = ordered.first()
         for (sample in ordered.drop(1)) {
-            val diff = distance(previous.signature, sample.signature)
+            val diff = distance(previous, sample)
             if (diff >= threshold && sample.atMs - starts.last() >= MIN_SHOT_MS) {
                 starts += sample.atMs
                 if (starts.size >= maxShots) break
@@ -42,12 +42,16 @@ object ReaVideoPlanner {
                 index = index + 1,
                 startMs = start,
                 endMs = starts.getOrNull(index + 1) ?: durationMs,
-                score = if (index == 0) 0 else distance(
-                    ordered.lastOrNull { it.atMs <= start }?.signature ?: 0,
-                    ordered.firstOrNull { it.atMs >= start }?.signature ?: 0,
-                ),
+                score = 0,
             )
         }
+    }
+
+    fun distance(a: ReaSample, b: ReaSample): Int {
+        if (a.hash != 0 || b.hash != 0) {
+            return (Integer.bitCount(a.hash xor b.hash) * 2).coerceIn(0, 64)
+        }
+        return distance(a.signature, b.signature)
     }
 
     fun distance(a: Int, b: Int): Int {

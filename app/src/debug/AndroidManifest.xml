@@ -8,5 +8,8 @@
                 <action android:name="com.hvkeyn.ceditneuro.PROBE_SNAPSHOT" />
             </intent-filter>
         </receiver>
+        <receiver android:name=".debug.ReaProbeReceiver" android:exported="true">
+            <intent-filter><action android:name="com.hvkeyn.ceditneuro.REA_PROBE" /></intent-filter>
+        </receiver>
     </application>
 </manifest>
