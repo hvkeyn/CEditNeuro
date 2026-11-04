@@ -749,24 +749,35 @@ object StarterSkills {
             6. Do not repeat a FAIL that is already in the notes. Do not wait for another phone to assign the next piece.
             7. When your piece is finished, use_skill name=crew scope=app on=false.
         """.trimIndent() + "\n",
-        "reverse-engineering" to """
-            # Reverse engineering a program
+        "reverse-engineering" to """            # Reverse engineering a program
 
             Use this when a program, an APK or DEX, a native library, a firmware image, or a script must be understood beyond its screen: recover the real algorithm, a hidden branch, a key, a protocol, a packer, or a backdoor inserted by a developer or by someone redistributing the software. A surface APK check is android-apk; this skill goes to the logic.
 
-            ## Before the sample
 
-            1. Authorization and provenance. Analyze only software you own or are allowed to inspect. Record the SHA-256, the size, the source, the date, and who asked. Work on a copy. A sample from a victim is evidence: do not clean it, rename it, or run it in place.
-            2. Isolation. Static analysis first. A suspected malware sample is not run on this daily phone. Dynamic work uses a disposable device, a second profile, an emulator, or a PC that can be wiped. If no isolation is available, stop at static analysis and say so. Never contact a live command server, log in, pay, or replay a request. Capture traffic with capture_dump and read it with read_dump; do not send a payload to a remote host.
-            3. Evidence. Hash every file you touch (SHA-256 at minimum; MD5, SHA-1, and imphash when a corpus uses them). Note the file type, architecture, bitness, sections, entropy, imports, exports, signatures, manifest, and the exact tool command. Keep the sample outside the project in a quarantine folder; put only hashes, notes, and extracted facts in the project. Do not upload the sample to a reader, a scanner, a paste host, or a model.
-            4. No fabrication. A function exists only where an address, a disassembly, or a cross-reference supports it. A key is recovered only when a test vector decrypts. A backdoor is proven only by a trigger and an action path, not by one suspicious string. Say "proven", "inferred", or "unresolved" for each claim. Do not name a malware family from a single string.
+            ## Fast path (LeanREA pattern)
+
+            - Budget **2–4 tool calls**: one batched inventory, one or two targeted slices, then answer. Turns cost more than bytes.
+            - Work on a copy, never the evidence. Reuse an extraction under `/data/local/tmp/re/<name>`.
+            - Route by `file -b` and magic bytes first; then the cheapest inventory; decompile only after that.
+            - Batch independent probes in one shell call with `;` and `echo '--- name'` markers. Cap every output with `head` or `-m`.
+            - `rg` skips hidden and ignored files; bundlers hide code in `.webpack/`, `.vite/`, `assets/`. Search extracted trees with `rg -uu`.
+            - Never `cat` a big or minified file. Slice it: `rg -uu -o '.{0,200}NEEDLE.{0,200}' F | head`.
+            - Mark each claim **seen** (file:offset, symbol, string, or decoded bytes), **inferred**, or **unknown**. A fact you did not find is unknown, not absent. Static reading is not observed execution.
+            - A missing tool is not a blocker: use the fallback in the router or the user's own PC. Do not upload the sample.
+
+            ## Safety gates
+
+            - Analyze only software you own or are allowed to inspect. Record SHA-256, size, provenance, date, and who asked. Work on a copy; never clean, rename, or run evidence in place.
+            - Static first. Suspected malware is not run on this daily phone. Dynamic work uses a disposable device, second profile, emulator, or a PC that can be wiped; without isolation, stop at static and say so.
+            - Never contact a live command server, log in, pay, replay a payload, or upload the sample to a scanner, paste host, or model. Use capture_dump/read_dump; do not send a payload to a remote host.
+            - Keep the sample and full decompilation outside the project, and delete them when done. Put hashes, notes, and extracted facts in the report; never paste a key, cookie, password, or private payload.
 
             ## Map the target
 
             - File type and container: APK (ZIP), DEX/ODEX/VDEX, ELF shared object, PE, Mach-O, firmware, or script. Architecture: AArch64, ARM32 or Thumb, x86, x86-64. Bitness, endianness, and whether the file is packed.
             - Android layers: Java or Kotlin to DEX and smali; JNI to a native library; assets and resources; split APKs and dynamic features; React Native, Flutter, Unity, Cordova, or Xamarin; packers such as Jiagu, Bangcle, Legu, DexGuard, or a custom loader; encrypted DEX and dynamic loading; virtual-machine protectors.
             - First pass: sha256sum, unzip -l, file, strings -a and strings -el, readelf -h -S -l -d -s, objdump -d, aapt2 dump badging, apktool d, jadx. Check the signing certificate, the manifest, exported components, permissions, native libraries, and every asset that is not an image.
-            - Annotations: keep a table of address or offset, name, what it does, and the evidence. Use the same names in every note. Paranoia and the desktop tools key annotations by SHA-256, so the same sample keeps its names.
+            - Annotations: keep a table of address or offset, name, what it does, and the evidence. Use the same names in every note. Keep the table keyed by SHA-256.
 
             ## Recover the logic
 
@@ -775,38 +786,53 @@ object StarterSkills {
             3. Data first. Recover constants, ASCII and UTF-16 strings, resources, encrypted blobs, keys, IVs, URLs, user agents, headers, JSON or protobuf schemes, file paths, package names, certificate pins, and feature flags. Map each value to the code that reads it and to the code that acts on it.
             4. Control flow. Branches, switches, loops, state machines, and exception handlers. Build a decision table: input or environment, condition, action. Look for triggers: time or date, locale, SIM or carrier, build properties, installed package, network answer, license, debugger, emulator, root, signature, battery or screen state, and a second stage.
             5. Algorithm. Identify crypto by constants and structure: AES S-box and round count, SHA initial words, ChaCha or Salsa constants, RC4, CRC, Base64, XOR, compression (zlib, gzip, lz4), serialization, and custom bytecode. Recover the key schedule, the IV or nonce, the mode, and every transform around the cipher. Reproduce it in Python or Java and check it against a known plaintext, a captured request, or a test vector. A decryptor is not proven until it round-trips.
-            6. Native code. ELF headers, sections, imports (libc, JNI, OpenSSL, curl), JNI entry points, syscalls, anti-debug checks (ptrace, TracerPid, /proc/self/status), anti-VM checks (QEMU properties, sensors, build fields), packing, and the init array. Use readelf, objdump, strings, and Paranoia on a PC. Note that ARM32 and Thumb are not covered by Paranoia; use objdump or radare2 there.
+            6. Native code. ELF headers, sections, imports (libc, JNI, OpenSSL, curl), JNI entry points, syscalls, anti-debug checks (ptrace, TracerPid, /proc/self/status), anti-VM checks (QEMU properties, sensors, build fields), packing, and the init array. Use readelf, objdump, strings, radare2, or Ghidra on a PC. ARM32 and Thumb need objdump or radare2.
             7. Dynamic work, only when isolated. Logcat filtered to the package, a filesystem watch, a memory dump of a decrypted DEX or a native payload, Java and JNI hooks with Frida if the disposable device already has it, and a network capture. Do not install a hooking framework on the daily phone. Do not let the sample reach its live server.
             8. Reconstruct. Write the recovered function as C-like pseudocode, the data structures, the protocol messages, the key schedule, and the state table. Mark every original name as a guess. Keep a list of what is still unresolved.
 
-            ## Paranoia on a computer
+            ## Router and first moves
 
-            Paranoia (github.com/Altumptic/paranoia, Apache-2.0) is a local-first disassembler and analysis platform for PE, ELF, and Mach-O on x86, x86-64, and AArch64. Its CLI is useful when a PC is available:
+            Use the first line that matches the target; do not run every tool.
 
+            | Target (detect) | Fastest path |
+            |---|---|
+            | Android APK / DEX | `unzip -l T \| head -40`; `aapt2 dump badging T`; `aapt2 dump xmltree T --file AndroidManifest.xml`; then `apktool d -o D T` and `jadx -d S T`. Smali is ground truth; jadx is for reading. `rg -uu` the result. |
+            | Native ELF / SO | `file -b T`; `readelf -hldS T \| head -80`; `nm -D --defined-only T`; `strings -a -n 6 T \| head -300`; `objdump -d --no-show-raw-insn T > D/dis.txt`; grep the disassembly. JNI symbols start with `Java_`. |
+            | Go binary | `go version -m T` usually answers toolchain, module, deps, and build flags in one call. No Go: `strings -a T \| rg -m1 -A200 'Go buildinf'`. |
+            | Rust binary | `strings -a T \| rg -o '/rustc/[0-9a-f]{40}' \| sort -u`; `cargo audit bin T` when cargo-auditable data exists. |
+            | Flutter APK | `unzip -l` for `lib/*/libflutter.so`; `libapp.so` magic `f5 f5 dc dc`; the 32 hex chars at +20 are the Dart snapshot hash. Deep Dart AOT is a desktop step (blutter). |
+            | Hermes / React Native | `index.android.bundle` magic `c6 1f bc 03`; `hermes-dec`/`hbc-decompiler`; `.jsc` cannot be decompiled — strings and runtime hooks. |
+            | Electron / asar | `npx -y @electron/asar extract app.asar X`; `jq '{name,version,main}' X/package.json`; `rg -uu -n 'ipcMain\.(handle|on)|contextBridge|preload|nodeIntegration' X --glob '!node_modules'`; also inspect `app.asar.unpacked/`. |
+            | Web / minified JS | Find `sourceMappingURL`; if the map has `sourcesContent`, dump sources; slice around a needle; `prettier --parser babel F > F.pretty.js` then read ranges. |
+            | WASM / SQLite / pcap / firmware | `wasm-objdump -x`; copy SQLite db plus `-wal` and use `.schema`; `tshark -r C -q -z conv,tcp`; `binwalk -e F` or `unblob -e X F`, then route each extracted file here. |
+            | Desktop app / runtime | On the user's own PC: `otool`/`dyld_info` (Mach-O), `lldb`/Frida/`log stream`; Electron `--inspect` only if the app allows it. Never install a hook on the daily phone. |
+
+            **One inventory call.** For Android:
+
+            ```sh
+            T=./sample.apk; D=/data/local/tmp/re/${'$'}(basename "${'$'}T"); mkdir -p "${'$'}D"
+            file -b "${'$'}T"; sha256sum "${'$'}T"; unzip -l "${'$'}T" | head -40
+            aapt2 dump badging "${'$'}T" | head -40
             ```
-            paranoia info SAMPLE
-            paranoia functions SAMPLE
-            paranoia disasm SAMPLE --at main -n 40
-            paranoia pseudo SAMPLE main
-            paranoia xrefs SAMPLE CreateFileW
-            paranoia strings --referenced SAMPLE --json
+
+            For a native library:
+
+            ```sh
+            T=./libfoo.so; D=/data/local/tmp/re/${'$'}(basename "${'$'}T"); mkdir -p "${'$'}D"
+            file -b "${'$'}T"; readelf -hldS "${'$'}T" | head -80; nm -D --defined-only "${'$'}T" | head -120
+            strings -a -n 6 "${'$'}T" | head -300
+            objdump -d --no-show-raw-insn "${'$'}T" > "${'$'}D/dis.txt"
             ```
 
-            It provides recursive-descent function discovery, basic blocks, switch-table recovery, imports and exports, cross-references, a call graph, a partial x86/x64 pseudocode view, entropy, sections, mitigations (ASLR, DEP, CFG, RELRO, PIE, canaries, FORTIFY), bookmarks, patching, and IDC export. Use it on a copy; it has no network access and never uploads the file. Do not install it on this phone.
-
-            Limits to state in the report: no DEX or APK loader, no ARM32 or Thumb, no debugger, no type libraries or FLIRT signatures, and the pseudocode is partial (x86/x64 only, no full SSA or types). It is not a full decompiler and it does not recover original source. For an Android APK, use apktool, jadx, smali, and the native tools; for a PE or ELF on a PC, Paranoia is a fast first pass. A user-owned remote PC with the CLI can be reached with remote_put and ssh_exec; never send a sample to a third-party server.
+            Then answer from the smallest slice that supports each claim. If the phone lacks a tool, use the installer from `load_tools group=build`, or hand the hash and the exact next command to the user's PC. Ghidra, jadx, and radare2 are optional desktop accelerators, not requirements.
 
             ## Backdoors and supply-chain insertions
 
             Compare the official build with the redistributed build: signature and certificate, SHA-256, section and asset hashes, manifest and permissions, component list, native libraries, endpoints, and build metadata. An extra class, asset, native library, permission, receiver, or endpoint is a lead, not a verdict.
 
-            Look for both halves of a backdoor:
+            A backdoor needs both halves: a **trigger** (date, locale, SIM, device property, installed app, server response, license or signature check, first-run counter, file marker) and an **action** (data exfiltration, overlay or accessibility abuse, admin, remote shell, install, proxy, miner, ransomware, kill switch). Evasion includes packers, string encryption, control-flow flattening, anti-debug/anti-VM, certificate pinning, split payloads, dynamic loading, reflection, native code, and environment fingerprints. Name a protection only when a signature or behavior supports it; otherwise say "custom or unknown".
 
-            - Trigger: a date or time, a locale or country, a carrier or SIM, a device property, an installed app, a server response, a license check, a debugger or emulator check, a root check, a signature check, a first-run counter, a file marker, or a remote configuration flag.
-            - Action: exfiltration of contacts, SMS, call log, clipboard, files, screen, camera, microphone, or keys; an overlay or accessibility abuse; device admin; notification access; a remote shell; an install or update; a crypto miner; ransomware; a proxy; a DNS tunnel; steganography; an encrypted configuration; a kill switch.
-            - Evasion: packers, string encryption, control-flow flattening, virtual-machine protectors, anti-debug and anti-VM checks, certificate pinning, split payloads, dynamic loading, reflection, native code, direct syscalls, timing checks, and environment fingerprints. Name the protection only when a signature or a behavior supports it; otherwise say "custom or unknown".
-
-            A hidden branch is proven when the trigger is reached in a controlled copy and the action is observed or reconstructed. A suspicious URL alone is an indicator, not a backdoor. Report indicators (domains, IPs, paths, registry keys, certificates, mutexes, user agents, hashes) without copying a secret payload.
+            A hidden branch is proven only when the trigger is reached in a controlled copy and the action is observed or reconstructed. A suspicious URL alone is an indicator, not a backdoor. Report indicators without copying a secret payload.
 
             ## Prove it and report
 
@@ -818,7 +844,7 @@ object StarterSkills {
 
             ## On this phone
 
-            `run_command`, `read_file`, `write_file`, `edit_file`, `grep`, `http_request`, and `load_tools` are already on every turn. Call `load_tools group=build` for `install_android_sdk`, `install_jdk`, `install_module`, and `install_program`; `group=device` for `shizuku_exec`, `install_apk`, and `open_file`; `group=study` for `capture_dump`, `read_dump`, and `net_audit`; `group=remote` only for `remote_put` and `ssh_exec` to the user's own PC. Aapt2, java, apktool, and jadx come through those installers on this phone. Keep the sample outside the project; `open_file` a report, not the sample.
+            `run_command`, `read_file`, `write_file`, `edit_file`, `grep`, `http_request`, and `load_tools` are on every turn. `load_tools group=build` installs the Android SDK/JDK and modules/programs; `group=device` gives `shizuku_exec`, `install_apk`, and `open_file`; `group=study` gives `capture_dump`, `read_dump`, and `net_audit`; `group=remote` gives `remote_put`/`ssh_exec` for the user's own PC. Aapt2, java, apktool, and jadx come through those installers. Keep the sample outside the project; open a report, not the sample.
 
             ## Quality gates
 
@@ -827,86 +853,73 @@ object StarterSkills {
             - Keep the original and every patched copy hashed. Patch only a copy, never the evidence.
             - If the target is Android malware and no disposable device is available, stop at static analysis and say the dynamic behavior was not observed.
             - When the question is only "is this APK safe to install", use android-apk; when it is "what does this program really do", stay here and go to the logic.
-        """.trimIndent() + "\n",
-        "rea" to """
-            # REA: reverse engineering software systems
+""".trimIndent() + "\n",
+        "rea" to """            # REA: reverse engineering systems, lean
 
-            Use this when a desktop app, native binary, JavaScript or Electron app, .NET assembly, APK, firmware image, packaged Python app, Unity/Godot game, or recorded runtime must be understood as a system: a feature, a protocol, a data format, a build difference, or a behavior. REA 6.8.0 (MIT, morluto/rea) is the reference toolkit. It is not installed on this phone; the local `reverse-engineering` skill is the phone fallback.
+            Use this when a desktop app, native binary, JavaScript/Electron app, .NET assembly, APK, firmware, Unity/Godot game, or recorded runtime must be understood as a system. REA 6.8.0 (MIT, morluto/rea) is an **optional desktop MCP toolkit**, not the default. It is not installed on this phone; the local `reverse-engineering` skill is the phone path.
 
-            ## Where REA runs
+            ## Correct the old assumption
 
-            REA is a local MCP server and CLI. It needs Node.js `^22.23.4 || ^24.22.1 || >=26.12.1` and npm. The supported agents are Claude Code, Codex, Cursor, Gemini CLI, Grok Build, and other MCP clients.
+            REA adds an MCP server, Node, and a large tool surface. LeanREA (MIT, aicodeking/leanrea) benchmarked one 8 KB skill against REA 6.5.0: plain local CLI was **38% faster and 35% cheaper**, with the same score on its four tasks. The benchmark is small (one model, three reps), so treat it as a warning, not proof. Start with local commands; use REA only when its specific providers (canonical Evidence, IL2CPP/Unity, .NET, capture environments) save real work.
 
-            - First setup on the user's own computer: `npx rea-agents@latest setup`. Review the changes, approve the MCP registration, restart the agent.
-            - Global CLI: `npm install -g rea-agents`, then `rea --help`.
-            - Update: `rea update`, or refresh setup with `npx rea-agents@latest setup`.
-            - Node 23 and 25 are not supported. Do not upgrade Node silently; tell the user.
-            - Deep native analysis uses an existing Hopper, Ghidra, or IDA installation. Static JavaScript and .NET inspection do not require a native engine. Do not install a commercial tool or a cracked copy.
-            - The phone cannot run this MCP stack. If a user-owned PC is connected, `remote_put` the sample or path and run the CLI with `ssh_exec` on that PC. Do not send the sample to a third-party server.
+            ## Lean path
 
-            ## Choose the target workflow
+            - Budget **2–4 calls**: one batched inventory, one or two slices, then answer.
+            - Work on a copy; hash the original and every patched copy. Keep the sample outside the project.
+            - Route by `file -b` and magic bytes, then the cheapest inventory.
+            - Batch independent probes with `;` and `echo '--- name'`; cap output with `head`.
+            - Search extracted trees with `rg -uu`; bundlers hide code in `.webpack/`, `.vite/`, `assets/`.
+            - Slice a big or minified file: `rg -uu -o '.{0,200}NEEDLE.{0,200}' F | head`; never dump it into chat.
+            - Mark each claim **seen** (file:offset, symbol, string, decoded bytes), **inferred**, or **unknown**. A missing fact is unknown, not absent.
 
-            | Target | What to inspect | Requirement |
-            | --- | --- | --- |
-            | Desktop install | Runtime candidates, support files, component markers, next probes | built-in bounded directory inspection |
-            | Native binary | Pseudocode, assembly, strings, symbols, calls, references | Hopper, Ghidra, or IDA |
-            | JavaScript / Electron | Modules, imports, source maps, routes, IPC, native add-ons | Node and npm |
-            | .NET assembly | Metadata, CIL, native dependencies, build comparison | static only |
-            | APK | Manifest, classes, decompiled methods, references, signatures, resources | headless JADX and a full JDK; optional Apktool |
-            | Android device | Packages, processes, logs, dumps, screen, APK/file transfer | caller-supplied adb |
-            | Go / Rust / Swift | Embedded build identity, modules, dependencies, symbols | built-in static inspection |
-            | Unity IL2CPP / Godot PCK / PyInstaller / Node SEA | Metadata, archive inventory, entry scripts, bytecode | built-in static decoding |
-            | GPU / model / WASM / SQLite / firmware | Code objects, model metadata, imports, tables, regions | built-in or caller-supplied tool |
-            | Website / capture | Page structure, scripts, requests, responses, source locations | Chrome-family browser or HAR/SAZ |
-            | Process behavior | Terminal output, interactions, exit, filesystem, comparisons | Linux/macOS PTY |
+            ## Router
 
-            Pick the narrowest workflow that can answer the question. Do not start a native provider for a JavaScript route, and do not use a runtime capture when static files already answer it.
+            | Target | First move |
+            |---|---|
+            | APK / DEX | `unzip -l`; `aapt2 dump badging`; `apktool d`; `jadx -d`; `rg -uu`. Smali is ground truth. |
+            | Native ELF/Mach-O/PE | `file`; `readelf -hldS` or `otool -L`; `nm -D`; `strings`; `objdump -d` into a file; grep it. |
+            | JavaScript/Electron | extract `app.asar`; read `package.json.main`; `rg -uu` for IPC, preload, `contextBridge`, `.node`; source maps. |
+            | Go / Rust | `go version -m`; Rust path strings and cargo-auditable data. |
+            | Flutter / Hermes / WASM | `libapp.so` magic `f5 f5 dc dc` and Dart hash; Hermes magic `c6 1f bc 03`; `wasm-objdump -x`. Deep AOT is a PC step. |
+            | SQLite / pcap / firmware | copy db plus `-wal`; `sqlite3 .schema`; `tshark -r`; `binwalk -e`/`unblob`, then route each file. |
+            | Desktop runtime | `lldb`/Frida/log stream on the user's own PC; Electron `--inspect` only when allowed. Never hook the daily phone. |
 
-            ## Evidence protocol
+            ## When REA MCP is actually available
 
-            REA returns canonical Evidence, not just prose. Read `normalized_result` for the operation and `evidence_id` for its identity. `raw_result` is a provider-specific representation and may be null. Keep limitations and coverage; they are part of the answer.
-
-            - `analyze_function` returns a retained summary by default in 6.8.0. Ask for `detail: "complete"` only when you need the full dossier; use `inspect_analysis_view` to page a summary or a large collection.
-            - Compare only compatible Evidence. `compare_functions` accepts a complete dossier; a summary is rejected. Use the retained `evidence_id` for a dossier, not the summary.
-            - A coverage status of `unknown` or `partial` is not equality. Do not turn a missing observation into a negative fact.
-            - MCP input schemas are compact by default. Set `REA_MCP_INPUT_SCHEMA_PROFILE=full` when a field is ambiguous; do not guess a parameter shape.
-            - Save large Evidence to a file and project a summary/page; do not paste hundreds of megabytes into the chat.
+            - Only on the user's own PC, after an explicit setup. Phone cannot run it; do not install Node/npm/Hopper/Ghidra/IDA here.
+            - Node requirement and setup belong to the PC owner; do not upgrade Node silently or install a commercial/cracked tool.
+            - Read `normalized_result` and `evidence_id`; `raw_result` is provider-specific and may be null. Keep coverage and limitations.
+            - `analyze_function` returns a summary by default; ask for `detail: "complete"` only when needed. Compare only complete dossiers.
+            - Save large Evidence to a file and project a page; never paste megabytes into chat.
+            - If REA is not already installed, use `reverse-engineering` or the local CLI first. Do not install it just to repeat a check.
+            - Use `rea-agents-6.8.0` when pinning; never mix output from another version without saying so.
 
             ## Investigation
 
-            1. State the feature or behavior, the target build, and the authorization. A lawful sample the user owns or may inspect; no DRM bypass, no stolen license, no third-party system.
-            2. Fingerprint first: file type, architecture, version, signature, hashes, install layout, runtime. Record what is packed or stripped.
-            3. Static first: strings, symbols, imports, manifest, routes, source maps, metadata, archive inventory. Do not run an unknown sample on the daily phone.
-            4. Trace the feature: entry point -> callers/callees -> data -> external boundary. Keep a call path and file/offset references.
-            5. Use dynamic capture only in an isolated environment and only when static evidence is insufficient. Do not contact a live command server or replay credentials.
-            6. Reconstruct: pseudocode, data structures, protocol messages, constants, state machine, test vector. Reimplement in a small harness and test it.
-            7. Report evidence, unknowns, limitations, and the smallest next probe. A decompiler output is not source code.
+            1. State the feature, target build, and authorization. No DRM bypass, stolen license, or third-party system.
+            2. Fingerprint: type, architecture, version, signature, hashes, install layout, packing/stripping.
+            3. Static first: strings, symbols, imports, manifest, routes, source maps, metadata, archive inventory. Do not run suspected malware on the daily phone.
+            4. Trace: entry point -> callers/callees -> data -> external boundary. Keep a path and offsets.
+            5. Dynamic capture only in isolation and only when static evidence is insufficient. No live command server, credential replay, or exploitation.
+            6. Reconstruct: pseudocode, structures, protocol, constants, state machine, test vector; reimplement in a small harness and test it.
+            7. Report what is seen, inferred, and unknown, plus one smallest next probe. Decompiler output is not source code.
 
-            ## 6.8.0 specifics
+            ## Safety
 
-            - Agent environments can be built from network captures, browser scenarios, or a prompt; derived reads and evidence-gated writes can be served and compared with fresh captures.
-            - More static formats: GPU code objects, BEAM, Python bytecode, Unity IL2CPP metadata, Godot PCK, PyInstaller, Node.js SEA, devicetree, and more PE/ELF tables.
-            - Retained summaries and selected fact queries keep a large investigation bounded; complete Evidence remains available.
-            - Breaking changes to know: `analyze_function` default summary; JSONL metadata record; `environment-serve` serves derived state unless `--replay-only`; MCP schemas compact by default; Node 23/25 unsupported.
-            - Use the release tag `rea-agents-6.8.0` when pinning; do not mix output from an older version without saying so.
-
-            ## Quality and safety
-
-            - Every claim gets an Evidence location, a function/offset, or a test vector. Unknown stays unknown.
+            - Every claim has an Evidence location, function/offset, or test vector.
             - A suspicious string is not a backdoor; a trigger and an action path are.
-            - No live C2, no credential replay, no exploitation, no bypass of a license or paywall.
-            - Keep the sample outside the project and delete it when the investigation is done. Hash the original and every patched copy.
-            - On this phone, use `reverse-engineering` and local tools; do not install Node, npm, Hopper, Ghidra, or IDA here.
-            - If a PC is not available, stop at static phone analysis and say so.
+            - No live C2, credential replay, license/paywall bypass, or sample upload.
+            - Keep the sample outside the project and delete it when done.
+            - On this phone, use `reverse-engineering` and local tools; if no PC is available, stop at static analysis and say so.
 
             ## Output
 
             1. Target and authorization.
-            2. Workflow and tool version (REA 6.8.0, provider).
+            2. Workflow: local CLI or REA 6.8.0 provider, and why.
             3. Evidence chain: feature -> function/offset -> observation.
             4. Reconstruction and test vector.
             5. Unknowns, limitations, and one next probe.
-        """.trimIndent() + "\n",
+""".trimIndent() + "\n",
         "reanimate" to """
             # Reanimate: motion from a reference
 
@@ -2458,6 +2471,26 @@ object StarterSkills {
         extendRrsi(appDir)
         extendSecondMonitor(appDir)
         extendMobileControl(appDir)
+        extendReverseEngineering(appDir)
+        extendRea(appDir)
+    }
+
+    /** Phones that saved the old REA-heavy reverse skill get the batched LeanREA path. */
+    private fun extendReverseEngineering(appDir: File) {
+        val file = File(appDir, "reverse-engineering.md")
+        if (!file.isFile) return
+        val current = file.readText(Charsets.UTF_8)
+        if (current.contains("Fast path (LeanREA pattern)") && current.contains("rg -uu")) return
+        file.writeText(skills.getValue("reverse-engineering"), Charsets.UTF_8)
+    }
+
+    /** Phones that saved the REA MCP-first skill get the corrected optional-PC version. */
+    private fun extendRea(appDir: File) {
+        val file = File(appDir, "rea.md")
+        if (!file.isFile) return
+        val current = file.readText(Charsets.UTF_8)
+        if (current.contains("LeanREA") && current.contains("optional desktop MCP")) return
+        file.writeText(skills.getValue("rea"), Charsets.UTF_8)
     }
 
     /** Phones that saved mobile-control before accessibility support gain the service path. */

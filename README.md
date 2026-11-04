@@ -26,7 +26,9 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ---
 
-## New in 0.99.82
+## New in 0.99.83
+
+- **REA corrected for the lean path**: the `rea` skill now treats REA 6.8.0 as an optional desktop MCP toolkit, notes LeanREA's smaller/faster local-CLI benchmark, and sends normal work to `reverse-engineering`. That skill now starts with a 2–4-call batched inventory, `rg -uu`, and seen/inferred/unknown evidence labels. Existing old `rea.md`/`reverse-engineering.md` files are migrated.
 
 - **No-Shizuku foreground control verified**: `ui_status` reports accessibility ready; `ui_act action=launch` opened Settings and `ui_snapshot` read it with Shizuku stopped. The app can operate visible apps without root/Shizuku. Only the optional background VirtualDisplay needs Shizuku. Enabling Accessibility still requires the person to toggle it in Android settings.
 

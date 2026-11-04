@@ -213,9 +213,9 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 | 22 | [network-study](#network-study) | starter | a network concept or topology must be taught with a drawing | study, device | 6,531 |
 | 23 | [photo-ocr](#photo-ocr) | user | a photo arrived and the message has only paths | — | 1,491 |
 | 24 | [research](#research) | builtin | a study question, a claim to check, a measured build | study | 4,340 |
-| 25 | [rea](#rea) | starter | a software system must be understood with REA 6.8.0 on a PC | remote | 6,675 |
+| 25 | [rea](#rea) | starter | a software system needs REA or a lean local path | remote | 4,836 |
 | 26 | [reanimate](#reanimate) | starter | an animation from a GIF, video, or site must be rebuilt | — | 9,462 |
-| 27 | [reverse-engineering](#reverse-engineering) | starter | a program must be understood to its real algorithm or a backdoor | build, device, study, remote | 10,747 |
+| 27 | [reverse-engineering](#reverse-engineering) | starter | a program must be understood to its real algorithm or a backdoor | build, device, study, remote | 11,965 |
 | 28 | [review](#review) | starter | before saying a code change works | — | 364 |
 | 29 | [rrsi](#rrsi) | starter | improve the agent's own harness | harness | 1,749 |
 | 30 | [ru-translate](#ru-translate) | starter | translate into Russian or polish Russian | — | 4,809 |
@@ -474,7 +474,7 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 
 ### rea
 
-**Scope:** app · **Origin:** starter · **File:** `rea.md` · **Size:** 6,675 chars
+**Scope:** app · **Origin:** starter · **File:** `rea.md` · **Size:** 4,836 chars
 
 **Use when:** a software system must be understood with REA 6.8.0 on a PC.
 
@@ -504,7 +504,7 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 
 ### reverse-engineering
 
-**Scope:** app · **Origin:** starter · **File:** `reverse-engineering.md` · **Size:** 10,747 chars
+**Scope:** app · **Origin:** starter · **File:** `reverse-engineering.md` · **Size:** 11,965 chars
 
 **Use when:** a program, an APK or DEX, a native library, a firmware image, or a script must be understood beyond its screen: recover the real algorithm, a hidden branch, a key, a protocol, a packer, or a backdoor inserted by a developer or by someone redistributing the software.
 
@@ -744,10 +744,10 @@ The JSON below is the same inventory. `origin` is `starter`, `builtin`, or `user
 {"name": "net-map", "scope": "app", "origin": "starter", "trigger": "a network must be drawn from packets", "groups": ["study"], "tools": ["net_audit", "capture_dump", "read_dump", "research_figure"], "chars": 5603, "file": "net-map.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "network-study", "scope": "app", "origin": "starter", "trigger": "a network concept or topology must be taught with a drawing", "groups": ["study", "device"], "tools": ["net_audit", "capture_dump", "read_dump", "write_file", "network_card", "open_file", "load_tools"], "chars": 6531, "file": "network-study.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "photo-ocr", "scope": "app", "origin": "user", "trigger": "a photo arrived and the message has only paths", "groups": [], "tools": ["run_command", "read_file", "remote_delete"], "chars": 1491, "file": "photo-ocr.md", "source": "phone:CEditNeuro/skills/photo-ocr.md"},
-    {"name": "rea", "scope": "app", "origin": "starter", "trigger": "a software system must be understood with REA 6.8.0 on a PC", "groups": ["remote"], "tools": ["remote_put", "ssh_exec", "run_command", "read_file", "write_file", "http_request", "load_tools"], "chars": 6675, "file": "rea.md", "source": "ResearchSkill.kt#StarterSkills"},
+    {"name": "rea", "scope": "app", "origin": "starter", "trigger": "a software system needs REA or a lean local path", "groups": ["remote"], "tools": ["remote_put", "ssh_exec", "run_command", "read_file", "write_file", "http_request", "load_tools"], "chars": 4836, "file": "rea.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "reanimate", "scope": "app", "origin": "starter", "trigger": "an animation from a GIF, video, or site must be rebuilt", "groups": [], "tools": ["http_request", "read_file", "write_file", "edit_file", "open_file", "layout", "visual_card"], "chars": 9462, "file": "reanimate.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "research", "scope": "app", "origin": "builtin", "trigger": "a study question, a claim to check, a measured build", "groups": ["study"], "tools": ["research_log", "research_report", "research_figure", "research_plot", "research_run", "reference", "calculate", "chart", "open_file", "http_request", "grep"], "requires_skills": ["deep-read", "review", "debug", "security"], "chars": 4340, "file": "research.md", "source": "ResearchSkill.kt#TEXT"},
-    {"name": "reverse-engineering", "scope": "app", "origin": "starter", "trigger": "a program must be understood to its real algorithm or a backdoor", "groups": ["build", "device", "study", "remote"], "tools": ["install_android_sdk", "install_jdk", "install_module", "install_program", "shizuku_exec", "install_apk", "open_file", "capture_dump", "read_dump", "net_audit", "remote_put", "ssh_exec", "run_command", "read_file", "write_file", "edit_file", "grep", "http_request"], "requires_skills": ["android-apk"], "chars": 10747, "file": "reverse-engineering.md", "source": "ResearchSkill.kt#StarterSkills"},
+    {"name": "reverse-engineering", "scope": "app", "origin": "starter", "trigger": "a program must be understood to its real algorithm or a backdoor", "groups": ["build", "device", "study", "remote"], "tools": ["install_android_sdk", "install_jdk", "install_module", "install_program", "shizuku_exec", "install_apk", "open_file", "capture_dump", "read_dump", "net_audit", "remote_put", "ssh_exec", "run_command", "read_file", "write_file", "edit_file", "grep", "http_request"], "requires_skills": ["android-apk"], "chars": 11965, "file": "reverse-engineering.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "review", "scope": "app", "origin": "starter", "trigger": "before saying a code change works", "groups": [], "tools": ["git_diff", "read_file", "run_command"], "chars": 364, "file": "review.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "rrsi", "scope": "app", "origin": "starter", "trigger": "improve the agent's own harness", "groups": ["harness"], "tools": ["harness_rrsi", "delete_skill"], "chars": 1749, "file": "rrsi.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "ru-translate", "scope": "app", "origin": "starter", "trigger": "translate into Russian or polish Russian", "groups": [], "tools": ["read_file", "write_file", "edit_file", "run_command", "reader_note", "reference"], "chars": 4809, "file": "ru-translate.md", "source": "ResearchSkill.kt#StarterSkills"},

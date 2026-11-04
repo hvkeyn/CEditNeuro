@@ -45,6 +45,7 @@ class SkillWiringTest {
         "scroll_forward",
         "clear_text",
         "set_text",
+        "dyld_info",
     )
 
     @Test
@@ -121,8 +122,9 @@ class SkillWiringTest {
     @Test
     fun reverseEngineeringKeepsEvidenceAndIsolation() {
         val text = StarterSkills.skills.getValue("reverse-engineering")
-        listOf("Paranoia", "test vector", "trigger and an action path", "daily phone", "android-apk", "not a full decompiler")
+        listOf("Fast path (LeanREA pattern)", "rg -uu", "**seen**", "**unknown**", "test vector", "trigger and an action path", "daily phone", "android-apk")
             .forEach { assertTrue("reverse-engineering lacks $it", text.contains(it, ignoreCase = true)) }
+        assertFalse(text.contains("Paranoia"))
         assertTrue(text.length <= ACTIVE_SKILL_CHARS)
         assertTrue(buildSystemPrompt().contains("use_skill reverse-engineering"))
     }
@@ -175,7 +177,7 @@ class SkillWiringTest {
     @Test
     fun reaIsThePcWorkflowAndThePhoneFallsBack() {
         val text = StarterSkills.skills.getValue("rea")
-        listOf("REA 6.8.0", "remote_put", "reverse-engineering", "evidence")
+        listOf("REA 6.8.0", "LeanREA", "optional desktop MCP", "reverse-engineering", "evidence")
             .forEach { assertTrue("rea lacks $it", text.contains(it, ignoreCase = true)) }
         assertTrue(text.length <= ACTIVE_SKILL_CHARS)
         assertTrue(buildSystemPrompt().contains("use_skill rea"))
