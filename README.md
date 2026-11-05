@@ -26,7 +26,9 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ---
 
-## New in 0.99.88
+## New in 0.99.89
+
+- **Maintenance build**: current HTML browser, REA-Video changes, Stageshow, and Autoloop guidance are packaged together after the latest fixes. No new feature claim beyond that build.
 
 - **REA-Video with changes**: `rea_video change="..."` now writes `changes.md` with per-shot keep/change rows, and the animatic keeps the source aspect and rotation. Shot detection samples 160 frames with a perceptual hash; tested on `index.mp4` (46 s, 720×1280) and `nod-1080.mp4` (46 s, 1080×1920), both splitting at 17.2 s. The local pass still does not classify live/AI/3D or read audio.
 

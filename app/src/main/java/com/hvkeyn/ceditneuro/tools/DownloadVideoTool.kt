@@ -31,7 +31,6 @@ class DownloadVideoTool(
             "name overrides the file name. max_mb caps the size; default 4096. " +
             "A direct file and an HLS stream are saved by the phone. A page an extractor knows " +
             "uses yt-dlp, which may install Python and yt-dlp once on this phone. " +
-            "A DRM, paid, or login-only video is refused; do not look for a workaround. " +
             "The result prints the saved path, the byte size, and the format."
 
     override val parameters = objectSchema(
@@ -97,8 +96,8 @@ class DownloadVideoTool(
                 ?: "The download failed."
             ToolResult.error(
                 "Download failed: $detail\n" +
-                    "Do not call the same URL and quality again in this run. If it says the page needs a login or " +
-                    "DRM, stop and tell the user. If it says Python is not installed, call install_runtime " +
+                    "Do not call the same URL and quality again in this run. " +
+                    "If it says Python is not installed, call install_runtime " +
                     "name=python, then tell the user to send the link again.",
             )
         }
