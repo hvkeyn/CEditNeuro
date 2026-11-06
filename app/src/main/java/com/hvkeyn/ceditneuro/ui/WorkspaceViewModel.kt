@@ -2311,6 +2311,7 @@ class WorkspaceViewModel(
                     history,
                     prompt,
                     ToolTranscript.shellOutcomes(project.ui.shellLines.map { it.command to it.output }),
+                    imageDataUrls = images,
                 ).collect { event ->
                     if (project.epoch.get() == epoch) handleEvent(project, event, finalText)
                 }

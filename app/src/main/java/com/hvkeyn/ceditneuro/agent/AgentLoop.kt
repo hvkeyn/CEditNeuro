@@ -63,6 +63,7 @@ class AgentLoop(
         history: List<ChatMessage>,
         userRequest: String,
         shellOutcomes: Map<String, Boolean> = emptyMap(),
+        imageDataUrls: List<String> = emptyList(),
     ): Flow<AgentEvent> = flow {
         failedCalls += ToolTranscript.failedCalls(history)
         failureNotes += ToolTranscript.failureNotes(history)
@@ -76,7 +77,7 @@ class AgentLoop(
         messages += ChatMessage.system(systemPrompt)
         if (setupPrompt.isNotBlank()) messages += ChatMessage.system(setupPrompt)
         messages += history
-        messages += ChatMessage.user(userRequest)
+        messages += ChatMessage.user(userRequest, imageDataUrls)
 
         var lengthContinues = 0
         var emptyContinues = 0

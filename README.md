@@ -26,7 +26,9 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ---
 
-## New in 0.99.90
+## New in 0.99.91
+
+- **Image fix verified**: the selected image is now passed into the agent loop, not only written into the conversation record. On the phone, DeepSeek V4.1 Flash described an attached screenshot directly; OCR was not used.
 
 - **Photos go to the model, not OCR**: when the selected model has image input enabled, attached images are sent as `image_url` content and the prompt tells the agent to read them directly. Built-in DeepSeek Flash models now advertise vision; every model has an Images switch in Settings, and new models default to vision. If Images is off, the app says so instead of silently OCRing.
 
