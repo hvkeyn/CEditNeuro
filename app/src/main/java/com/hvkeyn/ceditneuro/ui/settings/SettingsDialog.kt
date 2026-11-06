@@ -873,7 +873,7 @@ private fun ProviderCard(
                     selected = provider.id == selectedProviderId && model.name == selectedModel,
                     onClick = { onSelectModel(model.name) },
                 )
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(model.displayName, style = MaterialTheme.typography.bodyMedium)
                     Text(
                         text = model.name,
@@ -881,15 +881,29 @@ private fun ProviderCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                Text("Images", style = MaterialTheme.typography.labelSmall)
+                Switch(
+                    checked = model.seesImages(),
+                    onCheckedChange = { enabled ->
+                        onChange(
+                            provider.copy(
+                                models = provider.models.map {
+                                    if (it.name == model.name) it.copy(supportsVision = enabled) else it
+                                },
+                            ),
+                        )
+                    },
+                )
             }
         }
-        AddModelRow(provider.apiUrl, provider.apiKey, provider.models.map { it.name }) { name, displayName, reasoning ->
+        AddModelRow(provider.apiUrl, provider.apiKey, provider.models.map { it.name }) { name, displayName, reasoning, vision ->
             onChange(
                 provider.copy(
                     models = provider.models + CatalogModel(
                         name = name,
                         displayName = displayName.ifBlank { name },
                         supportsReasoning = reasoning,
+                        supportsVision = vision,
                     ),
                 ),
             )
@@ -990,11 +1004,12 @@ private fun AddModelRow(
     apiUrl: String,
     apiKey: String,
     existing: List<String>,
-    onAdd: (name: String, displayName: String, reasoning: Boolean) -> Unit,
+    onAdd: (name: String, displayName: String, reasoning: Boolean, vision: Boolean) -> Unit,
 ) {
     var name by rememberSaveable { mutableStateOf("") }
     var displayName by rememberSaveable { mutableStateOf("") }
     var reasoning by rememberSaveable { mutableStateOf(false) }
+    var vision by rememberSaveable { mutableStateOf(true) }
     var note by remember(apiUrl) { mutableStateOf("A hidden name is added only after this host accepts it.") }
     val scope = rememberCoroutineScope()
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1026,6 +1041,14 @@ private fun AddModelRow(
             Text("Reasoning", style = MaterialTheme.typography.bodySmall)
             Switch(checked = reasoning, onCheckedChange = { reasoning = it })
         }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Images (vision)", style = MaterialTheme.typography.bodySmall)
+            Switch(checked = vision, onCheckedChange = { vision = it })
+        }
         TextButton(
             onClick = {
                 val trimmed = name.trim()
@@ -1043,10 +1066,11 @@ private fun AddModelRow(
                         note = verdict
                         return@launch
                     }
-                    onAdd(trimmed, displayName.trim(), reasoning)
+                    onAdd(trimmed, displayName.trim(), reasoning, vision)
                     name = ""
                     displayName = ""
                     reasoning = false
+                    vision = true
                     note = verdict
                 }
             },

@@ -2063,7 +2063,11 @@ class WorkspaceViewModel(
         val prepared = com.hvkeyn.ceditneuro.agent.Attachments.prepare(
             appContext, project.workspace.root, prompt, attachments,
         )
-        val images = if (settingsStore.current.model.seesImages()) prepared.imageDataUrls else emptyList()
+        val model = settingsStore.current.model
+        val images = if (model.seesImages()) prepared.imageDataUrls else emptyList()
+        if (prepared.imageCount > 0 && !model.seesImages()) {
+            showMessage("This model has images off. Turn on Images for it in Settings; the photo was not OCRed.")
+        }
         startPrompt(project, prepared.prompt, images, fromPeer = false)
     }
 

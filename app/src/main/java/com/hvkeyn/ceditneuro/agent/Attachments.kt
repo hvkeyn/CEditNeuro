@@ -19,13 +19,15 @@ object Attachments {
     data class Prepared(
         val prompt: String,
         val imageDataUrls: List<String>,
+        val imageCount: Int = 0,
     )
 
     fun prepare(context: Context, projectRoot: File, prompt: String, uris: List<Uri>): Prepared {
-        if (uris.isEmpty()) return Prepared(prompt, emptyList())
+        if (uris.isEmpty()) return Prepared(prompt, emptyList(), 0)
         val inbox = File(projectRoot, ".ceditneuro/inbox").apply { mkdirs() }
         val blocks = StringBuilder()
         val images = mutableListOf<String>()
+        var imageCount = 0
         uris.forEach { uri ->
             val saved = copyIn(context, inbox, uri) ?: return@forEach
             blocks.append("\n\n--- attached file ---\n")
@@ -36,6 +38,7 @@ object Attachments {
             if (text != null) {
                 blocks.append("text:\n").append(text)
             } else if (isImage(saved)) {
+                imageCount++
                 val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                 BitmapFactory.decodeFile(saved.absolutePath, bounds)
                 blocks.append("image: ").append(bounds.outWidth).append('x').append(bounds.outHeight).append('\n')
@@ -47,10 +50,10 @@ object Attachments {
         val body = buildString {
             append(prompt.trim())
             if (isNotEmpty()) append("\n")
-            append("The files below are saved in this project. Use the text and paths as the real content.")
+            append("The files below are saved in this project. Use the text and paths as the real content. When the selected model accepts images, the image bytes are attached to this message as image content; read the picture directly instead of OCRing it.")
             append(blocks)
         }
-        return Prepared(body, images)
+        return Prepared(body, images, imageCount)
     }
 
     private fun copyIn(context: Context, inbox: File, uri: Uri): File? = runCatching {

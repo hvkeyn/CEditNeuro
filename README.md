@@ -26,7 +26,9 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ---
 
-## New in 0.99.89
+## New in 0.99.90
+
+- **Photos go to the model, not OCR**: when the selected model has image input enabled, attached images are sent as `image_url` content and the prompt tells the agent to read them directly. Built-in DeepSeek Flash models now advertise vision; every model has an Images switch in Settings, and new models default to vision. If Images is off, the app says so instead of silently OCRing.
 
 - **Maintenance build**: current HTML browser, REA-Video changes, Stageshow, and Autoloop guidance are packaged together after the latest fixes. No new feature claim beyond that build.
 

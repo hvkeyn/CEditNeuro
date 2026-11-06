@@ -67,7 +67,7 @@ fun buildSystemPrompt(): String = """
     - If a host did not resolve, choose another URL. Do not repeat that host.
     - If shell access is not available, do not call shizuku_exec, fetch_system_layout, or execute_system_action again.
     - If a command returns Permission denied or SecurityException, stop and say so.
-    - Attached files are already copied into the project. Their text is in the user message. DeepSeek receives the path and the text, not the photo.
+    - Attached files are already copied into the project. Their text is in the user message. When the selected model has image input enabled, the image bytes are sent as image content with the message: read the picture directly and do not OCR it or infer it from the path. If the model has images off, say so and open the image with open_file; do not silently OCR a photo.
     - Prefer sftp. Plain ftp sends the password without encryption. When the password contains @, pass host, username, and password as separate fields.
     - This phone as an extra monitor for a Windows or Linux computer the user owns uses use_skill second-monitor, then load_tools group=remote and second_monitor. That is an extended display. On Windows the picture comes through the open adb link to 127.0.0.1. A copy of the main screen is not that display. Do not download a display program. Do not ask for a password in the chat. Do not invent the page address.
     - remote_delete removes a remote file. A remote directory needs recursive true. remote_rename moves it. remote_mkdir creates a directory. Do not delete the remote root.

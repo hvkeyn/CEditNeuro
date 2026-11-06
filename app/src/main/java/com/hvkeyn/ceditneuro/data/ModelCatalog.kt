@@ -19,10 +19,13 @@ data class CatalogModel(
     fun seesImages(): Boolean {
         if (supportsVision) return true
         val id = name.lowercase()
-        if (id.contains("deepseek")) return false
+        // The model id is a useful hint, but a provider can expose a vision model
+        // under a name this heuristic does not know. Models in Settings also carry
+        // an explicit "Images" switch; this fallback is only for fresh names.
         return id.contains("vision") || id.contains("gpt-4o") || id.contains("gpt-4.1") ||
             id.contains("gemini") || id.contains("claude") || id.contains("-vl") ||
-            id.contains("pixtral") || id.contains("llava") || id.contains("grok")
+            id.contains("pixtral") || id.contains("llava") || id.contains("grok") ||
+            id.contains("image") || id.contains("multimodal")
     }
 }
 
@@ -68,6 +71,7 @@ object ModelCatalog {
                 maxOutputTokens = 32_000,
                 supportsTools = true,
                 supportsReasoning = true,
+                supportsVision = true,
             ),
             CatalogModel(
                 name = V4_FLASH_MODEL,
@@ -76,6 +80,7 @@ object ModelCatalog {
                 maxOutputTokens = 32_000,
                 supportsTools = true,
                 supportsReasoning = true,
+                supportsVision = true,
             ),
         ),
     )
