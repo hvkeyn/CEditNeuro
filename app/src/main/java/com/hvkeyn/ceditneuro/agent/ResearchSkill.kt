@@ -2300,6 +2300,59 @@ object StarterSkills {
             12. Keep a dream journal only when the user asks: write_file or edit_file dreams/journal.md in the project with the date, the dream as told, the feeling, and a one-line summary of the interpretation. Do not upload it anywhere.
             13. When the dream talk is finished, call use_skill name=dreams scope=app on=false.
         """.trimIndent() + "\n",
+        "cinecode" to """
+            # CineCode: a film written in code
+
+            Use this when the user wants a short film, animation, ad, product film, explainer, music video, or a film "in the style of" a reference, and wants the picture, words, and sound made as code. This is the direction and story layer; `hyperframes` is the HTML/render contract, and `render_video` is the phone's encoder.
+
+            Adapted from [sarpstar/cinecode](https://github.com/sarpstar/cinecode) (MIT). The upstream kit is a desktop system: Node 22+, Python, ffmpeg, headless Chrome, three.js, film modes, and a `-14 LUFS` master. **This phone does not install or run that kit.** This skill keeps the direction rules and produces one self-contained HTML composition rendered by the app. Do not claim the upstream kit ran.
+
+            ## Start with a decision
+
+            1. **Purpose.** Cinematic story, or ad/product. A product, brand, launch, app, or sponsor is an ad; a story, place, feeling, or art idea is cinematic. Ask one short question if it is not clear.
+            2. **Length and format.** A phone film is usually 10–60 seconds. Name the aspect (9:16, 1:1, 16:9) and the exact seconds. Longer than about 3 minutes is a separate, larger job; do not promise it in one pass.
+            3. **Mode.** On this phone use **Quick**: one HTML file, one draft, then revisions. Do not offer the upstream six-gate Film mode, per-shot three.js renders, or a narrator pipeline. If the user needs those, use the upstream kit on their own PC.
+            4. **The idea.** One sentence with a place, a subject, and a change. If the user gives no idea, offer three real directions and ask; do not invent a story and call it theirs. A factual claim needs a source; a person's likeness or a brand asset needs permission.
+
+            ## The card before the build
+
+            Write a short `film-plan.md` with numbers, not adjectives:
+
+            - title, purpose, aspect, duration in seconds;
+            - 3–8 beats: start, end, what changes, one action, what is heard;
+            - one lead per beat, the camera move and its reason;
+            - palette (one ground, one ink, one accent), two type roles, one signature shape;
+            - sound: an existing project audio file, a bundled effect, or silence. Never invent a music licence.
+            - what is deliberately left out.
+
+            A complete brief goes straight to the card and a first draft; do not ask what the brief already answers. A film whose first two seconds are a still title, a fade from black, or a logo is a failed draft: start on an action.
+
+            ## Build
+
+            - Write one HTML composition in the project. Read the printed `hyperframes-core` page with `http_request` only for the timeline contract; otherwise use the `hyperframes` skill's local contract.
+            - Root: `data-composition-id`, `data-start="0"`, `data-width`, `data-height`, `data-duration`; scenes as `.clip` with start/duration/track; a paused `window.__timelines` object with `duration`, `seek`, `pause`.
+            - Build the world at full detail before the draft. No template scenes, no placeholder geometry, no abstract shapes standing in for a real subject unless the user asked for an abstract film.
+            - Every beat changes something visible or audible. A camera move alone is not a beat. One lead per moment; cause before effect; nothing living moves linearly; no pop; land on the cue.
+            - Vary shot size, camera move, light, and type as the tempo asks. Adjacent shots do not repeat the same move or size; do not reuse one designed transition twice in a row. A plain cut is the default joint.
+            - Text is real words from the brief, not lorem. No font, image, or sound without a licence; use project files or bundled assets. No remote script, CDN, or external font.
+            - No `Math.random` or `Date.now`; use a seeded helper if variation is needed, so a re-render is the same film.
+
+            ## Look, then render
+
+            - A still or a draft is shown before a long render. Open the HTML with `open_file` for a live browser preview; if a frame must be inspected, render a short draft and open the MP4. Do not claim you watched a frame you did not see.
+            - `load_tools group=video`, then `render_video path=<film>.html out=<film>.mp4 fps=30 size=1280`.
+            - Check the printed path, duration, dimensions, and frame count. A page that throws, a black frame, a hole in the timeline, or a missing timeline is a failed render; fix the HTML and render again.
+            - This phone has no loudness meter. Do not claim `-14 LUFS`, broadcast loudness, or a final master. Say the audio is as mixed in the HTML.
+            - The first render is a draft. Fix the largest visible fault: hook, framing, one action per beat, legibility, then polish. Do not rewrite the whole film for one note.
+
+            ## Delivery
+
+            Report: title, aspect, seconds, file path and bytes, number of scenes, what was checked, what was not. Keep the MP4 in the project and open it. Do not upload it or call a paid generator without consent. When the film is done, turn this skill off.
+
+            ## Upstream on a PC
+
+            If the user has a computer and wants the full kit, point them to https://github.com/sarpstar/cinecode and its `SKILL.md`; install Node 22+, Python, ffmpeg, and Chrome there. Do not copy its scripts into this project or install them on the phone.
+        """.trimIndent() + "\n",
         "hyperframes" to """
             # Make a video as HTML
 

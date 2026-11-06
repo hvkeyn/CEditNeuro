@@ -2,7 +2,7 @@
 
 A complete snapshot of every skill available in CEditNeuro **0.99.31 (versionCode 147)**, taken on **2026-10-22**, updated **2026-10-24**, from the phone's app-scope folder and the built-in source.
 
-**47 skills:** 45 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
+**48 skills:** 46 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
 
 This file is a catalog and a porting guide. The app does not load `SKILLS.md`; it loads the `.md` files in the two skill folders described below. The JSON at the end is the same inventory in a machine-readable form.
 
@@ -236,6 +236,7 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 | 45 | [rea-video](#rea-video) | starter | a reference video must be taken apart shot by shot and remade | video, remote | 4,530 |
 | 46 | [stageshow](#stageshow) | starter | a faux product UI, feature card, bento, or cursor demo must look real | design, video | 5,183 |
 | 47 | [agent-autoloop](#agent-autoloop) | starter | a background agent loop needs rules, approvals, and durable events on a PC | remote | 4,729 |
+| 48 | [cinecode](#cinecode) | starter | a short film, ad, explainer, or music video must be written in code | video | 5,040 |
 
 ## Every skill
 
@@ -432,6 +433,18 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 **Tools:** `health_log`, `health_panel`, `health_trend`, `health_index` (group `health`).
 
 **Shape:** read only the named file; save each printed value with its unit and range; `health_panel`; a value outside the sheet's range is reported as such and a doctor is suggested; no disease name from a number; quote a scan impression only as written; the record stays in the project; turn off when done.
+
+### cinecode
+
+**Scope:** app · **Origin:** starter · **File:** `cinecode.md` · **Size:** 5,040 chars
+
+**Trigger:** a short film, ad, explainer, or music video must be written in code.
+
+**Use:** `use_skill name=cinecode scope=app`
+
+**Shape:** phone adaptation of sarpstar/cinecode (MIT). Purpose, exact seconds/aspect, 3–8 numbered beats, one lead and one action per beat, hook in the first two seconds, one self-contained HTML, `render_video`, then a real MP4 check. Upstream six-gate Film mode, three.js, Node, ffmpeg, and `-14 LUFS` are PC-only and are not claimed here.
+
+**Group(s):** video · **Tool(s):** `render_video`, `open_file`, `read_file`, `write_file`, `edit_file`, `http_request`, `load_tools`
 
 ### hyperframes
 
@@ -779,7 +792,8 @@ The JSON below is the same inventory. `origin` is `starter`, `builtin`, or `user
 {"name": "frontend-design", "scope": "app", "origin": "starter", "trigger": "a landing page, cabinet, form, or product screen", "groups": ["design"], "tools": ["http_request", "write_file", "design_system"], "requires_skills": ["hyperframes", "web-to-app"], "chars": 4804, "file": "frontend-design.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "genealogy", "scope": "app", "origin": "starter", "trigger": "family history, ancestors, or archive records in the former USSR", "groups": ["remote"], "tools": ["write_file", "read_file", "run_command", "http_request", "browse_page", "load_tools"], "chars": 11976, "file": "genealogy.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "health", "scope": "app", "origin": "starter", "trigger": "a lab sheet, scan report, or family health record", "groups": ["health"], "tools": ["health_log", "health_panel", "health_trend", "health_index"], "chars": 1361, "file": "health.md", "source": "ResearchSkill.kt#StarterSkills"},
-    {"name": "hyperframes", "scope": "app", "origin": "starter", "trigger": "a video, animation, title card, or HyperFrames composition", "groups": [], "tools": ["render_video", "edit_video", "sound_effect", "make_music", "voiceover", "web_search", "http_request", "write_file", "edit_file"], "chars": 11930, "file": "hyperframes.md", "source": "ResearchSkill.kt#StarterSkills"},
+    {"name": "cinecode", "scope": "app", "origin": "starter", "trigger": "a short film, ad, explainer, or music video must be written in code", "groups": ["video"], "tools": ["render_video", "open_file", "read_file", "write_file", "edit_file", "http_request", "load_tools"], "chars": 5040, "file": "cinecode.md", "source": "ResearchSkill.kt#StarterSkills"},
+{"name": "hyperframes", "scope": "app", "origin": "starter", "trigger": "a video, animation, title card, or HyperFrames composition", "groups": [], "tools": ["render_video", "edit_video", "sound_effect", "make_music", "voiceover", "web_search", "http_request", "write_file", "edit_file"], "chars": 11930, "file": "hyperframes.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "learn", "scope": "app", "origin": "starter", "trigger": "learn a subject, be taught, or practice", "groups": ["learn"], "tools": ["learn", "http_request", "web_search"], "chars": 2501, "file": "learn.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "mobile-control", "scope": "app", "origin": "starter", "trigger": "operate another Android app through accessibility refs", "groups": ["device"], "tools": ["ui_snapshot", "ui_act", "ui_find", "ui_collect", "ui_display", "ui_frame", "list_apps", "device_status", "shizuku_exec", "fetch_system_layout", "execute_system_action", "clipboard"], "chars": 7722, "file": "mobile-control.md", "source": "ResearchSkill.kt#StarterSkills"}
 {"name": "net-map", "scope": "app", "origin": "starter", "trigger": "a network must be drawn from packets", "groups": ["study"], "tools": ["net_audit", "capture_dump", "read_dump", "research_figure"], "chars": 5603, "file": "net-map.md", "source": "ResearchSkill.kt#StarterSkills"},

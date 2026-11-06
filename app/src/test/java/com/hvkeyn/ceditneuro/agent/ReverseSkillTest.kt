@@ -20,6 +20,14 @@ class ReverseSkillTest {
     }
 
     @Test
+    fun cinecodeKeepsFilmProcessWithoutTheDesktopKit() {
+        val text = StarterSkills.skills.getValue("cinecode")
+        listOf("sarpstar/cinecode", "3–8 beats", "first two seconds", "render_video", "No `Math.random`", "-14 LUFS")
+            .forEach { assertTrue("cinecode lacks $it", text.contains(it, ignoreCase = true)) }
+        assertTrue(text.length <= 12_000)
+    }
+
+    @Test
     fun autoloopIsExplainedAsAPcDaemonNotAPhoneSkill() {
         val text = StarterSkills.skills.getValue("agent-autoloop")
         listOf("not a skill", "Node 24", "Windows port is pending", "agent-autoloop", "approval", "team", "Do not install")

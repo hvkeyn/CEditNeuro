@@ -54,7 +54,7 @@ class MathEvalTest {
             ResearchSkill.ensure(dir)
             assertTrue(!debug.exists())
             assertEquals(
-                listOf("agent-autoloop", "agent-team", "android-apk", "android-app", "android-compose", "android-ui", "ascii-studio", "book-notes", "crew", "debug", "deep-read", "diff-tour", "dreams", "find-skills", "frontend-design", "genealogy", "health", "hyperframes", "learn", "mobile-control", "net-map", "network-study", "rea", "rea-video", "reanimate", "research", "reverse-engineering", "review", "rrsi", "ru-translate", "second-monitor", "security", "skill-security", "spec-kit", "stageshow", "systematic-debugging", "ub-mode", "unbrowse", "understand-anything", "video-download", "video-notes", "visual-explainer", "visualize", "web-reach", "web-to-app"),
+                listOf("agent-autoloop", "agent-team", "android-apk", "android-app", "android-compose", "android-ui", "ascii-studio", "book-notes", "cinecode", "crew", "debug", "deep-read", "diff-tour", "dreams", "find-skills", "frontend-design", "genealogy", "health", "hyperframes", "learn", "mobile-control", "net-map", "network-study", "rea", "rea-video", "reanimate", "research", "reverse-engineering", "review", "rrsi", "ru-translate", "second-monitor", "security", "skill-security", "spec-kit", "stageshow", "systematic-debugging", "ub-mode", "unbrowse", "understand-anything", "video-download", "video-notes", "visual-explainer", "visualize", "web-reach", "web-to-app"),
                 SkillLibrary(null, dir).list().map { it.name },
             )
         } finally {

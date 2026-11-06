@@ -26,7 +26,9 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ---
 
-## New in 0.99.91
+## New in 0.99.92
+
+- **CineCode direction layer**: a new `cinecode` skill for short films, ads, explainers, and music videos written in code. It keeps the hook, one action per beat, numbered card, deterministic motion, and real MP4 check, but uses one HTML composition and the phone's `render_video`; it explicitly does not claim the upstream Node/ffmpeg/three.js kit or a −14 LUFS master.
 
 - **Image fix verified**: the selected image is now passed into the agent loop, not only written into the conversation record. On the phone, DeepSeek V4.1 Flash described an attached screenshot directly; OCR was not used.
 
