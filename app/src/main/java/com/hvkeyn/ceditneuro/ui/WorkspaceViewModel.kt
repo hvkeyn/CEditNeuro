@@ -3673,6 +3673,7 @@ class WorkspaceViewModel(
             com.hvkeyn.ceditneuro.tools.LayoutTool(),
             com.hvkeyn.ceditneuro.tools.DesignSystemTool(),
             com.hvkeyn.ceditneuro.tools.StageReviewTool(ws),
+            com.hvkeyn.ceditneuro.tools.PocketModelTool(appContext),
             com.hvkeyn.ceditneuro.tools.NetworkCardTool(),
             com.hvkeyn.ceditneuro.tools.AsciiArtTool(),
             com.hvkeyn.ceditneuro.tools.VisualCardTool(),

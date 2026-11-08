@@ -56,7 +56,27 @@ object ModelCatalog {
     const val FLASH_MODEL = "deepseek-flash"
     const val V4_FLASH_MODEL = "deepseek-v4-flash"
 
-    fun builtins(): List<ModelProvider> = listOf(deepSeek())
+    fun builtins(): List<ModelProvider> = listOf(deepSeek(), pocketLocal())
+
+    /** The official MNN-Pocket GGUF served by the app's local llama.cpp process. */
+    fun pocketLocal(): ModelProvider = ModelProvider(
+        id = "mnn-pocket-local",
+        name = "MNN Pocket (local)",
+        apiUrl = "http://127.0.0.1:8091/v1",
+        keyless = true,
+        builtin = true,
+        models = listOf(
+            CatalogModel(
+                name = "mnn-pocket",
+                displayName = "MNN-Pocket 0.3B (on this phone)",
+                maxContextTokens = 2_048,
+                maxOutputTokens = 512,
+                supportsTools = false,
+                supportsReasoning = false,
+                supportsVision = false,
+            ),
+        ),
+    )
 
     fun deepSeek(): ModelProvider = ModelProvider(
         id = DEEPSEEK_ID,

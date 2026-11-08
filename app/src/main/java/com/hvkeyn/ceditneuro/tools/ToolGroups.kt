@@ -69,6 +69,7 @@ object ToolGroups {
             "open_settings",
             "clipboard",
             "open_file",
+            "pocket_model",
         ),
         "remote" to listOf(
             "remote_connect",

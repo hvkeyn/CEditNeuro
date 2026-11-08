@@ -26,7 +26,10 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ---
 
-## New in 0.99.92
+## New in 0.99.93
+
+- **MNN-Pocket on the phone**: `pocket_model action=install` downloads the official Q4_1 GGUF and llama.cpp arm64 server, extracts them into the app, and starts a keyless local endpoint. The built-in **MNN Pocket (local)** provider then answers in the normal chat. Tested on the phone: `2+2 → 4`; `/v1/models` reported 302,830,976 parameters, Q4_1, 32K training context.
+- `pocket_model action=update` checks the Hugging Face commit; `start`/`stop`/`status` manage the runtime. The app uses the official GGUF and llama.cpp, not Alibaba's native MNN runtime; the model card and runtime are Apache-2.0/MIT.
 
 - **CineCode direction layer**: a new `cinecode` skill for short films, ads, explainers, and music videos written in code. It keeps the hook, one action per beat, numbered card, deterministic motion, and real MP4 check, but uses one HTML composition and the phone's `render_video`; it explicitly does not claim the upstream Node/ffmpeg/three.js kit or a −14 LUFS master.
 
