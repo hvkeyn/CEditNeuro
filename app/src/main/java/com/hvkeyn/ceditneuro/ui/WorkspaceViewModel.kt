@@ -3788,14 +3788,17 @@ class WorkspaceViewModel(
         }
 
         toolSession.present = tools.map { it.name }.toSet()
+        val localModel = settingsStore.current.model.name == "mnn-pocket"
         return AgentLoop(
             backend = backend,
             toolRegistry = ToolRegistry(tools),
             toolSession = toolSession,
-            systemPrompt = buildSystemPrompt(),
+            systemPrompt = if (localModel) localModelPrompt(ws.root.absolutePath) else buildSystemPrompt(),
             peerFeed = ::takePeerFeed,
             onUsage = { usage -> recordUsage(project, usage, "main") },
-            setupPrompt = buildSetupPrompt(
+            setupPrompt = if (localModel) {
+                "Project root: ${ws.root.absolutePath}\nThis local model has no tools. Answer in the user's language, be concise, and say when a task needs the cloud model."
+            } else buildSetupPrompt(
                 projectRoot = ws.root.absolutePath,
                 toolchainBin = deviceShell.toolchainBin.absolutePath,
                 remoteSummary = remoteSummary,
@@ -3821,6 +3824,13 @@ class WorkspaceViewModel(
             ),
         )
     }
+
+    private fun localModelPrompt(projectRoot: String): String =
+        "You are CEdiNeuro's local assistant running on this Android phone. " +
+            "Project: $projectRoot. Answer in the user's language. Be concise: the context is 8K tokens. " +
+            "You have no tools, no file access, no vision, and no web access in this local mode. " +
+            "Do not claim you read or changed a file. For a task that needs files, tools, or current facts, say that the cloud model is required. " +
+            "Do not invent numbers, paths, or sources."
 
     private fun appendShellLine(project: LiveProject, command: String, rendered: String) {
         editProject(project) {

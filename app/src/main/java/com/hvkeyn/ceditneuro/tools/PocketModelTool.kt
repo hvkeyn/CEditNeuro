@@ -75,7 +75,7 @@ class PocketModelTool(private val context: Context) : Tool {
                 val log = File(dir, "server.log")
                 val process = ProcessBuilder(
                     server.absolutePath, "-m", model.absolutePath,
-                    "--host", "127.0.0.1", "--port", "8091", "-c", "2048", "-t", "4",
+                    "--host", "127.0.0.1", "--port", "8091", "-c", "8192", "-t", "4",
                 ).directory(dir).redirectErrorStream(true)
                     .redirectOutput(ProcessBuilder.Redirect.appendTo(log)).apply {
                         environment()["LD_LIBRARY_PATH"] = dir.absolutePath
@@ -85,7 +85,7 @@ class PocketModelTool(private val context: Context) : Tool {
                 ToolResult.ok("Local MNN-Pocket running at http://127.0.0.1:8091/v1 (model mnn-pocket).")
             }
             "stop" -> {
-                Runtime.getRuntime().exec(arrayOf("pkill", "-f", "llama-server -m ${model.absolutePath}")).waitFor()
+                Runtime.getRuntime().exec(arrayOf("killall", "llama-server")).waitFor()
                 ToolResult.ok("Local MNN-Pocket stopped.")
             }
             else -> ToolResult.error("action is status, install, update, start, or stop.")

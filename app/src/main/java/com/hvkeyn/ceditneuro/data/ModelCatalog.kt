@@ -69,7 +69,7 @@ object ModelCatalog {
             CatalogModel(
                 name = "mnn-pocket",
                 displayName = "MNN-Pocket 0.3B (on this phone)",
-                maxContextTokens = 2_048,
+                maxContextTokens = 8_192,
                 maxOutputTokens = 512,
                 supportsTools = false,
                 supportsReasoning = false,

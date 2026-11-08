@@ -26,7 +26,9 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ---
 
-## New in 0.99.93
+## New in 0.99.94
+
+- **Local context fix**: MNN-Pocket now starts with an **8192-token** server context instead of 2048, and the local provider advertises 8192. The local-only prompt is compact and explicitly tool-free, so the normal coding prompt no longer overfills a small model. A 123 project with a long history is trimmed by `ContextBudget`; the server no longer rejects the whole request at 2048.
 
 - **MNN-Pocket on the phone**: `pocket_model action=install` downloads the official Q4_1 GGUF and llama.cpp arm64 server, extracts them into the app, and starts a keyless local endpoint. The built-in **MNN Pocket (local)** provider then answers in the normal chat. Tested on the phone: `2+2 → 4`; `/v1/models` reported 302,830,976 parameters, Q4_1, 32K training context.
 - `pocket_model action=update` checks the Hugging Face commit; `start`/`stop`/`status` manage the runtime. The app uses the official GGUF and llama.cpp, not Alibaba's native MNN runtime; the model card and runtime are Apache-2.0/MIT.
