@@ -2272,7 +2272,13 @@ class WorkspaceViewModel(
                 "skills",
             )
         }
-        val history = project.conversation.toList()
+        val localChat = settingsStore.current.model.name == "mnn-pocket"
+        val history = if (localChat) {
+            // A 0.3B local model cannot carry a coding transcript; keep only the tail.
+            project.conversation.takeLast(2)
+        } else {
+            project.conversation.toList()
+        }
         project.runContext = null
         project.conversation += ChatMessage.user(prompt, images)
         val epoch = project.epoch.get()

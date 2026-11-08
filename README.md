@@ -26,7 +26,9 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ---
 
-## New in 0.99.94
+## New in 0.99.95
+
+- **Local chat no longer hangs**: the local MNN-Pocket path keeps only the last two conversation messages, uses the compact tool-free prompt, and runs the server at 8192 tokens. Tested in project 123: an English prompt answered in normal time; the old 2048 server had produced the multi-minute wait. Stop the old server before starting the new one.
 
 - **Local context fix**: MNN-Pocket now starts with an **8192-token** server context instead of 2048, and the local provider advertises 8192. The local-only prompt is compact and explicitly tool-free, so the normal coding prompt no longer overfills a small model. A 123 project with a long history is trimmed by `ContextBudget`; the server no longer rejects the whole request at 2048.
 
