@@ -26,7 +26,9 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ---
 
-## New in 0.99.96
+## New in 0.99.97
+
+- **Chat threads: rename and icons**: the thread bar is now icon-first, with the active title in one small line. The thread menu has Rename, icon choices (Chat, Code, Bug, Idea, Design, Research, Search, Video, Build, Folder), Archive, and Delete. Names and icons are saved per project.
 
 - **Chat threads in one project**: a project can now hold several chats. The chat bar has a dropdown, New chat, Archive, and Delete; each thread keeps its own transcript, agent job, and UI. Switching threads does not stop a running job. Added on the phone, switched Main → Chat 2 → Main, restarted the app, and both threads were still there.
 

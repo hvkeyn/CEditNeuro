@@ -43,6 +43,16 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Science
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
@@ -64,8 +74,10 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -75,6 +87,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import com.hvkeyn.ceditneuro.agent.YouShouldKnow
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
@@ -142,6 +155,7 @@ fun ChatPanel(
     onAddThread: () -> Unit = {},
     onArchiveThread: (String) -> Unit = {},
     onDeleteThread: (String) -> Unit = {},
+    onRenameThread: (String, String, String) -> Unit = { _, _, _ -> },
 ) {
     var input by rememberSaveable { mutableStateOf("") }
     var attachments by remember { mutableStateOf<List<Uri>>(emptyList()) }
@@ -261,6 +275,7 @@ fun ChatPanel(
                 onAdd = onAddThread,
                 onArchive = onArchiveThread,
                 onDelete = onDeleteThread,
+                onRename = onRenameThread,
             )
             AgentToolbar(
                 settings = settings,
@@ -872,6 +887,24 @@ private fun ComposerActions(
     }
 }
 
+private data class ThreadIconChoice(val key: String, val label: String, val image: androidx.compose.ui.graphics.vector.ImageVector)
+
+private val threadIconChoices = listOf(
+    ThreadIconChoice("chat", "Chat", Icons.Default.Chat),
+    ThreadIconChoice("code", "Code", Icons.Default.Code),
+    ThreadIconChoice("bug", "Bug", Icons.Default.BugReport),
+    ThreadIconChoice("idea", "Idea", Icons.Default.Lightbulb),
+    ThreadIconChoice("design", "Design", Icons.Default.Palette),
+    ThreadIconChoice("research", "Research", Icons.Default.Science),
+    ThreadIconChoice("search", "Search", Icons.Default.Search),
+    ThreadIconChoice("video", "Video", Icons.Default.Movie),
+    ThreadIconChoice("build", "Build", Icons.Default.Build),
+    ThreadIconChoice("folder", "Folder", Icons.Default.Folder),
+)
+
+private fun threadIcon(key: String): androidx.compose.ui.graphics.vector.ImageVector =
+    threadIconChoices.firstOrNull { it.key == key }?.image ?: Icons.Default.Chat
+
 @Composable
 private fun ChatThreadBar(
     state: WorkspaceUiState,
@@ -879,24 +912,32 @@ private fun ChatThreadBar(
     onAdd: () -> Unit,
     onArchive: (String) -> Unit,
     onDelete: (String) -> Unit,
+    onRename: (String, String, String) -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
     var more by remember { mutableStateOf(false) }
+    var renameOpen by remember { mutableStateOf(false) }
+    var renameTitle by remember { mutableStateOf("") }
+    var renameIcon by remember { mutableStateOf("chat") }
     val active = state.chatThreads.firstOrNull { it.id == state.activeThreadId }
     Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 2.dp, top = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 2.dp, top = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Box {
-            Pill(
-                text = "Chat: ${active?.title ?: state.activeThreadTitle}",
-                onClick = { open = true },
-                maxWidth = 260.dp,
-            )
+            IconButton(onClick = { open = true }, modifier = Modifier.size(36.dp)) {
+                Icon(
+                    threadIcon(active?.icon ?: state.activeThreadIcon),
+                    contentDescription = "Chat: ${active?.title ?: state.activeThreadTitle}",
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
             FitDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
                 state.chatThreads.forEach { thread ->
                     DropdownMenuItem(
+                        leadingIcon = { Icon(threadIcon(thread.icon), contentDescription = null) },
                         text = {
                             Column {
                                 Text(thread.title)
@@ -926,6 +967,16 @@ private fun ChatThreadBar(
             }
             DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
                 DropdownMenuItem(
+                    text = { Text("Rename this chat") },
+                    leadingIcon = { Icon(threadIcon(active?.icon ?: "chat"), contentDescription = null) },
+                    onClick = {
+                        more = false
+                        renameTitle = active?.title ?: "Chat"
+                        renameIcon = active?.icon ?: "chat"
+                        renameOpen = true
+                    },
+                )
+                DropdownMenuItem(
                     text = { Text("Archive this chat") },
                     leadingIcon = { Icon(Icons.Default.Archive, contentDescription = null) },
                     onClick = {
@@ -943,6 +994,63 @@ private fun ChatThreadBar(
                 )
             }
         }
+        if (active != null && !active.archived) {
+            Text(
+                text = active.title,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+    if (renameOpen) {
+        AlertDialog(
+            onDismissRequest = { renameOpen = false },
+            title = { Text("Rename chat") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = renameTitle,
+                        onValueChange = { renameTitle = it.take(40) },
+                        label = { Text("Name") },
+                        singleLine = true,
+                    )
+                    Text("Icon", style = MaterialTheme.typography.labelMedium)
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        threadIconChoices.forEach { choice ->
+                            IconButton(
+                                onClick = { renameIcon = choice.key },
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .background(
+                                        if (renameIcon == choice.key) MaterialTheme.colorScheme.primaryContainer
+                                        else androidx.compose.ui.graphics.Color.Transparent,
+                                        androidx.compose.foundation.shape.CircleShape,
+                                    ),
+                            ) {
+                                Icon(choice.image, contentDescription = choice.label)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onRename(state.activeThreadId, renameTitle, renameIcon)
+                        renameOpen = false
+                    },
+                ) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { renameOpen = false }) { Text("Cancel") }
+            },
+        )
     }
 }
 

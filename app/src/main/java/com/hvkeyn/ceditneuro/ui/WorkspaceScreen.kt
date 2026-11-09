@@ -917,6 +917,7 @@ private fun AgentChat(
         onAddThread = viewModel::addChatThread,
         onArchiveThread = viewModel::archiveChatThread,
         onDeleteThread = viewModel::deleteChatThread,
+        onRenameThread = viewModel::renameChatThread,
         modifier = modifier,
     )
 }

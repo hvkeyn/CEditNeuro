@@ -213,7 +213,12 @@ data class BookLine(val mine: Boolean, val text: String)
 
 data class ReaderMention(val title: String, val path: String)
 
-data class ChatThreadInfo(val id: String, val title: String, val archived: Boolean = false)
+data class ChatThreadInfo(
+    val id: String,
+    val title: String,
+    val icon: String = "chat",
+    val archived: Boolean = false,
+)
 
 data class ReaderView(
     val path: String,
@@ -258,6 +263,7 @@ data class WorkspaceUiState(
     val chatThreads: List<ChatThreadInfo> = emptyList(),
     val activeThreadId: String = "main",
     val activeThreadTitle: String = "Main chat",
+    val activeThreadIcon: String = "chat",
     val chatVisible: Boolean = false,
     val shellVisible: Boolean = false,
     val shellRunning: Boolean = false,
@@ -342,6 +348,7 @@ private class LiveProject(
     val workspace: Workspace,
     val threadId: String,
     var threadTitle: String,
+    var threadIcon: String,
     val conversation: MutableList<ChatMessage>,
     val buffers: MutableMap<String, String>,
     val idGenerator: AtomicLong,
@@ -648,7 +655,7 @@ class WorkspaceViewModel(
         val index = chatThreads.load(root)
         val id = "t${System.currentTimeMillis()}"
         val title = "Chat ${index.threads.size + 1}"
-        val thread = com.hvkeyn.ceditneuro.data.StoredThread(id = id, title = title, createdAt = System.currentTimeMillis())
+        val thread = com.hvkeyn.ceditneuro.data.StoredThread(id = id, title = title, icon = "chat", createdAt = System.currentTimeMillis())
         project.ui = projectSlice(_state.value)
         persistNow(project)
         chatThreads.save(root, index.copy(activeId = id, threads = index.threads + thread))
@@ -672,6 +679,29 @@ class WorkspaceViewModel(
         )
         chatThreads.save(root, nextIndex)
         showThreadProject(root, nextIndex, restored)
+    }
+
+    fun renameChatThread(id: String, title: String, icon: String) {
+        val project = current ?: return
+        val root = project.workspace.root.canonicalPath
+        val cleanTitle = title.trim().take(40).ifBlank { "Chat" }
+        val cleanIcon = icon.trim().ifBlank { "chat" }
+        val index = chatThreads.load(root)
+        val next = index.threads.map {
+            if (it.id == id) it.copy(title = cleanTitle, icon = cleanIcon) else it
+        }
+        chatThreads.save(root, index.copy(threads = next))
+        if (project.threadId == id) {
+            project.threadTitle = cleanTitle
+            project.threadIcon = cleanIcon
+        }
+        _state.update {
+            it.copy(
+                chatThreads = threadInfo(index.copy(threads = next)),
+                activeThreadTitle = if (project.threadId == id) cleanTitle else it.activeThreadTitle,
+                activeThreadIcon = if (project.threadId == id) cleanIcon else it.activeThreadIcon,
+            )
+        }
     }
 
     fun archiveChatThread(id: String) {
@@ -762,6 +792,7 @@ class WorkspaceViewModel(
             workspace = opened,
             threadId = thread.id,
             threadTitle = thread.title,
+            threadIcon = thread.icon,
             conversation = ToolTranscript.seal(session.conversation).toMutableList(),
             buffers = mutableMapOf(),
             idGenerator = AtomicLong(session.nextId),
@@ -784,6 +815,7 @@ class WorkspaceViewModel(
                 chatThreads = threadInfo(chatThreads.load(canonical.path)),
                 activeThreadId = thread.id,
                 activeThreadTitle = thread.title,
+                activeThreadIcon = thread.icon,
             ),
         )
     }
@@ -823,6 +855,7 @@ class WorkspaceViewModel(
                 chatThreads = threadInfo(index),
                 activeThreadId = project.threadId,
                 activeThreadTitle = project.threadTitle,
+                activeThreadIcon = project.threadIcon,
             )
         }
         project.ui = projectSlice(_state.value)
@@ -4012,7 +4045,7 @@ class WorkspaceViewModel(
         chatThreads.save(root, index.copy(
             activeId = project.threadId,
             threads = index.threads.map {
-                if (it.id == project.threadId) it.copy(title = project.threadTitle, session = session) else it
+                if (it.id == project.threadId) it.copy(title = project.threadTitle, icon = project.threadIcon, session = session) else it
             },
         ))
         library.updateSession(root, session)
@@ -4026,7 +4059,7 @@ class WorkspaceViewModel(
         projects.values.filter { it.workspace.root.canonicalPath == root }
 
     private fun threadInfo(index: com.hvkeyn.ceditneuro.data.StoredThreadIndex): List<ChatThreadInfo> =
-        index.threads.map { ChatThreadInfo(it.id, it.title, it.archived) }
+        index.threads.map { ChatThreadInfo(it.id, it.title, it.icon, it.archived) }
 
     private fun nextId(project: LiveProject): Long = project.idGenerator.incrementAndGet()
 

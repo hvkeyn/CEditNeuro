@@ -11,6 +11,7 @@ import java.security.MessageDigest
 data class StoredThread(
     val id: String,
     val title: String,
+    val icon: String = "chat",
     val archived: Boolean = false,
     val createdAt: Long = 0L,
     val session: StoredSession = StoredSession(),
