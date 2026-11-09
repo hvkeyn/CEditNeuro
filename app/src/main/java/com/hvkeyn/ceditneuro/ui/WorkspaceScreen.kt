@@ -913,6 +913,10 @@ private fun AgentChat(
         onOpenLink = viewModel::openChatLink,
         onYouShouldKnow = { on -> viewModel.updateSettings { it.copy(youShouldKnow = on) } },
         onToggleTeam = viewModel::toggleTeam,
+        onSelectThread = viewModel::selectChatThread,
+        onAddThread = viewModel::addChatThread,
+        onArchiveThread = viewModel::archiveChatThread,
+        onDeleteThread = viewModel::deleteChatThread,
         modifier = modifier,
     )
 }

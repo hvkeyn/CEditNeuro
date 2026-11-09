@@ -42,6 +42,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.PhotoCamera
@@ -134,6 +138,10 @@ fun ChatPanel(
     onRecheck: () -> Unit = {},
     onYouShouldKnow: (Boolean) -> Unit = {},
     onToggleTeam: () -> Unit = {},
+    onSelectThread: (String) -> Unit = {},
+    onAddThread: () -> Unit = {},
+    onArchiveThread: (String) -> Unit = {},
+    onDeleteThread: (String) -> Unit = {},
 ) {
     var input by rememberSaveable { mutableStateOf("") }
     var attachments by remember { mutableStateOf<List<Uri>>(emptyList()) }
@@ -247,6 +255,13 @@ fun ChatPanel(
 
     Surface(modifier = modifier, color = MaterialTheme.colorScheme.surfaceVariant) {
         Column {
+            ChatThreadBar(
+                state = state,
+                onSelect = onSelectThread,
+                onAdd = onAddThread,
+                onArchive = onArchiveThread,
+                onDelete = onDeleteThread,
+            )
             AgentToolbar(
                 settings = settings,
                 compact = compact,
@@ -854,6 +869,80 @@ private fun ComposerActions(
             enabled = state.projectRoot != null && hasDraft,
             onClick = onSend,
         )
+    }
+}
+
+@Composable
+private fun ChatThreadBar(
+    state: WorkspaceUiState,
+    onSelect: (String) -> Unit,
+    onAdd: () -> Unit,
+    onArchive: (String) -> Unit,
+    onDelete: (String) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    var more by remember { mutableStateOf(false) }
+    val active = state.chatThreads.firstOrNull { it.id == state.activeThreadId }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 2.dp, top = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Box {
+            Pill(
+                text = "Chat: ${active?.title ?: state.activeThreadTitle}",
+                onClick = { open = true },
+                maxWidth = 260.dp,
+            )
+            FitDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                state.chatThreads.forEach { thread ->
+                    DropdownMenuItem(
+                        text = {
+                            Column {
+                                Text(thread.title)
+                                if (thread.archived) {
+                                    Text(
+                                        "archived",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        },
+                        onClick = {
+                            open = false
+                            onSelect(thread.id)
+                        },
+                    )
+                }
+            }
+        }
+        IconButton(onClick = onAdd, modifier = Modifier.size(36.dp)) {
+            Icon(Icons.Default.Add, contentDescription = "New chat thread", modifier = Modifier.size(19.dp))
+        }
+        Box {
+            IconButton(onClick = { more = true }, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Default.MoreVert, contentDescription = "Chat thread actions", modifier = Modifier.size(19.dp))
+            }
+            DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
+                DropdownMenuItem(
+                    text = { Text("Archive this chat") },
+                    leadingIcon = { Icon(Icons.Default.Archive, contentDescription = null) },
+                    onClick = {
+                        more = false
+                        onArchive(state.activeThreadId)
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Delete this chat") },
+                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                    onClick = {
+                        more = false
+                        onDelete(state.activeThreadId)
+                    },
+                )
+            }
+        }
     }
 }
 

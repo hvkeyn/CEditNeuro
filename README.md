@@ -26,7 +26,9 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ---
 
-## New in 0.99.95
+## New in 0.99.96
+
+- **Chat threads in one project**: a project can now hold several chats. The chat bar has a dropdown, New chat, Archive, and Delete; each thread keeps its own transcript, agent job, and UI. Switching threads does not stop a running job. Added on the phone, switched Main → Chat 2 → Main, restarted the app, and both threads were still there.
 
 - **Local chat no longer hangs**: the local MNN-Pocket path keeps only the last two conversation messages, uses the compact tool-free prompt, and runs the server at 8192 tokens. Tested in project 123: an English prompt answered in normal time; the old 2048 server had produced the multi-minute wait. Stop the old server before starting the new one.
 

@@ -213,6 +213,8 @@ data class BookLine(val mine: Boolean, val text: String)
 
 data class ReaderMention(val title: String, val path: String)
 
+data class ChatThreadInfo(val id: String, val title: String, val archived: Boolean = false)
+
 data class ReaderView(
     val path: String,
     val title: String,
@@ -253,6 +255,9 @@ data class WorkspaceUiState(
     val dirtyPaths: Set<String> = emptySet(),
     val reloadCounter: Long = 0L,
     val chat: List<ChatEntry> = emptyList(),
+    val chatThreads: List<ChatThreadInfo> = emptyList(),
+    val activeThreadId: String = "main",
+    val activeThreadTitle: String = "Main chat",
     val chatVisible: Boolean = false,
     val shellVisible: Boolean = false,
     val shellRunning: Boolean = false,
@@ -335,6 +340,8 @@ data class TeamUi(
 
 private class LiveProject(
     val workspace: Workspace,
+    val threadId: String,
+    var threadTitle: String,
     val conversation: MutableList<ChatMessage>,
     val buffers: MutableMap<String, String>,
     val idGenerator: AtomicLong,
@@ -406,6 +413,7 @@ class WorkspaceViewModel(
     private var speedBytes = 0
     private var speedMark = System.currentTimeMillis()
     private val library = ProjectLibrary(appContext)
+    private val chatThreads = com.hvkeyn.ceditneuro.data.ChatThreadStore(appContext)
     private val readerStore = com.hvkeyn.ceditneuro.data.ReaderStore(appContext)
     private val bookChats = HashMap<String, List<BookLine>>()
     private var pendingMarkup: com.hvkeyn.ceditneuro.data.ReaderRecord? = null
@@ -598,18 +606,23 @@ class WorkspaceViewModel(
         if (!canonical.isDirectory) {
             if (library.roots().size <= 1) allowEmptyProfile = true
             library.forget(canonical.path)
-            projects.remove(canonical.path)
+            projectsForRoot(canonical.path).forEach { p -> projects.remove(threadKey(canonical.path, p.threadId)) }
+            chatThreads.forget(canonical.path)
             _state.update { it.copy(recentProjects = library.roots(), otherRuns = runStatuses(current)) }
             showMessage("Folder is gone: ${canonical.path}")
             return
         }
+        val index = chatThreads.ensureMigrated(canonical.path, library.load(canonical.path))
+        val active = index.threads.firstOrNull { it.id == index.activeId && !it.archived }
+            ?: index.threads.firstOrNull { !it.archived }
+            ?: index.threads.first()
         if (current?.workspace?.root?.canonicalPath == canonical.path) {
-            current?.let { project ->
-                project.ui = projectSlice(_state.value)
-                library.save(canonical.path, snapshotSession(project))
+            current?.let { project -> project.ui = projectSlice(_state.value); persistNow(project) }
+            if (current?.threadId != active.id) showThreadProject(canonical.path, index, active)
+            else {
+                _state.update { it.copy(projectRoot = canonical.path, recentProjects = library.roots()) }
+                refreshProjectTree()
             }
-            _state.update { it.copy(projectRoot = canonical.path, recentProjects = library.roots()) }
-            refreshProjectTree()
             return
         }
 
@@ -618,25 +631,104 @@ class WorkspaceViewModel(
             persistNow(leaving)
         }
 
-        val project = projects[canonical.path] ?: run {
-            val created = runCatching { loadProject(canonical) }.getOrElse { error ->
+        val project = threadProject(canonical.path, active.id) ?: run {
+            val created = runCatching { loadProject(canonical, active) }.getOrElse { error ->
                 showMessage("Cannot open project: ${error.message}")
                 return
             }
-            projects[canonical.path] = created
+            projects[threadKey(canonical.path, active.id)] = created
             created
         }
         showProject(project)
     }
 
+    fun addChatThread() {
+        val project = current ?: return
+        val root = project.workspace.root.canonicalPath
+        val index = chatThreads.load(root)
+        val id = "t${System.currentTimeMillis()}"
+        val title = "Chat ${index.threads.size + 1}"
+        val thread = com.hvkeyn.ceditneuro.data.StoredThread(id = id, title = title, createdAt = System.currentTimeMillis())
+        project.ui = projectSlice(_state.value)
+        persistNow(project)
+        chatThreads.save(root, index.copy(activeId = id, threads = index.threads + thread))
+        val created = loadProject(File(root), thread)
+        projects[threadKey(root, id)] = created
+        showProject(created)
+    }
+
+    fun selectChatThread(id: String) {
+        val project = current ?: return
+        if (project.threadId == id) return
+        val root = project.workspace.root.canonicalPath
+        val index = chatThreads.load(root)
+        val thread = index.threads.firstOrNull { it.id == id } ?: return
+        project.ui = projectSlice(_state.value)
+        persistNow(project)
+        val restored = if (thread.archived) thread.copy(archived = false) else thread
+        val nextIndex = index.copy(
+            activeId = id,
+            threads = index.threads.map { if (it.id == id) restored else it },
+        )
+        chatThreads.save(root, nextIndex)
+        showThreadProject(root, nextIndex, restored)
+    }
+
+    fun archiveChatThread(id: String) {
+        val project = current ?: return
+        val root = project.workspace.root.canonicalPath
+        val index = chatThreads.load(root)
+        val nextThreads = index.threads.map { if (it.id == id) it.copy(archived = true) else it }
+        if (nextThreads.none { !it.archived }) {
+            showMessage("Keep at least one active chat.")
+            return
+        }
+        chatThreads.save(root, index.copy(threads = nextThreads))
+        if (project.threadId == id) {
+            val next = nextThreads.first { !it.archived }
+            chatThreads.save(root, index.copy(activeId = next.id, threads = nextThreads))
+            project.ui = projectSlice(_state.value)
+            persistNow(project)
+            showThreadProject(root, index.copy(activeId = next.id, threads = nextThreads), next)
+        } else {
+            _state.update { it.copy(chatThreads = threadInfo(index.copy(threads = nextThreads))) }
+        }
+    }
+
+    fun deleteChatThread(id: String) {
+        val project = current ?: return
+        val root = project.workspace.root.canonicalPath
+        val index = chatThreads.load(root)
+        val remaining = index.threads.filterNot { it.id == id }
+        if (remaining.isEmpty()) {
+            showMessage("A project needs one chat thread.")
+            return
+        }
+        val removed = projects.remove(threadKey(root, id))
+        removed?.persistJob?.cancel()
+        if (removed?.agentJob?.isActive == true) abandonAgent(removed, announce = false)
+        val next = remaining.firstOrNull { !it.archived } ?: remaining.first()
+        chatThreads.save(root, index.copy(activeId = next.id, threads = remaining))
+        if (project.threadId == id) {
+            project.ui = projectSlice(_state.value)
+            persistNow(project)
+            showThreadProject(root, index.copy(activeId = next.id, threads = remaining), next)
+        } else {
+            _state.update { it.copy(chatThreads = threadInfo(index.copy(threads = remaining))) }
+        }
+    }
+
     fun forgetProject(path: String) {
         val canonical = runCatching { File(path).canonicalPath }.getOrDefault(path)
-        val project = projects.remove(canonical)
-        val leavingCurrent = current === project || workspace?.root?.canonicalPath == canonical
-        if (project != null) {
+        val removed = projectsForRoot(canonical)
+        removed.forEach { project ->
+            projects.remove(threadKey(canonical, project.threadId))
             project.persistJob?.cancel()
             if (project.agentJob?.isActive == true) abandonAgent(project, announce = false)
         }
+        chatThreads.forget(canonical)
+        val leavingCurrent = current == null || removed.any { it === current } || workspace?.root?.canonicalPath == canonical
+        val project = removed.firstOrNull()
         if (leavingCurrent) {
             current = null
             workspace = null
@@ -663,12 +755,13 @@ class WorkspaceViewModel(
         remaining.firstOrNull()?.let { openProject(File(it)) }
     }
 
-    private fun loadProject(canonical: File): LiveProject {
+    private fun loadProject(canonical: File, thread: com.hvkeyn.ceditneuro.data.StoredThread): LiveProject {
         val opened = Workspace(canonical)
-        val session = library.load(canonical.path)
-        library.save(canonical.path, session)
+        val session = thread.session
         return LiveProject(
             workspace = opened,
+            threadId = thread.id,
+            threadTitle = thread.title,
             conversation = ToolTranscript.seal(session.conversation).toMutableList(),
             buffers = mutableMapOf(),
             idGenerator = AtomicLong(session.nextId),
@@ -688,8 +781,21 @@ class WorkspaceViewModel(
                     ShellLine(id = line.id, command = line.command, output = line.output)
                 },
                 activeSkills = session.activeSkills,
+                chatThreads = threadInfo(chatThreads.load(canonical.path)),
+                activeThreadId = thread.id,
+                activeThreadTitle = thread.title,
             ),
         )
+    }
+
+    private fun showThreadProject(root: String, index: com.hvkeyn.ceditneuro.data.StoredThreadIndex, thread: com.hvkeyn.ceditneuro.data.StoredThread) {
+        val key = threadKey(root, thread.id)
+        val project = projects[key] ?: run {
+            val created = loadProject(File(root), thread)
+            projects[key] = created
+            created
+        }
+        showProject(project)
     }
 
     private fun showProject(project: LiveProject) {
@@ -711,7 +817,14 @@ class WorkspaceViewModel(
             hostPrompt = previous.hostPrompt,
             otherRuns = runStatuses(project),
             online = previous.online,
-        )
+        ).let { shown ->
+            val index = chatThreads.load(project.workspace.root.canonicalPath)
+            shown.copy(
+                chatThreads = threadInfo(index),
+                activeThreadId = project.threadId,
+                activeThreadTitle = project.threadTitle,
+            )
+        }
         project.ui = projectSlice(_state.value)
         openPages = emptyList()
         readerImages = emptyMap()
@@ -3894,8 +4007,26 @@ class WorkspaceViewModel(
 
     private fun persistNow(project: LiveProject) {
         val root = project.workspace.root.canonicalPath
-        library.save(root, snapshotSession(project))
+        val session = snapshotSession(project)
+        val index = chatThreads.load(root)
+        chatThreads.save(root, index.copy(
+            activeId = project.threadId,
+            threads = index.threads.map {
+                if (it.id == project.threadId) it.copy(title = project.threadTitle, session = session) else it
+            },
+        ))
+        library.updateSession(root, session)
     }
+
+    private fun threadKey(root: String, id: String): String = "$root\u0000$id"
+
+    private fun threadProject(root: String, id: String): LiveProject? = projects[threadKey(root, id)]
+
+    private fun projectsForRoot(root: String): List<LiveProject> =
+        projects.values.filter { it.workspace.root.canonicalPath == root }
+
+    private fun threadInfo(index: com.hvkeyn.ceditneuro.data.StoredThreadIndex): List<ChatThreadInfo> =
+        index.threads.map { ChatThreadInfo(it.id, it.title, it.archived) }
 
     private fun nextId(project: LiveProject): Long = project.idGenerator.incrementAndGet()
 
