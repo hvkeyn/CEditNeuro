@@ -2300,6 +2300,53 @@ object StarterSkills {
             12. Keep a dream journal only when the user asks: write_file or edit_file dreams/journal.md in the project with the date, the dream as told, the feeling, and a one-line summary of the interpretation. Do not upload it anywhere.
             13. When the dream talk is finished, call use_skill name=dreams scope=app on=false.
         """.trimIndent() + "\n",
+        "reelmimic" to """
+            # ReelMimic: a new 2D video in the reference's style
+
+            Use this when the user gives a reference video and wants a **new 2D animation** in the same visual language: watercolor, crayon, pixel art, paper cut-out, whiteboard doodle, anime cel, or vector motion graphics. The reference supplies technique, not its footage, characters, or assets.
+
+            Adapted from [edenfunf/reelmimic](https://github.com/edenfunf/reelmimic) (MIT). The upstream product is a full local web studio: Node 22.18+, Python 3.10+, FFmpeg, Chrome, Claude Code or Codex, a workflow server, and up to six agent workers. **That stack is not installed on this phone and cannot run here.** This skill keeps the direction method and builds one HTML animation with `render_video`.
+
+            ## First, measure the reference
+
+            If the file is in the project, run `rea_video` with a change brief. If it is a link, `download_video` first. Read `storyboard.jpg`, the shot times, palette swatches, and `changes.md`. Do not reuse the source frames; they are evidence, not assets.
+
+            Write a short `reelmimic-plan.md`:
+
+            - duration (start with 10–30 seconds), aspect, frame rate;
+            - one style sentence: engine, line weight, edge, texture, palette, light, background;
+            - original cast: 1–3 characters, each with shape language, palette, and one silhouette cue;
+            - shots: start, end, framing, camera, one action, one change;
+            - sound: project audio, a bundled effect, or silence;
+            - what is deliberately absent.
+
+            ## Style lock
+
+            Pick one of these and keep it for the whole piece:
+
+            - **vector / motion graphics** — flat shapes, crisp edges, UI-like typography;
+            - **watercolor** — soft washes, paper grain, bleeding edges, imperfect overlaps;
+            - **crayon** — wobbly strokes, visible tooth, hand-lettered caps;
+            - **pixel art** — a strict grid, limited palette, nearest-neighbor scaling;
+            - **paper cut-out** — layered flat pieces, drop shadows, hinge-like motion;
+            - **whiteboard** — ink lines appearing, sparse color, one hand-drawn diagram;
+            - **anime cel** — clean line, two-tone shadow, held poses, speed lines.
+
+            In CSS/SVG/Canvas, imitate the **technique**, not a copyrighted character, logo, or a frame from the source. Character designs are original; no real person's likeness. A style that is not one of these becomes a written proposal, not a silent guess.
+
+            ## Build and review
+
+            1. One self-contained HTML composition: `data-composition-id`, `data-duration`, `.clip` scenes, paused `window.__timelines`.
+            2. A hook in the first two seconds; one lead per shot; a cause before an effect; no still title card.
+            3. Use the connected model's eyes when it accepts images: open the storyboard and check each style frame against the reference's palette and line, not its content.
+            4. `load_tools group=video`, then `render_video path=<film>.html out=<film>.mp4 fps=24 size=1280`.
+            5. Check the real path, duration, dimensions, and frame count. Fix the largest visible fault and render again.
+            6. Do not claim watercolor paint, frame-by-frame raster painting, six parallel workers, or a `-14 LUFS` master. This phone renders code animation; it does not run ReelMimic's painting engines.
+
+            ## Rights
+
+            Learn pacing, framing, transitions, and palette; never reuse source footage, characters, voices, logos, or music. Do not upload a private reference. No real people, no imitation of a living artist's signature, no paid generator without consent. For the full ReelMimic web studio, use the user's own computer and its `install.sh`/`start.sh`; do not install Node or Python here.
+        """.trimIndent() + "\n",
         "cinecode" to """
             # CineCode: a film written in code
 

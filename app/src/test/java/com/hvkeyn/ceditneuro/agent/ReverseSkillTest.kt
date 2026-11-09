@@ -20,6 +20,14 @@ class ReverseSkillTest {
     }
 
     @Test
+    fun reelmimicKeeps2dStyleWithoutClaimingTheStudio() {
+        val text = StarterSkills.skills.getValue("reelmimic")
+        listOf("edenfunf/reelmimic", "rea_video", "watercolor", "render_video", "six", "not installed")
+            .forEach { assertTrue("reelmimic lacks $it", text.contains(it, ignoreCase = true)) }
+        assertTrue(text.length <= 12_000)
+    }
+
+    @Test
     fun cinecodeKeepsFilmProcessWithoutTheDesktopKit() {
         val text = StarterSkills.skills.getValue("cinecode")
         listOf("sarpstar/cinecode", "3–8 beats", "first two seconds", "render_video", "No `Math.random`", "-14 LUFS")

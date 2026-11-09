@@ -26,7 +26,9 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ---
 
-## New in 0.99.97
+## New in 0.99.98
+
+- **ReelMimic direction layer**: a new `reelmimic` skill for turning a reference video into a new 2D animation in its style. It measures with `rea_video`, locks one code style (vector, watercolor look, crayon, pixel, paper cut-out, whiteboard, anime cel), writes one HTML/CSS/SVG/Canvas film, and renders with the phone encoder. The upstream Node/Python/FFmpeg/Chrome studio and six agents are **not** installed or claimed.
 
 - **Chat threads: rename and icons**: the thread bar is now icon-first, with the active title in one small line. The thread menu has Rename, icon choices (Chat, Code, Bug, Idea, Design, Research, Search, Video, Build, Folder), Archive, and Delete. Names and icons are saved per project.
 
