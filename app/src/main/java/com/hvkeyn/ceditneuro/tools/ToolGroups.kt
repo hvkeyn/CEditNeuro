@@ -37,6 +37,7 @@ object ToolGroups {
         "network_card",
         "ascii_art",
         "visual_card",
+        "archify",
         "list_models",
         "team",
     )

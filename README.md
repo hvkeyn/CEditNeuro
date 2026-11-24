@@ -26,7 +26,9 @@ No vendor lock-in: any model exposed through an OpenAI-compatible endpoint, incl
 
 ---
 
-## New in 0.99.98
+## New in 0.99.99
+
+- **Archify diagrams**: a typed JSON IR now becomes a self-contained interactive HTML/SVG system diagram. Five modes (architecture, workflow, sequence, data-flow, lifecycle), click-to-focus, details, light/dark, groups, and up to 16 nodes, with an inline SVG preview in the chat. The upstream Node CLI and its 9-point validator are not installed or claimed.
 
 - **ReelMimic direction layer**: a new `reelmimic` skill for turning a reference video into a new 2D animation in its style. It measures with `rea_video`, locks one code style (vector, watercolor look, crayon, pixel, paper cut-out, whiteboard, anime cel), writes one HTML/CSS/SVG/Canvas film, and renders with the phone encoder. The upstream Node/Python/FFmpeg/Chrome studio and six agents are **not** installed or claimed.
 

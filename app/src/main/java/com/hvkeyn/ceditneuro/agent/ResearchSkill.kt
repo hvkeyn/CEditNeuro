@@ -2300,6 +2300,49 @@ object StarterSkills {
             12. Keep a dream journal only when the user asks: write_file or edit_file dreams/journal.md in the project with the date, the dream as told, the feeling, and a one-line summary of the interpretation. Do not upload it anywhere.
             13. When the dream talk is finished, call use_skill name=dreams scope=app on=false.
         """.trimIndent() + "\n",
+        "archify" to """
+            # Archify: an explorable system diagram
+
+            Use this when the user asks for a beautiful architecture, workflow, sequence, data-flow, or lifecycle diagram, or when a plan has several connected parts. For one small schematic use `visual_card`; for measured numbers use `chart`.
+
+            Archify upstream ([tt-a1i/archify](https://github.com/tt-a1i/archify), MIT) is a typed JSON IR plus a Node CLI. **Node is not installed on this phone.** This app keeps the IR idea and renders one self-contained interactive HTML/SVG page with the local `archify` tool. Do not claim the upstream 9-point validator, PNG/WebM export, or a Node server.
+
+            ## Write the IR, not a Mermaid sketch
+
+            Call `archify` with a JSON string:
+
+            ```json
+            {
+              "type": "architecture",
+              "title": "Upload pipeline",
+              "subtitle": "How a file becomes a reviewed asset",
+              "nodes": [
+                {"id":"ui","label":"Mobile UI","kind":"frontend","group":"client","detail":"Picks a file and shows progress."},
+                {"id":"api","label":"Upload API","kind":"backend","group":"core","detail":"Checks size and type."},
+                {"id":"store","label":"Object store","kind":"database","group":"core","detail":"Keeps the immutable original."}
+              ],
+              "edges": [
+                {"from":"ui","to":"api","label":"PUT"},
+                {"from":"api","to":"store","label":"write"}
+              ],
+              "groups": [
+                {"id":"client","label":"Client"},
+                {"id":"core","label":"Server"}
+              ]
+            }
+            ```
+
+            Types: `architecture`, `workflow`, `sequence`, `dataflow`, `lifecycle`. Kinds color the node: `frontend`, `backend`, `database`, `cloud`, `security`, `messagebus`, `external`; for sequence use `actor`, for workflow `step`/`decision`, for lifecycle `state`. Keep **at most 12 main nodes** (hard limit 16) and only meaningful edges. Short labels; put explanation in `detail`, not on the canvas.
+
+            ## Rules
+
+            1. Use evidence from the project when the user asks about this codebase; do not invent a service or a boundary.
+            2. One diagram answers one question. Split a large system instead of adding a legend of twenty boxes.
+            3. Groups are real boundaries; do not use them as decoration.
+            4. After the tool returns, report the real HTML path and node/edge counts. Open it with `open_file path=archify/<name>.html`; the page has click-to-focus and a light/dark toggle.
+            5. It is a description, not runtime tracing. Do not claim live traffic, deployment ownership, or security proof.
+            6. No script, HTML, or external image in labels. No secret values.
+        """.trimIndent() + "\n",
         "reelmimic" to """
             # ReelMimic: a new 2D video in the reference's style
 

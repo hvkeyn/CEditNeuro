@@ -2,7 +2,7 @@
 
 A complete snapshot of every skill available in CEditNeuro **0.99.31 (versionCode 147)**, taken on **2026-10-22**, updated **2026-10-24**, from the phone's app-scope folder and the built-in source.
 
-**49 skills:** 47 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
+**50 skills:** 48 starter skills, 1 built-in (`research`), 1 user skill (`photo-ocr`). All are app scope on this phone; no project-scope skill was present in the checked projects.
 
 This file is a catalog and a porting guide. The app does not load `SKILLS.md`; it loads the `.md` files in the two skill folders described below. The JSON at the end is the same inventory in a machine-readable form.
 
@@ -238,6 +238,7 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 | 47 | [agent-autoloop](#agent-autoloop) | starter | a background agent loop needs rules, approvals, and durable events on a PC | remote | 4,729 |
 | 48 | [cinecode](#cinecode) | starter | a short film, ad, explainer, or music video must be written in code | video | 5,040 |
 | 49 | [reelmimic](#reelmimic) | starter | a reference video must become a new 2D animation in its style | video | 3,491 |
+| 50 | [archify](#archify) | starter | a multi-node system diagram should be explored | visual | 2,417 |
 
 ## Every skill
 
@@ -434,6 +435,18 @@ Alphabetical. `Origin`: **starter** = written by `StarterSkills`; **builtin** = 
 **Tools:** `health_log`, `health_panel`, `health_trend`, `health_index` (group `health`).
 
 **Shape:** read only the named file; save each printed value with its unit and range; `health_panel`; a value outside the sheet's range is reported as such and a doctor is suggested; no disease name from a number; quote a scan impression only as written; the record stays in the project; turn off when done.
+
+### archify
+
+**Scope:** app · **Origin:** starter · **File:** `archify.md` · **Size:** 2,417 chars
+
+**Trigger:** a beautiful, explorable architecture, workflow, sequence, data-flow, or lifecycle diagram.
+
+**Use:** `use_skill name=archify scope=app`
+
+**Shape:** typed JSON IR → self-contained interactive HTML/SVG from the local `archify` tool. Click-to-focus, detail panel, light/dark toggle. The upstream Node validator/exporters are not claimed.
+
+**Group(s):** visual · **Tool(s):** `archify`, `open_file`, `write_file`, `read_file`
 
 ### reelmimic
 
@@ -805,7 +818,8 @@ The JSON below is the same inventory. `origin` is `starter`, `builtin`, or `user
 {"name": "frontend-design", "scope": "app", "origin": "starter", "trigger": "a landing page, cabinet, form, or product screen", "groups": ["design"], "tools": ["http_request", "write_file", "design_system"], "requires_skills": ["hyperframes", "web-to-app"], "chars": 4804, "file": "frontend-design.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "genealogy", "scope": "app", "origin": "starter", "trigger": "family history, ancestors, or archive records in the former USSR", "groups": ["remote"], "tools": ["write_file", "read_file", "run_command", "http_request", "browse_page", "load_tools"], "chars": 11976, "file": "genealogy.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "health", "scope": "app", "origin": "starter", "trigger": "a lab sheet, scan report, or family health record", "groups": ["health"], "tools": ["health_log", "health_panel", "health_trend", "health_index"], "chars": 1361, "file": "health.md", "source": "ResearchSkill.kt#StarterSkills"},
-    {"name": "reelmimic", "scope": "app", "origin": "starter", "trigger": "a reference video must become a new 2D animation in its style", "groups": ["video"], "tools": ["rea_video", "download_video", "render_video", "open_file", "read_file", "write_file", "edit_file", "http_request", "load_tools"], "chars": 3491, "file": "reelmimic.md", "source": "ResearchSkill.kt#StarterSkills"},
+    {"name": "archify", "scope": "app", "origin": "starter", "trigger": "a multi-node system diagram should be explored", "groups": ["visual"], "tools": ["archify", "open_file", "write_file", "read_file"], "chars": 2417, "file": "archify.md", "source": "ResearchSkill.kt#StarterSkills"},
+{"name": "reelmimic", "scope": "app", "origin": "starter", "trigger": "a reference video must become a new 2D animation in its style", "groups": ["video"], "tools": ["rea_video", "download_video", "render_video", "open_file", "read_file", "write_file", "edit_file", "http_request", "load_tools"], "chars": 3491, "file": "reelmimic.md", "source": "ResearchSkill.kt#StarterSkills"},
 {"name": "cinecode", "scope": "app", "origin": "starter", "trigger": "a short film, ad, explainer, or music video must be written in code", "groups": ["video"], "tools": ["render_video", "open_file", "read_file", "write_file", "edit_file", "http_request", "load_tools"], "chars": 5040, "file": "cinecode.md", "source": "ResearchSkill.kt#StarterSkills"},
 {"name": "hyperframes", "scope": "app", "origin": "starter", "trigger": "a video, animation, title card, or HyperFrames composition", "groups": [], "tools": ["render_video", "edit_video", "sound_effect", "make_music", "voiceover", "web_search", "http_request", "write_file", "edit_file"], "chars": 11930, "file": "hyperframes.md", "source": "ResearchSkill.kt#StarterSkills"},
     {"name": "learn", "scope": "app", "origin": "starter", "trigger": "learn a subject, be taught, or practice", "groups": ["learn"], "tools": ["learn", "http_request", "web_search"], "chars": 2501, "file": "learn.md", "source": "ResearchSkill.kt#StarterSkills"},

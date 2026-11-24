@@ -3829,6 +3829,7 @@ class WorkspaceViewModel(
             com.hvkeyn.ceditneuro.tools.NetworkCardTool(),
             com.hvkeyn.ceditneuro.tools.AsciiArtTool(),
             com.hvkeyn.ceditneuro.tools.VisualCardTool(),
+            com.hvkeyn.ceditneuro.tools.ArchifyTool(ws),
             com.hvkeyn.ceditneuro.tools.ListModelsTool(
                 current = { settingsStore.current },
                 replace = { settingsStore.replace(it) },

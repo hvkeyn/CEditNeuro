@@ -20,6 +20,14 @@ class ReverseSkillTest {
     }
 
     @Test
+    fun archifyWritesTypedIrWithoutClaimingNodeValidation() {
+        val text = StarterSkills.skills.getValue("archify")
+        listOf("typed JSON IR", "upstream", "Node", "architecture", "sequence", "interactive")
+            .forEach { assertTrue("archify lacks $it", text.contains(it, ignoreCase = true)) }
+        assertTrue(text.length <= 12_000)
+    }
+
+    @Test
     fun reelmimicKeeps2dStyleWithoutClaimingTheStudio() {
         val text = StarterSkills.skills.getValue("reelmimic")
         listOf("edenfunf/reelmimic", "rea_video", "watercolor", "render_video", "six", "not installed")
